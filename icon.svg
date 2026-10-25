@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#18261C"/>
+      <stop offset="100%" stop-color="#0E1711"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C2D7A3"/>
+      <stop offset="100%" stop-color="#829B78"/>
+    </linearGradient>
+  </defs>
+  <!-- Apple Continuous Squircle Background -->
+  <rect width="512" height="512" rx="114" fill="url(#bgGrad)"/>
+  <rect x="2" y="2" width="508" height="508" rx="112" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="4"/>
+  
+  <!-- Minimalist Monoline Academic Book / Schedule Symbol -->
+  <g transform="translate(116, 126)">
+    <!-- Base Notebook -->
+    <path d="M40 230 C40 230, 140 210, 240 230 L240 40 C140 20, 40 40, 40 40 Z" fill="none" stroke="url(#accentGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M240 230 C240 230, 340 210, 440 230 L440 40 C340 20, 240 40, 240 40 Z" fill="none" stroke="#AFC49A" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+    <line x1="240" y1="40" x2="240" y2="230" stroke="#C2D7A3" stroke-width="14" stroke-linecap="round"/>
+    
+    <!-- Clean Schedule & Task Grid Indicators (Apple SF style) -->
+    <circle cx="120" cy="100" r="12" fill="#C2D7A3"/>
+    <line x1="150" y1="100" x2="200" y2="100" stroke="#AFC49A" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="120" cy="150" r="12" fill="#829B78"/>
+    <line x1="150" y1="150" x2="190" y2="150" stroke="#829B78" stroke-width="10" stroke-linecap="round"/>
+    
+    <polyline points="290 95 305 110 335 80" fill="none" stroke="#C2D7A3" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="355" y1="95" x2="400" y2="95" stroke="#AFC49A" stroke-width="10" stroke-linecap="round"/>
+    
+    <circle cx="300" cy="150" r="8" fill="#829B78"/>
+    <line x1="325" y1="150" x2="385" y2="150" stroke="#829B78" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>
