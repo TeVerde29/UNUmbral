@@ -189,6 +189,25 @@
       <!-- Resumen general del ciclo -->
       <div id="cursos-resumen" class="courses-overview hidden"></div>
 
+      <!-- Barra de herramientas de rendimiento -->
+      <div id="rendimiento-toolbar" class="rendimiento-toolbar-wrap hidden" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <button id="btn-toggle-graficos" class="btn-secondary btn-sm" style="font-size: 11.5px;">
+          📊 Comparativa Gráfica
+        </button>
+        <button id="btn-abrir-simulador" class="btn-primary btn-sm" style="font-size: 11.5px;">
+          🎯 Simulador de Meta
+        </button>
+      </div>
+
+      <!-- Contenedor de gráficos SVG de rendimiento -->
+      <div id="contenedor-graficos-svg" class="svg-chart-container hidden" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <h4 style="font-size:13px; font-weight:700; margin:0;">Comparativa de Rendimiento por Curso</h4>
+          <span style="font-size:11px; color:var(--text-secondary);">Escala vigesimal 0–20</span>
+        </div>
+        <div id="grafico-barras-svg-wrap"></div>
+      </div>
+
       <!-- Lista de cursos registrados -->
       <div id="cursos-list" class="cards-list">
         <!-- Renderizado dinámico -->
@@ -813,6 +832,11 @@
 
       <div id="notas-form-error" class="form-error hidden"></div>
 
+      <div id="notas-grafico-evolucion" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-hairline);">
+        <span class="form-label">Evolución de Evaluaciones</span>
+        <div id="notas-evolucion-svg-wrap" style="margin-top:6px;"></div>
+      </div>
+
       <div class="modal-footer">
         <div class="modal-footer-right">
           <button type="button" class="btn-secondary" id="btn-cancel-notas">Cancelar</button>
@@ -1094,6 +1118,59 @@
   </div>
 </div>
 
+<!-- MODAL DE SIMULADOR DE METAS ACADÉMICAS -->
+<div id="modal-simulador-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="simulador-modal-title" style="max-height: 88vh; overflow-y: auto;">
+    <div class="modal-header">
+      <div>
+        <h3 id="simulador-modal-title">Simulador de Meta Académica</h3>
+        <p class="modal-subtitle">¿Qué notas necesitas en tus exámenes pendientes para alcanzar tu promedio deseado?</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-simulador-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="modal-body" style="padding-top: 8px;">
+      <div class="form-group">
+        <label class="form-label" for="simulador-meta-input">Promedio Ponderado Objetivo (10.5 a 20.0)</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input type="number" id="simulador-meta-input" class="field" min="10.5" max="20" step="0.1" value="14.0" style="font-size:18px; font-weight:700; width:120px;">
+          <span id="simulador-factible-badge" class="badge-tag-success" style="padding:6px 12px; border-radius:var(--radius-pill); font-size:12px; font-weight:700;">Factible</span>
+        </div>
+      </div>
+
+      <div class="asist-grid" style="margin-top: 14px;">
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Créditos Totales</span>
+          <span class="asist-stat-value" id="sim-creditos-totales">0</span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Puntos Asegurados</span>
+          <span class="asist-stat-value" id="sim-puntos-asegurados">0</span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Puntos Faltantes</span>
+          <span class="asist-stat-value" id="sim-puntos-faltantes">0</span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Nota Uniforme Req.</span>
+          <span class="asist-stat-value" id="sim-nota-requerida" style="color:var(--deep-leaf);">14.0</span>
+        </div>
+      </div>
+
+      <div id="simulador-alerta-msg" style="padding:10px 12px; border-radius:var(--radius-sm); font-size:12px; margin-bottom:14px; background:rgba(35,120,70,0.12); color:#1b6338;">
+        Necesitas promediar esta nota en todas tus evaluaciones faltantes para alcanzar la meta.
+      </div>
+
+      <h4 style="font-size:13px; margin:16px 0 8px;">Desglose por Curso</h4>
+      <div id="simulador-cursos-list" style="display:flex; flex-direction:column; gap:8px;">
+        <!-- Desglose dinámico de cursos en el simulador -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DIÁLOGO DE CONFIRMACIÓN -->
 <div id="modal-confirm-backdrop" class="modal-backdrop hidden">
   <div class="confirm-box">
@@ -1117,6 +1194,7 @@
 <script src="lib/notificaciones.js"></script>
 <script src="lib/asistencia.js"></script>
 <script src="lib/prioridad.js"></script>
+<script src="lib/rendimiento.js"></script>
 <script src="app.js"></script>
 
 </body>

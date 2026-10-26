@@ -1930,7 +1930,7 @@ async function renderCursos() {
   }));
 
   resumenEl.classList.remove("hidden");
-  renderResumenCiclo(filas.map(f => f.r));
+  renderResumenCiclo(filas.map(f => f.r), cursos);
 
   listEl.innerHTML = filas.map(f => renderCursoCardHTML(f.curso, f.r, f.sesiones)).join("");
 
@@ -1948,13 +1948,31 @@ async function renderCursos() {
   });
 }
 
-function renderResumenCiclo(resultados) {
+let graficosRendimientoVisibles = false;
+let cursosCacheadosParaGrafico = [];
+
+function renderResumenCiclo(resultados, cursos = []) {
+  if (cursos && cursos.length > 0) {
+    cursosCacheadosParaGrafico = cursos;
+  }
   const completos = resultados.filter(r => r.promedio !== null);
   const aprobados = resultados.filter(r => r.estado === "aprobado" || r.estado === "asegurado").length;
   const enRiesgo = resultados.filter(r => ["en-riesgo", "sin-opcion", "desaprobado"].includes(r.estado)).length;
   const promedioCiclo = completos.length
     ? completos.reduce((acc, r) => acc + r.promedio, 0) / completos.length
     : null;
+
+  let ponderadoInfo = null;
+  if (typeof resumenPonderadoCompleto === "function" && cursos && cursos.length > 0) {
+    ponderadoInfo = resumenPonderadoCompleto(cursos);
+  }
+
+  const ponderadoHtml = ponderadoInfo && ponderadoInfo.creditosCalificados > 0
+    ? `<div class="overview-tile" title="Promedio ponderado por créditos (${ponderadoInfo.creditosCalificados} de ${ponderadoInfo.totalCreditos} créditos evaluados)">
+        <span class="overview-value">${formatNota(ponderadoInfo.promedioPonderado)}</span>
+        <span class="overview-label">Ponderado (${ponderadoInfo.creditosCalificados} cr)</span>
+      </div>`
+    : "";
 
   $("#cursos-resumen").innerHTML = `
     <div class="overview-tile">
@@ -1971,8 +1989,156 @@ function renderResumenCiclo(resultados) {
     </div>
     <div class="overview-tile" title="Promedio simple de los cursos con las 3 notas completas">
       <span class="overview-value">${formatNota(promedioCiclo)}</span>
-      <span class="overview-label">Prom. ciclo${completos.length ? ` (${completos.length})` : ""}</span>
-    </div>`;
+      <span class="overview-label">Prom. simple${completos.length ? ` (${completos.length})` : ""}</span>
+    </div>
+    ${ponderadoHtml}`;
+
+  const toolbar = $("#rendimiento-toolbar");
+  if (toolbar) {
+    if (cursos && cursos.length > 0) {
+      toolbar.classList.remove("hidden");
+    } else {
+      toolbar.classList.add("hidden");
+    }
+  }
+
+  actualizarGraficosRendimiento(cursos);
+}
+
+function toggleGraficosRendimiento() {
+  graficosRendimientoVisibles = !graficosRendimientoVisibles;
+  const cont = $("#contenedor-graficos-svg");
+  const btn = $("#btn-toggle-graficos");
+  if (!cont) return;
+
+  if (graficosRendimientoVisibles) {
+    cont.classList.remove("hidden");
+    if (btn) btn.textContent = "📊 Ocultar Gráfica";
+    actualizarGraficosRendimiento(cursosCacheadosParaGrafico);
+  } else {
+    cont.classList.add("hidden");
+    if (btn) btn.textContent = "📊 Comparativa Gráfica";
+  }
+}
+
+function actualizarGraficosRendimiento(cursos = []) {
+  if (cursos && cursos.length > 0) {
+    cursosCacheadosParaGrafico = cursos;
+  }
+  const cont = $("#contenedor-graficos-svg");
+  const wrap = $("#grafico-barras-svg-wrap");
+  if (!cont || !wrap || cont.classList.contains("hidden")) return;
+
+  if (!cursosCacheadosParaGrafico || cursosCacheadosParaGrafico.length === 0) {
+    wrap.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); text-align:center; padding:10px 0;">No hay cursos registrados para graficar.</p>`;
+    return;
+  }
+
+  if (typeof generarSvgBarrasComparativas === "function") {
+    wrap.innerHTML = generarSvgBarrasComparativas(cursosCacheadosParaGrafico, { width: 400, barHeight: 26 });
+  }
+}
+
+async function openSimuladorModal() {
+  const cursos = await db.cursos.toArray();
+  const input = $("#simulador-meta-input");
+  if (input && !input.value) {
+    input.value = "14.0";
+  }
+  await actualizarSimulador(cursos);
+  $("#modal-simulador-backdrop").classList.remove("hidden");
+}
+
+function closeSimuladorModal() {
+  $("#modal-simulador-backdrop").classList.add("hidden");
+}
+
+async function actualizarSimulador(cursosPreloaded) {
+  const cursos = cursosPreloaded || await db.cursos.toArray();
+  const input = $("#simulador-meta-input");
+  const meta = parseFloat(input ? input.value : 14) || 14;
+
+  if (typeof simuladorMeta !== "function") return;
+  const sim = simuladorMeta(cursos, meta);
+
+  const credTotEl = $("#sim-creditos-totales");
+  if (credTotEl) credTotEl.textContent = sim.sumaCreditos;
+  const ptsAsegEl = $("#sim-puntos-asegurados");
+  if (ptsAsegEl) ptsAsegEl.textContent = sim.puntosPonderadosAsegurados.toFixed(1);
+  const ptsFaltEl = $("#sim-puntos-faltantes");
+  if (ptsFaltEl) ptsFaltEl.textContent = sim.puntosPonderadosFaltantes.toFixed(1);
+  const notaReqEl = $("#sim-nota-requerida");
+  if (notaReqEl) notaReqEl.textContent = sim.yaAlcanzada ? "0.0" : sim.notaRequeridaUniforme.toFixed(1);
+
+  const badge = $("#simulador-factible-badge");
+  const alerta = $("#simulador-alerta-msg");
+
+  if (sim.yaAlcanzada) {
+    if (badge) {
+      badge.textContent = "¡Meta Alcanzada!";
+      badge.className = "badge-tag-success";
+      badge.style.background = "rgba(46,125,50,0.18)";
+      badge.style.color = "#1b6338";
+    }
+    if (alerta) {
+      alerta.style.background = "rgba(46,125,50,0.12)";
+      alerta.style.color = "#1b6338";
+      alerta.textContent = "¡Excelente! Con tus notas aseguradas actuales ya has superado tu promedio objetivo.";
+    }
+  } else if (sim.esFactible) {
+    if (badge) {
+      badge.textContent = "Factible";
+      badge.className = "badge-tag-success";
+      badge.style.background = "rgba(46,125,50,0.18)";
+      badge.style.color = "#1b6338";
+    }
+    if (alerta) {
+      alerta.style.background = "rgba(46,125,50,0.12)";
+      alerta.style.color = "#1b6338";
+      alerta.textContent = `Necesitas promediar ${sim.notaRequeridaUniforme.toFixed(1)} en tus evaluaciones faltantes para alcanzar la meta ponderada de ${sim.meta.toFixed(1)}.`;
+    }
+  } else {
+    if (badge) {
+      badge.textContent = "Inalcanzable";
+      badge.className = "badge-tag-urgent";
+      badge.style.background = "rgba(220,53,69,0.15)";
+      badge.style.color = "#a71d2a";
+    }
+    if (alerta) {
+      alerta.style.background = "rgba(220,53,69,0.12)";
+      alerta.style.color = "#a71d2a";
+      alerta.textContent = `Matemáticamente inalcanzable: se requeriría una nota promedio de ${sim.notaRequeridaUniforme.toFixed(1)} (superior al máximo de 20.0) en las evaluaciones pendientes.`;
+    }
+  }
+
+  const list = $("#simulador-cursos-list");
+  if (!list) return;
+
+  if (sim.cursosSim.length === 0) {
+    list.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); text-align:center;">No hay cursos registrados para simular.</p>`;
+    return;
+  }
+
+  list.innerHTML = sim.cursosSim.map(c => {
+    const tone = c.rendimiento.promedio !== null
+      ? (c.rendimiento.promedio >= 10.5 ? "st-ok" : "st-warn")
+      : "st-neutral";
+    const faltantesTexto = c.componentesFaltantes === 0
+      ? "Evaluaciones completas"
+      : `${c.componentesFaltantes} componente(s) faltante(s)`;
+
+    return `
+      <div style="background:var(--surface-hover); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:700; font-size:13px; color:var(--text-primary);">${escapeHtml(c.nombre)}</div>
+          <div style="font-size:11px; color:var(--text-secondary);">${c.creditos} crédito(s) · ${faltantesTexto}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-weight:700; font-size:14px; color:var(--deep-leaf);">${c.rendimiento.promedio !== null ? formatNota(c.rendimiento.promedio) : "—"}</div>
+          <span class="grade-status-pill ${tone}" style="font-size:10px; padding:2px 6px;">${c.rendimiento.estado}</span>
+        </div>
+      </div>`;
+  }).join("");
 }
 
 function gradeCellHTML(label, valor) {
@@ -2261,6 +2427,15 @@ function actualizarResumenNotas() {
   ppEl.textContent = r.pp === null
     ? "Promedio: —"
     : `Promedio: ${formatNota(r.pp)}${r.ppProvisional ? ` (${r.practicasCalificadas} de ${r.practicasTotal})` : ""}`;
+
+  const evoWrap = $("#notas-evolucion-svg-wrap");
+  if (evoWrap && typeof generarSvgEvolucionCurso === "function") {
+    const cursoTemp = {
+      nombre: ($("#modal-notas-title") && $("#modal-notas-title").textContent) || "Curso",
+      evaluacion
+    };
+    evoWrap.innerHTML = generarSvgEvolucionCurso(cursoTemp, { width: 380, height: 160 });
+  }
 }
 
 async function openNotasModal(id) {
@@ -3531,6 +3706,30 @@ function wireGlobalEvents() {
     });
   }
 
+  // Rendimiento y Simulador (Fase 5)
+  const btnToggleGraf = $("#btn-toggle-graficos");
+  if (btnToggleGraf) {
+    btnToggleGraf.addEventListener("click", toggleGraficosRendimiento);
+  }
+  const btnAbrirSim = $("#btn-abrir-simulador");
+  if (btnAbrirSim) {
+    btnAbrirSim.addEventListener("click", openSimuladorModal);
+  }
+  const btnCloseSim = $("#btn-close-simulador-modal");
+  if (btnCloseSim) {
+    btnCloseSim.addEventListener("click", closeSimuladorModal);
+  }
+  const modalSimBackdrop = $("#modal-simulador-backdrop");
+  if (modalSimBackdrop) {
+    modalSimBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-simulador-backdrop") closeSimuladorModal();
+    });
+  }
+  const inputSimMeta = $("#simulador-meta-input");
+  if (inputSimMeta) {
+    inputSimMeta.addEventListener("input", () => actualizarSimulador());
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
@@ -3540,6 +3739,7 @@ function wireGlobalEvents() {
       closeAsistenciaModal();
       closeModalExcepcion();
       closeModalEvento();
+      closeSimuladorModal();
       $("#modal-quick-backdrop").classList.add("hidden");
       if (activeConfirmCancel) activeConfirmCancel();
     }
