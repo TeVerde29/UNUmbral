@@ -2660,6 +2660,184 @@ button:active, .btn-primary:active, .btn-secondary:active {
   background: var(--status-danger-bg);
 }
 
+/* =====================================================================
+   FASE 3 — CONTROL DE CLASES, ASISTENCIA Y EXCEPCIONES
+   ===================================================================== */
+
+.holiday-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(220, 160, 40, 0.12);
+  border: 1px solid rgba(220, 160, 40, 0.35);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .holiday-banner {
+  background: rgba(220, 160, 40, 0.2);
+  border-color: rgba(220, 160, 40, 0.45);
+}
+
+.class-card.is-cancelled {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.class-card.is-cancelled .class-card-title {
+  text-decoration: line-through;
+}
+
+.class-card-attendance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-hairline);
+  flex-wrap: wrap;
+}
+
+.asist-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--trans-fast);
+}
+
+.asist-pill-btn:hover {
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+}
+
+.asist-pill-btn.active-presente {
+  background: rgba(35, 120, 70, 0.16);
+  border-color: rgba(35, 120, 70, 0.45);
+  color: #1b6338;
+}
+
+[data-theme="dark"] .asist-pill-btn.active-presente {
+  background: rgba(45, 180, 100, 0.2);
+  border-color: rgba(45, 180, 100, 0.5);
+  color: #6ee7b7;
+}
+
+.asist-pill-btn.active-falta {
+  background: rgba(210, 50, 50, 0.14);
+  border-color: rgba(210, 50, 50, 0.4);
+  color: #c02b2b;
+}
+
+[data-theme="dark"] .asist-pill-btn.active-falta {
+  background: rgba(230, 80, 80, 0.2);
+  border-color: rgba(230, 80, 80, 0.5);
+  color: #fca5a5;
+}
+
+.asist-pill-btn.active-justificada {
+  background: rgba(210, 150, 20, 0.14);
+  border-color: rgba(210, 150, 20, 0.4);
+  color: #b57a10;
+}
+
+[data-theme="dark"] .asist-pill-btn.active-justificada {
+  background: rgba(230, 170, 30, 0.2);
+  border-color: rgba(230, 170, 30, 0.5);
+  color: #fcd34d;
+}
+
+.asist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.asist-stat-card {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.asist-stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.asist-stat-value {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.asist-progress-wrap {
+  margin: 12px 0 16px;
+}
+
+.asist-progress-track {
+  width: 100%;
+  height: 9px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--border-hairline);
+}
+
+.asist-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.asist-session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: 12px;
+}
+
+.asist-session-row:last-child {
+  border-bottom: none;
+}
+
+.exceptions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.exception-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
 /* UTILIDAD */
 .hidden {
   display: none !important;

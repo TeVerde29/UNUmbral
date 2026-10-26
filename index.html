@@ -91,6 +91,15 @@
 
     <!-- VISTA 1: HOY (DASHBOARD EN TIEMPO REAL) -->
     <section id="view-hoy" class="view-panel active">
+      <!-- Banner de Feriado o Día No Laborable -->
+      <div id="today-holiday-banner" class="holiday-banner hidden">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span>🎉</span>
+          <span id="today-holiday-text">Hoy es día feriado</span>
+        </div>
+        <button id="btn-desmarcar-feriado-hoy" class="btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">Quitar feriado</button>
+      </div>
+
       <!-- Tarjeta de estado de clase en vivo -->
       <div id="live-status-card" class="live-card">
         <!-- Renderizado dinámico -->
@@ -98,8 +107,11 @@
 
       <!-- Resumen de Horario de Hoy -->
       <div class="section-header">
-        <h2 class="section-title">Clases de Hoy</h2>
-        <span class="section-badge" id="badge-clases-hoy">0 clases</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <h2 class="section-title">Clases de Hoy</h2>
+          <span class="section-badge" id="badge-clases-hoy">0 clases</span>
+        </div>
+        <button class="btn-text-action" id="btn-marcar-feriado-hoy" style="font-size:11.5px;">+ Marcar feriado</button>
       </div>
       <div id="today-classes-list" class="cards-list">
         <!-- Renderizado dinámico -->
@@ -427,6 +439,23 @@
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
             <span>Guardar Ajustes</span>
           </button>
+        </div>
+      </div>
+
+      <!-- SECCIÓN: EXCEPCIONES Y FERIADOS DEL CICLO -->
+      <div class="settings-card" style="margin-top: 18px;">
+        <div class="settings-card-header">
+          <div class="settings-card-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          </div>
+          <div style="flex:1;">
+            <h3>Feriados y Clases Canceladas</h3>
+            <p>Días inhábiles y suspensiones sin alertas ni faltas acumuladas.</p>
+          </div>
+          <button id="btn-abrir-nueva-excepcion" class="btn-secondary btn-sm">+ Añadir</button>
+        </div>
+        <div id="ajustes-excepciones-lista" class="exceptions-list" style="margin-top: 12px;">
+          <!-- Renderizado dinámico -->
         </div>
       </div>
 
@@ -847,6 +876,174 @@
   </div>
 </div>
 
+<!-- MODAL DE ASISTENCIA Y CONTROL DE FALTAS -->
+<div id="modal-asistencia-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="asist-modal-title" style="max-height: 88vh; overflow-y: auto;">
+    <div class="modal-header">
+      <div>
+        <h3 id="asist-modal-title">Control de Asistencia</h3>
+        <p class="modal-subtitle" id="asist-ciclo-rango">Ciclo Académico</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-asistencia-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="modal-body" style="padding-top: 8px;">
+      <div class="asist-grid">
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Total Sesiones</span>
+          <span class="asist-stat-value" id="asist-total-sesiones">0</span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Faltas / Límite</span>
+          <span class="asist-stat-value"><span id="asist-faltas-registradas">0</span> / <span id="asist-max-faltas">0</span></span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">Faltas Restantes</span>
+          <span class="asist-stat-value" id="asist-faltas-restantes" style="color:var(--deep-leaf);">0</span>
+        </div>
+        <div class="asist-stat-card">
+          <span class="asist-stat-label">% Inasistencia</span>
+          <span class="asist-stat-value" id="asist-pct-faltas">0%</span>
+        </div>
+      </div>
+
+      <div class="asist-progress-wrap">
+        <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+          <span>Inasistencia acumulada en el ciclo</span>
+          <span id="asist-progreso-texto">0% (Límite: 30%)</span>
+        </div>
+        <div class="asist-progress-track">
+          <div id="asist-progress-fill" class="asist-progress-fill" style="width:0%; background:var(--accent-teal);"></div>
+        </div>
+      </div>
+
+      <h4 style="font-size:13px; margin:16px 0 8px;">Historial de Sesiones</h4>
+      <div id="asist-sesiones-lista" style="display:flex; flex-direction:column; gap:6px;">
+        <!-- Lista dinámica de sesiones -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE REGISTRAR EXCEPCIÓN / FERIADO -->
+<div id="modal-excepcion-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="excepcion-modal-title">
+    <div class="modal-header">
+      <div>
+        <h3 id="excepcion-modal-title">Registrar Feriado o Cancelación</h3>
+        <p class="modal-subtitle">Suspende alertas y el conteo de asistencia</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-excepcion-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <form id="form-excepcion" class="modal-body" onsubmit="return false;">
+      <div class="form-group">
+        <label class="form-label" for="excepcion-tipo">Tipo de Excepción *</label>
+        <select id="excepcion-tipo" class="field" required>
+          <option value="feriado">Feriado o Día No Laborable (Todo el día)</option>
+          <option value="cancelada">Clase Cancelada o Suspendida (Curso/Clase específica)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="excepcion-fecha">Fecha *</label>
+          <input type="date" id="excepcion-fecha" class="field" required>
+        </div>
+        <div class="form-group" id="excepcion-curso-group">
+          <label class="form-label" for="excepcion-curso">Curso Afectado</label>
+          <select id="excepcion-curso" class="field">
+            <option value="">Aplica a todas las clases</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="excepcion-motivo">Motivo o Descripción *</label>
+        <input type="text" id="excepcion-motivo" class="field" placeholder="Ej: Feriado Nacional, Docente en congreso, Huelga…" required>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 14px; display:flex; justify-content:flex-end; gap:8px;">
+        <button type="button" class="btn-secondary" id="btn-cancel-excepcion">Cancelar</button>
+        <button type="button" class="btn-primary" id="btn-guardar-excepcion">Guardar Excepción</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL DE EVENTO ACADÉMICO -->
+<div id="modal-evento-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="evento-modal-title">
+    <div class="modal-header">
+      <div>
+        <h3 id="evento-modal-title">Evento Académico</h3>
+        <p class="modal-subtitle">Exámenes, entregas y evaluaciones destacadas</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-evento-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <form id="form-evento" class="modal-body" onsubmit="return false;">
+      <input type="hidden" id="evento-id">
+      <div class="form-group">
+        <label class="form-label" for="evento-titulo">Título del Evento *</label>
+        <input type="text" id="evento-titulo" class="field" placeholder="Ej: Examen Parcial, Presentación Proyecto Final…" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="evento-tipo">Tipo *</label>
+          <select id="evento-tipo" class="field" required>
+            <option value="parcial">Examen Parcial</option>
+            <option value="final">Examen Final</option>
+            <option value="practica">Práctica Calificada</option>
+            <option value="entrega">Entrega de Trabajo / Proyecto</option>
+            <option value="otro">Otro Evento</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="evento-curso">Curso Asociado *</label>
+          <select id="evento-curso" class="field" required></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="evento-fecha">Fecha *</label>
+          <input type="date" id="evento-fecha" class="field" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="evento-hora">Hora (opcional)</label>
+          <input type="time" id="evento-hora" class="field">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="evento-aula">Aula o Lugar (opcional)</label>
+        <input type="text" id="evento-aula" class="field" placeholder="Ej: Pabellón B - Aula 204">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="evento-notas">Comentarios / Temas a evaluar</label>
+        <textarea id="evento-notas" class="field" rows="2" placeholder="Temas, capítulos o material necesario…"></textarea>
+      </div>
+
+      <div class="modal-actions" style="margin-top: 14px; display:flex; justify-content:space-between;">
+        <button type="button" class="btn-danger btn-sm hidden" id="btn-eliminar-evento">Eliminar</button>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button type="button" class="btn-secondary btn-sm" id="btn-cancel-evento">Cancelar</button>
+          <button type="button" class="btn-primary btn-sm" id="btn-guardar-evento">Guardar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- DIÁLOGO DE CONFIRMACIÓN -->
 <div id="modal-confirm-backdrop" class="modal-backdrop hidden">
   <div class="confirm-box">
@@ -868,6 +1065,7 @@
 <script src="lib/ajustes.js"></script>
 <script src="lib/planificador.js"></script>
 <script src="lib/notificaciones.js"></script>
+<script src="lib/asistencia.js"></script>
 <script src="app.js"></script>
 
 </body>

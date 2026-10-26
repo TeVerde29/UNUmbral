@@ -677,6 +677,22 @@ function switchTab(tabId) {
 async function renderHoy() {
   $("#current-date-label").textContent = formatReadableDate();
 
+  const fechaHoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  const excepciones = await db.excepciones.toArray();
+  const asistencias = await db.asistencia.toArray();
+
+  const esFeriadoHoy = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fechaHoyStr, excepciones);
+  const holidayBannerEl = $("#today-holiday-banner");
+  if (holidayBannerEl) {
+    if (esFeriadoHoy) {
+      const fer = excepciones.find(e => e.fecha === fechaHoyStr && e.tipo === "feriado");
+      $("#today-holiday-text").textContent = `Hoy es día feriado: ${fer?.motivo || "Día No Laborable"}`;
+      holidayBannerEl.classList.remove("hidden");
+    } else {
+      holidayBannerEl.classList.add("hidden");
+    }
+  }
+
   const todayKey = getTodayDayKey();
   const classesToday = (await obtenerClasesEnriquecidas()).filter(c => c.dia_semana === todayKey);
   classesToday.sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio));
@@ -696,10 +712,23 @@ async function renderHoy() {
         <p>No tienes materias agendadas para el día de hoy.</p>
       </div>`;
   } else {
-    listEl.innerHTML = classesToday.map(c => renderClassCardHTML(c)).join("");
+    listEl.innerHTML = classesToday.map(c => {
+      const cancelada = esFeriadoHoy || (typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fechaHoyStr, excepciones);
+      const exItem = excepciones.find(e => e.fecha === fechaHoyStr && (e.tipo === "feriado" || (e.tipo === "cancelada" && (e.clase_id === c.id || (!e.clase_id && e.curso_id === c.curso_id)))));
+      const asistHoy = asistencias.find(a => a.curso_id === c.curso_id && a.fecha === fechaHoyStr);
+      return renderClassCardHTML(c, {
+        isHoy: true,
+        cancelada,
+        motivoCancelada: exItem?.motivo || (cancelada ? "Cancelada" : undefined),
+        estadoAsistencia: asistHoy ? asistHoy.estado : null
+      });
+    }).join("");
+
     $$(".class-card", listEl).forEach(card => {
       card.addEventListener("click", () => openEditClassModal(card.dataset.id));
     });
+
+    wireTodayAttendanceEvents(listEl, classesToday, fechaHoyStr, excepciones, asistencias);
   }
 
   // Radar de tareas urgentes
@@ -828,18 +857,163 @@ function renderLiveStatusCard(classesToday) {
     </div>`;
 }
 
-function renderClassCardHTML(c) {
+function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepciones, asistencias) {
+  $$("button[data-action^='asist-']", container).forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const claseId = btn.dataset.claseId;
+      const cursoId = btn.dataset.cursoId;
+      const nuevoEstado = action.replace("asist-", ""); // 'presente' | 'falta' | 'justificada'
+
+      const c = classesToday.find(x => x.id === claseId);
+      const asistPrev = asistencias.find(a => a.curso_id === cursoId && a.fecha === fechaHoyStr);
+
+      if (asistPrev && asistPrev.estado === nuevoEstado) {
+        await db.asistencia.where({ curso_id: cursoId, fecha: fechaHoyStr }).delete();
+        showToast("Registro de asistencia retirado.");
+      } else {
+        if (nuevoEstado === "falta") {
+          const clasesDelCurso = await db.clases.where("curso_id").equals(cursoId).toArray();
+          const asistCurso = await db.asistencia.where("curso_id").equals(cursoId).toArray();
+          const ajustes = await db.ajustes.toArray();
+          const mapAjustes = {};
+          for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+          const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+
+          const resPrev = (typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia)({
+            cursoId,
+            clasesDelCurso,
+            asistencias: asistCurso,
+            cicloInicio: cfg.ciclo_inicio || "2026-01-01",
+            cicloFin: cfg.ciclo_fin || "2026-12-31",
+            excepciones,
+            limiteFaltasPct: cfg.limite_faltas_pct || 30
+          });
+
+          const faltasAntes = resPrev.faltas;
+          const faltasDespues = (asistPrev?.estado === "falta") ? faltasAntes : faltasAntes + 1;
+
+          const umbralCruzado = (typeof detectarUmbralCruzado === "function" ? detectarUmbralCruzado : window.detectarUmbralCruzado)(faltasAntes, faltasDespues, resPrev.totalSesiones, [10, 20, 30]);
+
+          await db.asistencia.put({
+            id: `${cursoId}_${fechaHoyStr}`,
+            curso_id: cursoId,
+            clase_id: claseId,
+            fecha: fechaHoyStr,
+            estado: nuevoEstado
+          });
+
+          if (umbralCruzado) {
+            const restante = Math.max(0, resPrev.maxFaltasPermitidas - faltasDespues);
+            const msg = `⚠️ ¡Atención! Has alcanzado el ${umbralCruzado}% de faltas en ${c?.materia || "el curso"}. Te quedan ${restante} faltas permitidas.`;
+            showToast(msg, true);
+            if (typeof dispararNotificacionInmediata === "function") {
+              dispararNotificacionInmediata(`Alerta de Inasistencia (${umbralCruzado}%)`, msg, "urgente");
+            }
+          } else {
+            showToast(`Falta registrada en ${c?.materia || "el curso"}.`);
+          }
+        } else {
+          await db.asistencia.put({
+            id: `${cursoId}_${fechaHoyStr}`,
+            curso_id: cursoId,
+            clase_id: claseId,
+            fecha: fechaHoyStr,
+            estado: nuevoEstado
+          });
+          showToast(nuevoEstado === "presente" ? "✓ Asistencia registrada" : "Justificación registrada");
+        }
+      }
+
+      if (typeof reprogramarTodo === "function") reprogramarTodo();
+      renderHoy();
+    });
+  });
+
+  $$("button[data-action='cancelar-sesion']", container).forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const claseId = btn.dataset.claseId;
+      const cursoId = btn.dataset.cursoId;
+      const c = classesToday.find(x => x.id === claseId);
+      const motivo = prompt(`Motivo de suspensión para hoy (${c?.materia || "Clase"}):`, "Profesor no asistió");
+      if (motivo !== null && motivo.trim()) {
+        await db.excepciones.put({
+          id: `ex_${Date.now()}`,
+          fecha: fechaHoyStr,
+          tipo: "cancelada",
+          clase_id: claseId,
+          curso_id: cursoId,
+          motivo: motivo.trim()
+        });
+        showToast("Sesión marcada como cancelada.");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        renderHoy();
+      }
+    });
+  });
+
+  $$("button[data-action='restaurar-sesion']", container).forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const claseId = btn.dataset.claseId;
+      const cursoId = btn.dataset.cursoId;
+      const ex = excepciones.find(x => x.fecha === fechaHoyStr && x.tipo === "cancelada" && (x.clase_id === claseId || (!x.clase_id && x.curso_id === cursoId)));
+      if (ex) {
+        await db.excepciones.delete(ex.id);
+        showToast("Sesión restaurada.");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        renderHoy();
+      }
+    });
+  });
+}
+
+function renderClassCardHTML(c, opts = {}) {
   const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+  const cancelada = Boolean(opts.cancelada);
+  const isHoy = Boolean(opts.isHoy);
+  const motivoCancelada = opts.motivoCancelada;
+  const est = opts.estadoAsistencia;
+
   return `
-    <div class="class-card" data-id="${c.id}">
+    <div class="class-card ${cancelada ? "is-cancelled" : ""}" data-id="${c.id}" data-curso-id="${c.curso_id || ""}">
       <div class="class-card-stripe" style="background:${color}"></div>
       <div class="class-card-main">
-        <div class="class-card-title">${escapeHtml(c.materia)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <div class="class-card-title">${escapeHtml(c.materia)}</div>
+          ${cancelada ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:var(--radius-pill);background:rgba(210,50,50,0.15);color:var(--status-danger);font-weight:600;">${escapeHtml(motivoCancelada || "Cancelada")}</span>` : ""}
+        </div>
         <div class="class-card-details">
           <span class="class-time-tag">${ICONS.clock} ${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
           ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
           ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
         </div>
+        ${isHoy ? (
+          !cancelada ? `
+            <div class="class-card-attendance" onclick="event.stopPropagation();">
+              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
+                ✓ Asistí
+              </button>
+              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
+                ✗ Falté
+              </button>
+              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
+                💬 Justif.
+              </button>
+              <button type="button" class="asist-pill-btn" style="margin-left:auto;opacity:0.8;" data-action="cancelar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}" title="Cancelar solo la sesión de hoy">
+                🚫 Cancelar
+              </button>
+            </div>
+          ` : `
+            <div class="class-card-attendance" onclick="event.stopPropagation();">
+              <button type="button" class="asist-pill-btn" data-action="restaurar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
+                ↩ Restaurar sesión
+              </button>
+            </div>
+          `
+        ) : ""}
       </div>
       ${ICONS.chevronRight}
     </div>`;
@@ -1507,6 +1681,12 @@ async function renderCursos() {
   $$('[data-action="notas"]', listEl).forEach(btn => {
     btn.addEventListener("click", () => openNotasModal(btn.closest(".course-card").dataset.id));
   });
+  $$('[data-action="asistencia"]', listEl).forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openAsistenciaModal(btn.dataset.id || btn.closest(".course-card").dataset.id);
+    });
+  });
   $$('[data-action="edit-curso"]', listEl).forEach(btn => {
     btn.addEventListener("click", () => openEditCursoModal(btn.closest(".course-card").dataset.id));
   });
@@ -1566,6 +1746,7 @@ function renderCursoCardHTML(c, r, ses) {
         <span class="course-card-head">
           <span class="class-card-title">${nombre}</span>
           <span class="class-card-details">
+            ${c.creditos ? `<span class="class-detail-tag">${c.creditos} cr</span>` : ""}
             ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
             ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
             <span class="class-detail-tag">${ICONS.layers} ${sesionesTxt}</span>
@@ -1583,6 +1764,9 @@ function renderCursoCardHTML(c, r, ses) {
         <span class="course-card-footer">
           <span class="grade-status-pill ${info.tone}">${info.label}</span>
           <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
+          <button type="button" class="asist-pill-btn" data-action="asistencia" data-id="${escapeHtml(c.id)}" style="margin-left:auto;font-size:11px;" title="Ver registro y límite de faltas">
+            📊 Asistencia
+          </button>
         </span>
       </button>
       <button type="button" class="icon-btn course-edit-btn" data-action="edit-curso" aria-label="Editar datos de ${nombre}" title="Editar curso">${ICONS.edit}</button>
@@ -2142,6 +2326,274 @@ async function guardarAjustesUI() {
   if (typeof reprogramarTodo === "function") reprogramarTodo();
 }
 
+async function renderAjustes() {
+  await cargarAjustesUI();
+  await renderAjustesExcepciones();
+}
+
+async function renderAjustesExcepciones() {
+  const listEl = $("#ajustes-excepciones-lista");
+  if (!listEl) return;
+  const excepciones = await db.excepciones.toArray();
+  const cursos = await db.cursos.toArray();
+  const cursoMap = new Map(cursos.map(c => [c.id, c.nombre]));
+
+  if (excepciones.length === 0) {
+    listEl.innerHTML = `<p class="practicas-empty">No hay excepciones ni feriados registrados.</p>`;
+    return;
+  }
+
+  excepciones.sort((a, b) => (a.fecha > b.fecha ? 1 : -1));
+  listEl.innerHTML = excepciones.map(ex => {
+    const cursoNombre = ex.curso_id ? (cursoMap.get(ex.curso_id) || "Curso") : "Todos los cursos";
+    const tipoLabel = ex.tipo === "feriado" ? "🎉 Feriado" : "🚫 Clase cancelada";
+    return `
+      <div class="exception-item">
+        <div class="exception-item-details">
+          <strong>${tipoLabel}: ${escapeHtml(ex.motivo || "Sin motivo")}</strong>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
+            📅 ${ex.fecha} · <span>${escapeHtml(cursoNombre)}</span>
+          </div>
+        </div>
+        <button type="button" class="btn-danger btn-sm" data-action="delete-excepcion" data-id="${ex.id}" style="padding:4px 8px;font-size:11px;">Eliminar</button>
+      </div>
+    `;
+  }).join("");
+
+  $$("button[data-action='delete-excepcion']", listEl).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const ok = await confirmDialog("Eliminar excepción", "¿Deseas eliminar este registro de feriado/cancelación?");
+      if (ok) {
+        await db.excepciones.delete(btn.dataset.id);
+        showToast("Excepción eliminada.");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        renderAjustesExcepciones();
+        if ($("#view-hoy").classList.contains("active")) renderHoy();
+      }
+    });
+  });
+}
+
+async function openModalExcepcion(opts = {}) {
+  const cursos = await db.cursos.toArray();
+  const selCurso = $("#excepcion-curso");
+  selCurso.innerHTML = `<option value="">Aplica a todas las clases</option>` +
+    cursos.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join("");
+
+  $("#excepcion-fecha").value = opts.fecha || (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  $("#excepcion-tipo").value = opts.tipo || "feriado";
+  $("#excepcion-motivo").value = opts.motivo || "";
+  if (opts.cursoId) selCurso.value = opts.cursoId;
+
+  $("#modal-excepcion-backdrop").classList.remove("hidden");
+  $("#excepcion-motivo").focus();
+}
+
+function closeModalExcepcion() {
+  $("#modal-excepcion-backdrop").classList.add("hidden");
+}
+
+async function guardarExcepcion() {
+  const fecha = $("#excepcion-fecha").value;
+  const tipo = $("#excepcion-tipo").value;
+  const motivo = $("#excepcion-motivo").value.trim();
+  const curso_id = $("#excepcion-curso").value || null;
+
+  if (!fecha || !motivo) {
+    showToast("Fecha y motivo son obligatorios.", true);
+    return;
+  }
+
+  const id = `ex_${Date.now()}`;
+  await db.excepciones.put({
+    id,
+    fecha,
+    tipo,
+    motivo,
+    curso_id
+  });
+
+  closeModalExcepcion();
+  showToast(tipo === "feriado" ? "Feriado registrado." : "Cancelación registrada.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+  renderAjustesExcepciones();
+  if ($("#view-hoy").classList.contains("active")) renderHoy();
+}
+
+async function openAsistenciaModal(cursoId) {
+  const c = await db.cursos.get(cursoId);
+  if (!c) return;
+
+  const clasesDelCurso = await db.clases.where("curso_id").equals(cursoId).toArray();
+  const asistencias = await db.asistencia.where("curso_id").equals(cursoId).toArray();
+  const excepciones = await db.excepciones.toArray();
+  const ajustes = await db.ajustes.toArray();
+  const mapAjustes = {};
+  for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+  const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+
+  const res = (typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia)({
+    cursoId,
+    clasesDelCurso,
+    asistencias,
+    cicloInicio: cfg.ciclo_inicio || "2026-01-01",
+    cicloFin: cfg.ciclo_fin || "2026-12-31",
+    excepciones,
+    limiteFaltasPct: cfg.limite_faltas_pct || 30
+  });
+
+  $("#asist-modal-title").textContent = `Asistencia: ${c.nombre}`;
+  $("#asist-ciclo-rango").textContent = cfg.ciclo_inicio && cfg.ciclo_fin
+    ? `Ciclo: ${cfg.ciclo_inicio} al ${cfg.ciclo_fin}`
+    : "Ciclo: Configura inicio y fin en Ajustes";
+  $("#asist-total-sesiones").textContent = res.totalSesiones;
+  $("#asist-faltas-registradas").textContent = res.faltas;
+  $("#asist-max-faltas").textContent = res.maxFaltasPermitidas;
+  $("#asist-faltas-restantes").textContent = res.faltasRestantes;
+  $("#asist-faltas-restantes").style.color = res.enRiesgo ? "var(--status-danger)" : (res.faltasRestantes <= 2 ? "var(--status-warning)" : "var(--deep-leaf)");
+  $("#asist-pct-faltas").textContent = `${res.porcentajeFaltasCiclo}%`;
+
+  $("#asist-progreso-texto").textContent = `${res.porcentajeFaltasCiclo}% (Límite: ${res.limiteFaltasPct}%)`;
+  const fillPct = Math.min(100, (res.porcentajeFaltasCiclo / (res.limiteFaltasPct || 30)) * 100);
+  const fillEl = $("#asist-progress-fill");
+  fillEl.style.width = `${fillPct}%`;
+  fillEl.style.backgroundColor = res.enRiesgo ? "var(--status-danger)" : (res.porcentajeFaltasCiclo >= 20 ? "var(--status-warning)" : "var(--accent-teal)");
+
+  const listEl = $("#asist-sesiones-lista");
+  const sesiones = res.todasLasSesiones;
+  if (sesiones.length === 0) {
+    listEl.innerHTML = `<p class="practicas-empty">No hay sesiones calculadas. Asigna horario a este curso y revisa las fechas del ciclo en Ajustes.</p>`;
+  } else {
+    listEl.innerHTML = sesiones.map(s => {
+      const asist = asistencias.find(a => a.fecha === s.fecha);
+      const est = asist ? asist.estado : (s.cancelada ? (s.feriado ? "feriado" : "cancelada") : "pendiente");
+      return `
+        <div class="asist-session-row">
+          <div>
+            <strong>${s.fecha}</strong> · <span style="color:var(--text-secondary);">${DIAS_LABEL[DIAS_SEMANA[s.diaSemana - 1]] || ""} (${formatTimeRange12(s.horaInicio, s.horaFin)})</span>
+            ${s.motivo ? `<div style="font-size:11px;color:var(--status-warning);">${escapeHtml(s.motivo)}</div>` : ""}
+          </div>
+          <div style="display:flex;gap:4px;">
+            ${s.cancelada ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surface-subtle);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
+              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar presente">✓</button>
+              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar falta">✗</button>
+              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar justificada">💬</button>
+            `}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    $$("button[data-action='set-asist']", listEl).forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const f = btn.dataset.fecha;
+        const nuevo = btn.dataset.estado;
+        const curAsist = asistencias.find(a => a.fecha === f);
+        if (curAsist && curAsist.estado === nuevo) {
+          await db.asistencia.where({ curso_id: cursoId, fecha: f }).delete();
+        } else {
+          await db.asistencia.put({
+            id: `${cursoId}_${f}`,
+            curso_id: cursoId,
+            fecha: f,
+            estado: nuevo
+          });
+        }
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        await openAsistenciaModal(cursoId);
+        if ($("#view-hoy").classList.contains("active")) renderHoy();
+      });
+    });
+  }
+
+  $("#modal-asistencia-backdrop").classList.remove("hidden");
+}
+
+function closeAsistenciaModal() {
+  $("#modal-asistencia-backdrop").classList.add("hidden");
+}
+
+async function openModalEvento(eventoId = null, defaultCursoId = null) {
+  const cursos = await db.cursos.toArray();
+  const sel = $("#evento-curso");
+  sel.innerHTML = cursos.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join("");
+
+  if (eventoId) {
+    const ev = await db.eventos.get(eventoId);
+    if (!ev) return;
+    $("#evento-id").value = ev.id;
+    $("#evento-titulo").value = ev.titulo || "";
+    $("#evento-tipo").value = ev.tipo || "parcial";
+    sel.value = ev.curso_id || "";
+    $("#evento-fecha").value = ev.fecha || "";
+    $("#evento-hora").value = ev.hora || "";
+    $("#evento-aula").value = ev.aula || "";
+    $("#evento-notas").value = ev.notas || "";
+    $("#btn-eliminar-evento").classList.remove("hidden");
+    $("#evento-modal-title").textContent = "Editar Evento Académico";
+  } else {
+    $("#evento-id").value = "";
+    $("#evento-titulo").value = "";
+    $("#evento-tipo").value = "parcial";
+    if (defaultCursoId) sel.value = defaultCursoId;
+    $("#evento-fecha").value = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+    $("#evento-hora").value = "";
+    $("#evento-aula").value = "";
+    $("#evento-notas").value = "";
+    $("#btn-eliminar-evento").classList.add("hidden");
+    $("#evento-modal-title").textContent = "Nuevo Evento Académico";
+  }
+
+  $("#modal-evento-backdrop").classList.remove("hidden");
+  $("#evento-titulo").focus();
+}
+
+function closeModalEvento() {
+  $("#modal-evento-backdrop").classList.add("hidden");
+}
+
+async function guardarEvento() {
+  const titulo = $("#evento-titulo").value.trim();
+  const tipo = $("#evento-tipo").value;
+  const curso_id = $("#evento-curso").value;
+  const fecha = $("#evento-fecha").value;
+  const hora = $("#evento-hora").value || null;
+  const aula = $("#evento-aula").value.trim() || null;
+  const notas = $("#evento-notas").value.trim() || null;
+  const id = $("#evento-id").value || `ev_${Date.now()}`;
+
+  if (!titulo || !fecha || !curso_id) {
+    showToast("Título, fecha y curso son obligatorios.", true);
+    return;
+  }
+
+  await db.eventos.put({
+    id,
+    titulo,
+    tipo,
+    curso_id,
+    fecha,
+    hora,
+    aula,
+    notas
+  });
+
+  closeModalEvento();
+  showToast("Evento académico guardado.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+}
+
+async function eliminarEvento() {
+  const id = $("#evento-id").value;
+  if (!id) return;
+  const ok = await confirmDialog("Eliminar Evento", "¿Deseas eliminar este evento académico permanentemente?");
+  if (!ok) return;
+  await db.eventos.delete(id);
+  closeModalEvento();
+  showToast("Evento académico eliminado.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+}
+
 async function exportScheduleForFriends() {
   const [{ list: cursos, map: cursosMap }, classes] = await Promise.all([
     cargarCursos(),
@@ -2687,12 +3139,84 @@ function wireGlobalEvents() {
     btnSaveAjustes.addEventListener("click", guardarAjustesUI);
   }
 
+  // Eventos de Asistencia y Feriados (Fase 3)
+  const btnMarcarFeriado = $("#btn-marcar-feriado-hoy");
+  if (btnMarcarFeriado) {
+    btnMarcarFeriado.addEventListener("click", () => {
+      openModalExcepcion({
+        fecha: (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date()),
+        tipo: "feriado"
+      });
+    });
+  }
+
+  const btnDesmarcarFeriado = $("#btn-desmarcar-feriado-hoy");
+  if (btnDesmarcarFeriado) {
+    btnDesmarcarFeriado.addEventListener("click", async () => {
+      const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+      const fer = await db.excepciones.where("fecha").equals(hoyStr).filter(e => e.tipo === "feriado").first();
+      if (fer) {
+        await db.excepciones.delete(fer.id);
+        showToast("Feriado retirado de hoy.");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        renderHoy();
+      }
+    });
+  }
+
+  // Modal Asistencia
+  const btnCloseAsist = $("#btn-close-asistencia-modal");
+  if (btnCloseAsist) btnCloseAsist.addEventListener("click", closeAsistenciaModal);
+  const modalAsistBackdrop = $("#modal-asistencia-backdrop");
+  if (modalAsistBackdrop) {
+    modalAsistBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-asistencia-backdrop") closeAsistenciaModal();
+    });
+  }
+
+  // Modal Excepciones
+  const btnAbrirNuevaEx = $("#btn-abrir-nueva-excepcion");
+  if (btnAbrirNuevaEx) {
+    btnAbrirNuevaEx.addEventListener("click", () => openModalExcepcion());
+  }
+  const btnCloseEx = $("#btn-close-excepcion-modal");
+  if (btnCloseEx) btnCloseEx.addEventListener("click", closeModalExcepcion);
+  const btnCancelEx = $("#btn-cancel-excepcion");
+  if (btnCancelEx) btnCancelEx.addEventListener("click", closeModalExcepcion);
+  const btnGuardarEx = $("#btn-guardar-excepcion");
+  if (btnGuardarEx) btnGuardarEx.addEventListener("click", guardarExcepcion);
+  const modalExBackdrop = $("#modal-excepcion-backdrop");
+  if (modalExBackdrop) {
+    modalExBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-excepcion-backdrop") closeModalExcepcion();
+    });
+  }
+
+  // Modal Eventos
+  const btnCloseEv = $("#btn-close-evento-modal");
+  if (btnCloseEv) btnCloseEv.addEventListener("click", closeModalEvento);
+  const btnCancelEv = $("#btn-cancel-evento");
+  if (btnCancelEv) btnCancelEv.addEventListener("click", closeModalEvento);
+  const btnGuardarEv = $("#btn-guardar-evento");
+  if (btnGuardarEv) btnGuardarEv.addEventListener("click", guardarEvento);
+  const btnEliminarEv = $("#btn-eliminar-evento");
+  if (btnEliminarEv) btnEliminarEv.addEventListener("click", eliminarEvento);
+  const modalEvBackdrop = $("#modal-evento-backdrop");
+  if (modalEvBackdrop) {
+    modalEvBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-evento-backdrop") closeModalEvento();
+    });
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
       closeCursoModal();
       closeNotasModal();
       closeTaskModal();
+      closeAsistenciaModal();
+      closeModalExcepcion();
+      closeModalEvento();
       $("#modal-quick-backdrop").classList.add("hidden");
       if (activeConfirmCancel) activeConfirmCancel();
     }
