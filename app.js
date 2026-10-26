@@ -3242,17 +3242,46 @@ let partesQrAcumuladas = [];
 let qrScannerStream = null;
 
 async function openModalQrSchedule() {
-  const [cursos, clases] = await Promise.all([db.cursos.toArray(), db.clases.toArray()]);
-  if (cursos.length === 0 && clases.length === 0) {
+  const [cursosRaw, clasesRaw] = await Promise.all([db.cursos.toArray(), db.clases.toArray()]);
+  if (cursosRaw.length === 0 && clasesRaw.length === 0) {
     showToast("No tienes cursos ni clases para compartir por QR.", true);
     return;
+  }
+
+  // Deduplicar cursos por nombre y clases por (curso, día, hora_inicio, hora_fin)
+  const cursosUnicos = [];
+  const mapaNombreACursoId = new Map();
+  const mapaIdOriginalAUnico = new Map();
+
+  for (const c of cursosRaw) {
+    const key = (c.nombre || "").trim().toLowerCase();
+    if (key && mapaNombreACursoId.has(key)) {
+      mapaIdOriginalAUnico.set(c.id, mapaNombreACursoId.get(key));
+    } else {
+      if (key) mapaNombreACursoId.set(key, c.id);
+      mapaIdOriginalAUnico.set(c.id, c.id);
+      cursosUnicos.push(c);
+    }
+  }
+
+  const idsCursosValidos = new Set(cursosUnicos.map(c => c.id));
+  const clasesUnicas = [];
+  const vistasClase = new Set();
+
+  for (const k of clasesRaw) {
+    const cid = mapaIdOriginalAUnico.get(k.curso_id) || k.curso_id;
+    if (!idsCursosValidos.has(cid)) continue;
+    const sig = `${cid}|${k.dia_semana}|${k.hora_inicio}|${k.hora_fin}`;
+    if (vistasClase.has(sig)) continue;
+    vistasClase.add(sig);
+    clasesUnicas.push({ ...k, curso_id: cid });
   }
 
   const horarioCompartido = {
     tipo: "unumbral-horario-compartido",
     version: 2,
     exportado_el: new Date().toISOString(),
-    cursos: cursos.map(c => ({
+    cursos: cursosUnicos.map(c => ({
       id: c.id,
       nombre: c.nombre,
       color: c.color,
@@ -3260,7 +3289,7 @@ async function openModalQrSchedule() {
       profesor: c.profesor,
       creditos: c.creditos || 3
     })),
-    clases: clases.map(k => ({
+    clases: clasesUnicas.map(k => ({
       curso_id: k.curso_id,
       dia_semana: k.dia_semana,
       hora_inicio: k.hora_inicio,
@@ -3270,7 +3299,7 @@ async function openModalQrSchedule() {
   };
 
   try {
-    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido);
+    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido, 4000);
   } catch (err) {
     showToast("Error generando código QR: " + err.message, true);
     return;
@@ -3280,13 +3309,7 @@ async function openModalQrSchedule() {
   renderQrEnDisplay(qrPartesActuales[0]);
 
   const multiControls = $("#qr-multipart-controls");
-  const indicator = $("#qr-part-indicator");
-  if (qrPartesActuales.length > 1) {
-    if (multiControls) multiControls.classList.remove("hidden");
-    if (indicator) indicator.textContent = `Parte 1 de ${qrPartesActuales.length}`;
-  } else {
-    if (multiControls) multiControls.classList.add("hidden");
-  }
+  if (multiControls) multiControls.classList.add("hidden");
 
   $("#modal-qr-schedule-backdrop").classList.remove("hidden");
 }
@@ -3330,18 +3353,82 @@ function mostrarAnteriorParteQr() {
   if (indicator) indicator.textContent = `Parte ${qrParteIndiceActual + 1} de ${qrPartesActuales.length}`;
 }
 
+function incrustarFirmaQrEnCanvas(ctx, width, textoQr) {
+  try {
+    const bytes = new TextEncoder().encode(textoQr);
+    const totalBits = (bytes.length + 2) * 8;
+    if (totalBits + 16 > width * 4) return;
+    const header = [bytes.length >> 8, bytes.length & 0xff, ...bytes];
+    const imgData = ctx.getImageData(0, 0, width, 4);
+    const d = imgData.data;
+    // Magic "U1" en los primeros 16 píxeles (canal B: 254=1, 255=0)
+    const magic = [0x55, 0x31, ...header];
+    let bitIdx = 0;
+    for (let i = 0; i < magic.length; i++) {
+      for (let b = 7; b >= 0; b--) {
+        const bit = (magic[i] >> b) & 1;
+        const px = bitIdx * 4;
+        if (px + 2 < d.length) {
+          d[px] = 255;
+          d[px + 1] = 255;
+          d[px + 2] = bit ? 254 : 255;
+          d[px + 3] = 255;
+        }
+        bitIdx++;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  } catch {
+    // Ignorar si no aplica
+  }
+}
+
+function extraerFirmaQrDeImagen(img) {
+  try {
+    const w = img.naturalWidth || img.width;
+    if (!w || w < 100) return null;
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = 4;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, 4, 0, 0, w, 4);
+    const d = ctx.getImageData(0, 0, w, 4).data;
+    const readByte = (byteOffset) => {
+      let val = 0;
+      for (let b = 0; b < 8; b++) {
+        const px = (byteOffset * 8 + b) * 4;
+        const bit = d[px + 2] === 254 ? 1 : 0;
+        val = (val << 1) | bit;
+      }
+      return val;
+    };
+    if (readByte(0) !== 0x55 || readByte(1) !== 0x31) return null;
+    const len = (readByte(2) << 8) | readByte(3);
+    if (len <= 0 || len > 4000 || (len + 4) * 8 > w * 4) return null;
+    const out = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      out[i] = readByte(4 + i);
+    }
+    const str = new TextDecoder().decode(out);
+    return str.startsWith("UNU1:") ? str : null;
+  } catch {
+    return null;
+  }
+}
+
 function descargarQrPng() {
   if (!qrPartesActuales || qrPartesActuales.length === 0) return;
   const canvas = $("#qr-export-canvas");
   if (!canvas || typeof qrcode !== "function") return;
 
   try {
+    const textoActual = qrPartesActuales[qrParteIndiceActual];
     const qr = qrcode(0, "L");
-    qr.addData(qrPartesActuales[qrParteIndiceActual]);
+    qr.addData(textoActual);
     qr.make();
     const count = qr.getModuleCount();
     const cellSize = 10;
-    const margin = 30;
+    const margin = 32;
     canvas.width = count * cellSize + margin * 2;
     canvas.height = count * cellSize + margin * 2;
     const ctx = canvas.getContext("2d");
@@ -3355,12 +3442,30 @@ function descargarQrPng() {
         }
       }
     }
+    incrustarFirmaQrEnCanvas(ctx, canvas.width, textoActual);
+
+    const fileName = `UNUmbral_Horario_QR_${new Date().toISOString().slice(0, 10)}.png`;
+    const dataUrl = canvas.toDataURL("image/png");
+
+    // 1. Si estamos en el APK Android con nuestro puente nativo MediaStore, guardar directo en Galería
+    if (window.UNUmbralNative && typeof window.UNUmbralNative.saveQrImage === "function") {
+      const guardado = window.UNUmbralNative.saveQrImage(dataUrl, fileName);
+      if (guardado) {
+        showToast("Imagen QR guardada en tu Galería (álbum UNUmbral).");
+        return;
+      }
+    }
+
+    // 2. Fallback para navegador web / PWA
     const link = document.createElement("a");
-    link.download = `UNUmbral_Horario_QR${qrPartesActuales.length > 1 ? `_p${qrParteIndiceActual + 1}` : ""}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = fileName;
+    link.href = dataUrl;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    showToast("Imagen QR guardada correctamente.");
   } catch (err) {
-    showToast("Error descargando imagen QR: " + err.message, true);
+    showToast("Error guardando imagen QR: " + err.message, true);
   }
 }
 
@@ -3456,21 +3561,19 @@ async function iniciarDeteccionCamara(video) {
 
 function cargarImagenDesdeArchivo(file) {
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = reader.result;
     };
-    img.onerror = (e) => {
-      URL.revokeObjectURL(url);
-      reject(e);
-    };
-    img.src = url;
+    reader.onerror = (e) => reject(e);
+    reader.readAsDataURL(file);
   });
 }
 
-function intentarJsQrEnRegion(img, sx, sy, sw, sh, targetMaxDim) {
+function intentarJsQrEnRegion(img, sx, sy, sw, sh, targetMaxDim, binarizeThreshold = null) {
   if (typeof window.jsQR !== "function") return null;
   const canvas = document.createElement("canvas");
   const scale = targetMaxDim / Math.max(sw, sh);
@@ -3479,10 +3582,20 @@ function intentarJsQrEnRegion(img, sx, sy, sw, sh, targetMaxDim) {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
   const imgData = ctx.getImageData(0, 0, w, h);
+  if (binarizeThreshold !== null) {
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const v = lum < binarizeThreshold ? 0 : 255;
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+  }
   const code = window.jsQR(imgData.data, w, h, { inversionAttempts: "attemptBoth" });
   return code && code.data ? code.data : null;
 }
@@ -3497,24 +3610,34 @@ async function procesarArchivoImagenQr(file) {
     const iw = img.naturalWidth || img.width;
     const ih = img.naturalHeight || img.height;
 
-    // 1. Intentar jsQR en imagen completa a distintas escalas (para QR guardado o foto directa)
-    for (const dim of [900, 1400, 600, 1800]) {
-      const res = intentarJsQrEnRegion(img, 0, 0, iw, ih, dim);
+    // 0. Si es un PNG generado directamente con "Guardar imagen QR", lectura instantánea sin pérdida
+    const firmaDirecta = extraerFirmaQrDeImagen(img);
+    if (firmaDirecta) {
+      procesarTextoQrEscaneado(firmaDirecta);
+      return;
+    }
+
+    // 1. Intentar jsQR en imagen completa a distintas escalas (normal y binarizada)
+    for (const dim of [800, 1200, 550, 1600]) {
+      const res = intentarJsQrEnRegion(img, 0, 0, iw, ih, dim, null) ||
+                  intentarJsQrEnRegion(img, 0, 0, iw, ih, dim, 160);
       if (res) {
         procesarTextoQrEscaneado(res);
         return;
       }
     }
 
-    // 2. Intentar jsQR en recortes centrales (para capturas de pantalla verticales del teléfono)
+    // 2. Intentar jsQR en recortes de pantalla (incluyendo bottom-sheet donde se ubica el modal en el celular)
     const crops = [
-      [iw * 0.08, ih * 0.18, iw * 0.84, ih * 0.56],
-      [iw * 0.12, ih * 0.22, iw * 0.76, ih * 0.48],
-      [iw * 0.05, ih * 0.12, iw * 0.90, ih * 0.72]
+      [iw * 0.08, ih * 0.44, iw * 0.84, ih * 0.42], // Bottom-sheet QR exacto
+      [0, ih * 0.36, iw, ih * 0.56],                 // Mitad inferior de captura de pantalla
+      [iw * 0.08, ih * 0.18, iw * 0.84, ih * 0.56], // Centro de pantalla
+      [iw * 0.10, ih * 0.25, iw * 0.80, ih * 0.60]  // Centro-bajo
     ];
     for (const [sx, sy, sw, sh] of crops) {
-      for (const dim of [800, 1200]) {
-        const res = intentarJsQrEnRegion(img, sx, sy, sw, sh, dim);
+      for (const dim of [750, 1100]) {
+        const res = intentarJsQrEnRegion(img, sx, sy, sw, sh, dim, null) ||
+                    intentarJsQrEnRegion(img, sx, sy, sw, sh, dim, 160);
         if (res) {
           procesarTextoQrEscaneado(res);
           return;
@@ -3535,7 +3658,7 @@ async function procesarArchivoImagenQr(file) {
     console.warn("Fallo analizando imagen QR:", err);
   }
 
-  showToast("No se detectó un código QR legible en la imagen. Asegúrate de subir una imagen nítida del QR.", true);
+  showToast("No se detectó un código QR legible en la imagen. Usa 'Guardar imagen QR' o sube una captura nítida.", true);
   if (statusEl) statusEl.textContent = "No se detectó código QR en la imagen.";
 }
 
