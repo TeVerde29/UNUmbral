@@ -198,9 +198,9 @@
     <!-- VISTA 3: TAREAS -->
     <section id="view-tareas" class="view-panel">
       <div class="tasks-toolbar">
-        <div class="search-box">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="search" id="input-search-tasks" placeholder="Buscar por título o materia…" aria-label="Buscar tareas por título o materia" autocomplete="off" enterkeyhint="search">
+        <div class="segmented-control">
+          <button class="seg-btn active" id="btn-tasks-mode-list" data-mode="list">Lista</button>
+          <button class="seg-btn" id="btn-tasks-mode-cal" data-mode="calendar">Calendario</button>
         </div>
         <button id="btn-add-task" class="btn-primary btn-sm">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -208,9 +208,18 @@
         </button>
       </div>
 
+      <div class="search-box" id="tasks-search-container" style="margin-top: 10px;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="search" id="input-search-tasks" placeholder="Buscar por título o materia…" aria-label="Buscar tareas por título o materia" autocomplete="off" enterkeyhint="search">
+      </div>
+
       <!-- Chips de filtro con iconos SVG -->
       <div class="chips-scroll" id="tasks-filter-chips">
-        <button class="chip active" data-filter="pendientes">
+        <button class="chip active" data-filter="semana">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line></svg>
+          <span>Esta Semana</span>
+        </button>
+        <button class="chip" data-filter="pendientes">
           <span>Pendientes</span>
         </button>
         <button class="chip" data-filter="urgentes">
@@ -281,6 +290,47 @@
       <!-- Lista de tareas -->
       <div id="all-tasks-list" class="cards-list">
         <!-- Renderizado dinámico -->
+      </div>
+
+      <!-- Vista de Calendario Mensual -->
+      <div id="tasks-calendar-container" class="calendar-container hidden">
+        <div class="calendar-nav-bar">
+          <button id="btn-cal-prev" class="btn-icon-sm" aria-label="Mes anterior">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="calendar-month-heading">
+            <h3 id="cal-month-title">Octubre 2026</h3>
+            <button id="btn-cal-today" class="cal-today-pill">Hoy</button>
+          </div>
+          <button id="btn-cal-next" class="btn-icon-sm" aria-label="Mes siguiente">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+
+        <div class="calendar-weekdays-row">
+          <span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span>
+        </div>
+
+        <div id="cal-days-grid" class="calendar-grid">
+          <!-- Celdas del mes -->
+        </div>
+
+        <!-- Panel de detalle del día seleccionado -->
+        <div id="cal-day-detail" class="cal-day-detail-panel hidden">
+          <div class="cal-day-detail-header">
+            <div>
+              <h4 id="cal-day-detail-title">Lunes 26 de Octubre</h4>
+              <span class="cal-day-detail-subtitle" id="cal-day-detail-sub">0 clases · 0 tareas</span>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <button id="btn-cal-add-event" class="btn-secondary btn-sm" style="font-size:11px;">+ Evento</button>
+              <button id="btn-cal-add-task" class="btn-primary btn-sm" style="font-size:11px;">+ Tarea</button>
+            </div>
+          </div>
+          <div id="cal-day-items-list" class="cal-day-items">
+            <!-- Items del día -->
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1066,6 +1116,7 @@
 <script src="lib/planificador.js"></script>
 <script src="lib/notificaciones.js"></script>
 <script src="lib/asistencia.js"></script>
+<script src="lib/prioridad.js"></script>
 <script src="app.js"></script>
 
 </body>

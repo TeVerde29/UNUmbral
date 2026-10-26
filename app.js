@@ -418,9 +418,13 @@ const state = {
   currentTab: "view-hoy",
   scheduleMode: "agenda", // "agenda" o "matrix"
   selectedDay: getTodayDayKey(),
-  tasksFilter: "pendientes", // pendientes, urgentes, proximas, todas, completadas
+  tasksViewMode: "list", // "list" o "calendar"
+  tasksFilter: "semana", // semana, pendientes, urgentes, proximas, todas, completadas
   tasksMateriaFilter: "",
   tasksSearchQuery: "",
+  calendarYear: new Date().getFullYear(),
+  calendarMonth: new Date().getMonth() + 1,
+  selectedCalDate: null,
   matrixCompact: localStorage.getItem("umbral-matrix-compact") !== "false",
   theme: localStorage.getItem("umbral-theme") || localStorage.getItem("uniflow-theme") || "light",
   // Si el modal de curso se abrió desde el formulario de clase, al guardar se vuelve a él
@@ -1519,6 +1523,34 @@ async function renderTareas() {
     if (!t.completada) subjectMap[key].taskCount++;
   });
 
+  const isCalendar = state.tasksViewMode === "calendar";
+  const btnList = $("#btn-tasks-mode-list");
+  const btnCal = $("#btn-tasks-mode-cal");
+  if (btnList) btnList.classList.toggle("active", !isCalendar);
+  if (btnCal) btnCal.classList.toggle("active", isCalendar);
+
+  const searchBox = $("#tasks-search-container");
+  const filterChips = $("#tasks-filter-chips");
+  const subjectFilter = $(".subject-filter-container");
+  const listEl = $("#all-tasks-list");
+  const calContainer = $("#tasks-calendar-container");
+
+  if (isCalendar) {
+    if (searchBox) searchBox.classList.add("hidden");
+    if (filterChips) filterChips.classList.add("hidden");
+    if (subjectFilter) subjectFilter.classList.add("hidden");
+    if (listEl) listEl.classList.add("hidden");
+    if (calContainer) calContainer.classList.remove("hidden");
+    await renderCalendarioMensual();
+    return;
+  } else {
+    if (searchBox) searchBox.classList.remove("hidden");
+    if (filterChips) filterChips.classList.remove("hidden");
+    if (subjectFilter) subjectFilter.classList.remove("hidden");
+    if (listEl) listEl.classList.remove("hidden");
+    if (calContainer) calContainer.classList.add("hidden");
+  }
+
   // Si el curso filtrado fue eliminado, volver a "Todas"
   if (state.tasksMateriaFilter && !subjectMap[state.tasksMateriaFilter]) state.tasksMateriaFilter = "";
 
@@ -1527,6 +1559,53 @@ async function renderTareas() {
   actualizarBadgeTareas(totalPendingCount);
 
   renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjectMap);
+
+  // MODO ESTA SEMANA (Agrupado por prioridad y fecha)
+  if (state.tasksFilter === "semana") {
+    let pool = allTasks;
+    if (state.tasksMateriaFilter) {
+      pool = pool.filter(t => t._subjectKey === state.tasksMateriaFilter);
+    }
+    if (state.tasksSearchQuery) {
+      const q = state.tasksSearchQuery.toLowerCase();
+      pool = pool.filter(t => (t.titulo || "").toLowerCase().includes(q) || (t.materia || "").toLowerCase().includes(q));
+    }
+
+    const grupos = (typeof agruparSemana === "function" ? agruparSemana : window.agruparSemana)(pool, new Date());
+
+    if (grupos.totalPendientes === 0) {
+      listEl.innerHTML = `
+        <div class="empty-card">
+          <div class="empty-card-icon-wrap">${ICONS.checkCircle}</div>
+          <strong>¡Todo al día esta semana!</strong>
+          <p>No tienes tareas pendientes urgentes para estos días.</p>
+        </div>`;
+      return;
+    }
+
+    let html = "";
+    const renderGroup = (titulo, items, badgeClass) => {
+      if (!items || items.length === 0) return "";
+      return `
+        <div class="week-group-header">
+          <span class="week-group-title">${titulo}</span>
+          <span class="week-group-badge ${badgeClass}">${items.length}</span>
+        </div>
+        ${items.map(t => renderTaskCardHTML(t)).join("")}
+      `;
+    };
+
+    html += renderGroup("⚠️ Tareas Vencidas", grupos.vencidas, "danger");
+    html += renderGroup("📅 Para Hoy", grupos.hoy, "warning");
+    html += renderGroup("⏳ Para Mañana", grupos.manana, "neutral");
+    html += renderGroup("🗓️ Esta Semana", grupos.resto, "neutral");
+    html += renderGroup("Más Adelante", grupos.masAdelante, "neutral");
+    html += renderGroup("Sin Fecha Límite", grupos.sinFecha, "neutral");
+
+    listEl.innerHTML = html;
+    wireTaskCardEvents(listEl);
+    return;
+  }
 
   let list = allTasks;
   const nowMs = Date.now();
@@ -1564,7 +1643,6 @@ async function renderTareas() {
     return timeA - timeB;
   });
 
-  const listEl = $("#all-tasks-list");
   if (list.length === 0) {
     listEl.innerHTML = `
       <div class="empty-card">
@@ -1577,6 +1655,184 @@ async function renderTareas() {
 
   listEl.innerHTML = list.map(t => renderTaskCardHTML(t)).join("");
   wireTaskCardEvents(listEl);
+}
+
+const MESES_LABEL = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+async function renderCalendarioMensual() {
+  const anio = state.calendarYear;
+  const mes = state.calendarMonth;
+  const hoy = new Date();
+
+  const titleEl = $("#cal-month-title");
+  if (titleEl) {
+    titleEl.textContent = `${MESES_LABEL[mes - 1]} ${anio}`;
+  }
+
+  const [clases, tareas, eventos, excepciones, { map: cursosMap }] = await Promise.all([
+    obtenerClasesEnriquecidas(),
+    db.tareas.toArray(),
+    db.eventos.toArray(),
+    db.excepciones.toArray(),
+    cargarCursos()
+  ]);
+
+  const matriz = (typeof generarMatrizMes === "function" ? generarMatrizMes : window.generarMatrizMes)(anio, mes, hoy);
+  const gridEl = $("#cal-days-grid");
+  if (!gridEl) return;
+
+  gridEl.innerHTML = matriz.map(celda => {
+    const fecha = celda.fecha;
+    const diaNum = celda.dia;
+    const esHoy = celda.esHoy;
+    const esDelMes = celda.esDelMes;
+    const isSelected = state.selectedCalDate === fecha;
+
+    const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fecha, excepciones);
+    const dayKey = DIAS_SEMANA[celda.diaSemana - 1];
+    const clasesDelDia = feriado ? [] : clases.filter(c => c.dia_semana === dayKey && !(typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fecha, excepciones));
+    const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
+    const eventosDelDia = eventos.filter(e => e.fecha === fecha);
+
+    let indicatorsHtml = "";
+    if (feriado) {
+      indicatorsHtml += `<span class="cal-dot" style="background:var(--status-warning);" title="Feriado"></span>`;
+    }
+    eventosDelDia.slice(0, 2).forEach(ev => {
+      indicatorsHtml += `<span class="cal-diamond" style="background:#ef4444;" title="Evento: ${escapeHtml(ev.titulo)}"></span>`;
+    });
+    clasesDelDia.slice(0, 3).forEach(c => {
+      const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+      indicatorsHtml += `<span class="cal-dot" style="background:${color};" title="Clase: ${escapeHtml(c.materia)}"></span>`;
+    });
+    tareasDelDia.slice(0, 2).forEach(t => {
+      indicatorsHtml += `<span class="cal-dot" style="background:${t.completada ? '#10b981' : '#f59e0b'};" title="Tarea: ${escapeHtml(t.titulo)}"></span>`;
+    });
+
+    const cellClasses = [
+      "cal-cell",
+      !esDelMes ? "is-other-month" : "",
+      esHoy ? "is-today" : "",
+      isSelected ? "is-selected" : ""
+    ].filter(Boolean).join(" ");
+
+    return `
+      <div class="${cellClasses}" data-date="${fecha}">
+        <span class="cal-day-num">${diaNum}</span>
+        <div class="cal-cell-indicators">
+          ${indicatorsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  $$(".cal-cell", gridEl).forEach(cell => {
+    cell.addEventListener("click", () => {
+      const fecha = cell.dataset.date;
+      state.selectedCalDate = fecha;
+      $$(".cal-cell", gridEl).forEach(c => c.classList.toggle("is-selected", c.dataset.date === fecha));
+      renderCalDayDetail(fecha, clases, tareas, eventos, excepciones, cursosMap);
+    });
+  });
+
+  const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(hoy);
+  const fechaTarget = state.selectedCalDate || hoyStr;
+  state.selectedCalDate = fechaTarget;
+  const targetCell = $(`[data-date="${fechaTarget}"]`, gridEl);
+  if (targetCell) targetCell.classList.add("is-selected");
+  renderCalDayDetail(fechaTarget, clases, tareas, eventos, excepciones, cursosMap);
+}
+
+async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones, cursosMap) {
+  const panel = $("#cal-day-detail");
+  if (!panel) return;
+
+  if (!clases || !tareas || !eventos || !excepciones || !cursosMap) {
+    [clases, tareas, eventos, excepciones, { map: cursosMap }] = await Promise.all([
+      obtenerClasesEnriquecidas(),
+      db.tareas.toArray(),
+      db.eventos.toArray(),
+      db.excepciones.toArray(),
+      cargarCursos()
+    ]);
+  }
+
+  const partes = fechaStr.split("-").map(Number);
+  const d = new Date(partes[0], partes[1] - 1, partes[2]);
+  const jsDay = d.getDay();
+  const diaSemana = jsDay === 0 ? 7 : jsDay;
+  const dayKey = DIAS_SEMANA[diaSemana - 1];
+
+  $("#cal-day-detail-title").textContent = `${formatReadableDate(d)}`;
+
+  const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fechaStr, excepciones);
+  const ferObj = excepciones.find(e => e.fecha === fechaStr && e.tipo === "feriado");
+
+  const clasesDelDia = feriado ? [] : clases.filter(c => c.dia_semana === dayKey);
+  const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fechaStr));
+  const eventosDelDia = eventos.filter(e => e.fecha === fechaStr);
+
+  $("#cal-day-detail-sub").textContent = `${clasesDelDia.length} ${clasesDelDia.length === 1 ? 'clase' : 'clases'} · ${tareasDelDia.length} ${tareasDelDia.length === 1 ? 'tarea' : 'tareas'}${eventosDelDia.length ? ` · ${eventosDelDia.length} evento(s)` : ''}`;
+
+  const listEl = $("#cal-day-items-list");
+  let itemsHtml = "";
+
+  if (feriado) {
+    itemsHtml += `
+      <div class="holiday-banner" style="margin-bottom:6px;">
+        <span>🎉 Feriado: ${escapeHtml(ferObj?.motivo || "Día No Laborable")}</span>
+      </div>`;
+  }
+
+  eventosDelDia.forEach(ev => {
+    const cursoNombre = cursosMap[ev.curso_id]?.nombre || "Curso";
+    itemsHtml += `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;border-radius:var(--radius-sm);font-size:12px;">
+        <div>
+          <strong style="color:#ef4444;">${ev.tipo.toUpperCase()}: ${escapeHtml(ev.titulo)}</strong>
+          <div style="color:var(--text-secondary);font-size:11px;">${escapeHtml(cursoNombre)}${ev.hora ? ` · ${formatTime12(ev.hora)}` : ""}${ev.aula ? ` · ${escapeHtml(ev.aula)}` : ""}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  clasesDelDia.forEach(c => {
+    const cancelada = (typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fechaStr, excepciones);
+    const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+    itemsHtml += `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-subtle);border-left:3px solid ${color};border-radius:var(--radius-sm);font-size:12px;opacity:${cancelada ? 0.6 : 1};">
+        <div style="flex:1;">
+          <strong>${escapeHtml(c.materia)}</strong>
+          <div style="color:var(--text-secondary);font-size:11px;">
+            ${formatTimeRange12(c.hora_inicio, c.hora_fin)} ${c.aula ? `· ${escapeHtml(c.aula)}` : ""}${cancelada ? " · (Cancelada)" : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  tareasDelDia.forEach(t => {
+    const cursoNombre = cursosMap[t.curso_id]?.nombre || "General";
+    itemsHtml += `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-subtle);border-radius:var(--radius-sm);font-size:12px;border:1px solid var(--border-hairline);">
+        <span style="color:${t.completada ? '#10b981' : '#f59e0b'};font-weight:700;">${t.completada ? '✓' : '○'}</span>
+        <div style="flex:1;">
+          <span style="${t.completada ? 'text-decoration:line-through;opacity:0.7;' : ''}">${escapeHtml(t.titulo)}</span>
+          <div style="color:var(--text-secondary);font-size:11px;">${escapeHtml(cursoNombre)} · Nivel ${t.importancia || 3}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  if (!itemsHtml) {
+    itemsHtml = `<p class="practicas-empty" style="padding:10px;">Sin actividades registradas para este día.</p>`;
+  }
+
+  listEl.innerHTML = itemsHtml;
+  panel.classList.remove("hidden");
 }
 
 function renderTaskCardHTML(t) {
@@ -3024,6 +3280,73 @@ function wireGlobalEvents() {
       renderTareas();
     });
   });
+
+  const btnTasksList = $("#btn-tasks-mode-list");
+  if (btnTasksList) {
+    btnTasksList.addEventListener("click", () => {
+      state.tasksViewMode = "list";
+      renderTareas();
+    });
+  }
+
+  const btnTasksCal = $("#btn-tasks-mode-cal");
+  if (btnTasksCal) {
+    btnTasksCal.addEventListener("click", () => {
+      state.tasksViewMode = "calendar";
+      renderTareas();
+    });
+  }
+
+  const btnCalPrev = $("#btn-cal-prev");
+  if (btnCalPrev) {
+    btnCalPrev.addEventListener("click", () => {
+      state.calendarMonth--;
+      if (state.calendarMonth < 1) {
+        state.calendarMonth = 12;
+        state.calendarYear--;
+      }
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalNext = $("#btn-cal-next");
+  if (btnCalNext) {
+    btnCalNext.addEventListener("click", () => {
+      state.calendarMonth++;
+      if (state.calendarMonth > 12) {
+        state.calendarMonth = 1;
+        state.calendarYear++;
+      }
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalToday = $("#btn-cal-today");
+  if (btnCalToday) {
+    btnCalToday.addEventListener("click", () => {
+      const now = new Date();
+      state.calendarYear = now.getFullYear();
+      state.calendarMonth = now.getMonth() + 1;
+      state.selectedCalDate = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(now);
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalAddEv = $("#btn-cal-add-event");
+  if (btnCalAddEv) {
+    btnCalAddEv.addEventListener("click", () => {
+      openModalEvento(null, null);
+      if (state.selectedCalDate) $("#evento-fecha").value = state.selectedCalDate;
+    });
+  }
+
+  const btnCalAddTask = $("#btn-cal-add-task");
+  if (btnCalAddTask) {
+    btnCalAddTask.addEventListener("click", () => {
+      openNewTaskModal();
+      if (state.selectedCalDate) $("#task-fecha").value = state.selectedCalDate + "T23:59";
+    });
+  }
 
   const btnSubjectDropdown = $("#btn-subject-dropdown-toggle");
   const menuSubjectDropdown = $("#subject-dropdown-menu");
