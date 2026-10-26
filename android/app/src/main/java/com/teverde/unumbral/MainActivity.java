@@ -67,5 +67,47 @@ public class MainActivity extends BridgeActivity {
                 return false;
             }
         }
+
+        @JavascriptInterface
+        public boolean saveTextFile(String content, String fileName, String mimeType) {
+            try {
+                if (content == null || content.isEmpty()) return false;
+                String safeName = (fileName != null && !fileName.isEmpty()) ? fileName : ("UNUmbral_" + System.currentTimeMillis() + ".json");
+                String safeMime = (mimeType != null && !mimeType.isEmpty()) ? mimeType : "application/json";
+
+                ContentResolver resolver = getContentResolver();
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DISPLAY_NAME, safeName);
+                values.put(MediaStore.MediaColumns.MIME_TYPE, safeMime);
+
+                Uri collectionUri;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/UNUmbral");
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                    collectionUri = MediaStore.Downloads.EXTERNAL_CONTENT_URI;
+                } else {
+                    collectionUri = MediaStore.Files.getContentUri("external");
+                }
+
+                Uri uri = resolver.insert(collectionUri, values);
+                if (uri == null) return false;
+
+                try (OutputStream os = resolver.openOutputStream(uri)) {
+                    if (os == null) return false;
+                    os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    os.flush();
+                }
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    values.clear();
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                    resolver.update(uri, values, null, null);
+                }
+                return true;
+            } catch (Exception e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
     }
 }

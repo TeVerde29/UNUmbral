@@ -239,9 +239,11 @@ function evaluacionVacia() {
  */
 function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cursosSueltos) {
   const porNombre = new Map((cursosExistentes || []).map(c => [normalizarNombre(c.nombre), c]));
+  const porId = new Map((cursosExistentes || []).filter(c => c && c.id).map(c => [String(c.id), c]));
+  const idOriginalACurso = new Map();
   const cursosNuevos = [];
 
-  const obtenerCurso = (nombre, datos) => {
+  const obtenerCurso = (nombre, datos, idOriginal) => {
     const limpio = String(nombre || "").trim();
     if (!limpio) return null;
     const clave = normalizarNombre(limpio);
@@ -258,32 +260,63 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
         evaluacion: evaluacionVacia()
       };
       porNombre.set(clave, curso);
+      porId.set(String(curso.id), curso);
       cursosNuevos.push(curso);
     }
+    if (idOriginal !== undefined && idOriginal !== null && idOriginal !== "") {
+      idOriginalACurso.set(String(idOriginal), curso);
+    }
+    idOriginalACurso.set(clave, curso);
     return curso;
   };
 
-  (cursosSueltos || []).forEach(c => obtenerCurso(c.nombre, c));
+  (cursosSueltos || []).forEach(c => obtenerCurso(c.nombre, c, c.id));
 
   const clases = [];
   (clasesPlanas || []).forEach(c => {
     const hInicio = to24Hour(c.hora_inicio);
     const hFin = to24Hour(c.hora_fin);
-    if (c.curso_id) {
-      // curso_id puede ser un ID interno o el nombre del curso (importación por QR entre dispositivos)
-      let cursoResuelto = cursosExistentes.find(ce => ce.id === c.curso_id);
-      if (!cursoResuelto) {
-        cursoResuelto = cursosExistentes.find(ce => normalizarNombre(ce.nombre) === normalizarNombre(c.curso_id));
+    let curso = null;
+
+    // 1. Resolver por ID original asignado en el QR o archivo importado (ej: "0", "1", UUID)
+    if (c.curso_id !== undefined && c.curso_id !== null && c.curso_id !== "") {
+      const cidStr = String(c.curso_id);
+      if (idOriginalACurso.has(cidStr)) {
+        curso = idOriginalACurso.get(cidStr);
+      } else if (porId.has(cidStr)) {
+        curso = porId.get(cidStr);
       }
-      if (cursoResuelto) {
-        clases.push({ id: c.id || uuid(), curso_id: cursoResuelto.id, dia_semana: c.dia_semana, hora_inicio: hInicio, hora_fin: hFin, aula: c.aula || "" });
-        return;
-      }
-      // Si no se encontró por ID ni por nombre, tratar como curso nuevo por nombre
     }
-    const nombreCurso = c.materia || c.curso_id;
-    const curso = obtenerCurso(nombreCurso, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
+
+    // 2. Resolver por nombre de materia o curso_id si viene como texto
+    if (!curso) {
+      const nombreTexto = String(c.materia || c.curso_id || "").trim();
+      if (nombreTexto) {
+        const clave = normalizarNombre(nombreTexto);
+        if (idOriginalACurso.has(clave)) {
+          curso = idOriginalACurso.get(clave);
+        } else if (porNombre.has(clave)) {
+          curso = porNombre.get(clave);
+        }
+      }
+    }
+
+    // 3. Fallback: buscar en cursosExistentes por ID o nombre normalizado
+    if (!curso && c.curso_id) {
+      const cursoResuelto = (cursosExistentes || []).find(ce => ce.id === c.curso_id || normalizarNombre(ce.nombre) === normalizarNombre(c.curso_id));
+      if (cursoResuelto) curso = cursoResuelto;
+    }
+
+    // 4. Si no se resolvió, crear solo si el nombre NO es un índice numérico huérfano (evita cursos "0", "1", etc.)
+    if (!curso) {
+      const nombreTexto = String(c.materia || c.curso_id || "").trim();
+      if (nombreTexto && !/^\d+$/.test(nombreTexto)) {
+        curso = obtenerCurso(nombreTexto, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
+      }
+    }
+
     if (!curso) return;
+
     clases.push({
       id: c.id || uuid(),
       curso_id: curso.id,
@@ -3159,6 +3192,133 @@ async function eliminarEvento() {
   if (typeof reprogramarTodo === "function") reprogramarTodo();
 }
 
+
+/**
+ * Limpia cursos numéricos fantasma ("0", "1", "2"...) que hayan quedado de importaciones fallidas previas
+ * y reasocia sus clases a los cursos reales correspondientes.
+ */
+async function limpiarCursosResidualesNumericos() {
+  try {
+    const [cursos, clases] = await Promise.all([db.cursos.toArray(), db.clases.toArray()]);
+    const cursosNumericos = cursos.filter(c => /^\d+$/.test((c.nombre || "").trim()));
+    if (cursosNumericos.length === 0) return;
+
+    const cursosReales = cursos.filter(c => !/^\d+$/.test((c.nombre || "").trim()));
+    const idsABorrar = [];
+
+    await db.transaction("rw", db.cursos, db.clases, async () => {
+      for (const cNum of cursosNumericos) {
+        const numIdx = parseInt(cNum.nombre.trim(), 10);
+        const cursoRealDestino = (numIdx >= 0 && numIdx < cursosReales.length) ? cursosReales[numIdx] : null;
+        const clasesAsociadas = clases.filter(k => k.curso_id === cNum.id);
+        if (cursoRealDestino && clasesAsociadas.length > 0) {
+          for (const k of clasesAsociadas) {
+            await db.clases.update(k.id, { curso_id: cursoRealDestino.id });
+          }
+        }
+        idsABorrar.push(cNum.id);
+      }
+      if (idsABorrar.length) {
+        await db.cursos.bulkDelete(idsABorrar);
+      }
+    });
+  } catch (err) {
+    console.warn("Limpieza de cursos numéricos omitida:", err);
+  }
+}
+
+/**
+ * Deduplica clases en la base de datos que compartan el mismo curso, día y rango horario.
+ */
+async function deduplicarClasesEnBd() {
+  try {
+    const clases = await db.clases.toArray();
+    const vistas = new Set();
+    const idsDuplicados = [];
+    for (const c of clases) {
+      const sig = `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`;
+      if (vistas.has(sig)) {
+        idsDuplicados.push(c.id);
+      } else {
+        vistas.add(sig);
+      }
+    }
+    if (idsDuplicados.length > 0) {
+      await db.clases.bulkDelete(idsDuplicados);
+    }
+  } catch (err) {
+    console.warn("Deduplicación de clases omitida:", err);
+  }
+}
+
+/**
+ * Exporta o comparte un archivo JSON/texto de forma universal:
+ * 1. Si está en el APK Android con puente nativo, lo guarda en Descargas/UNUmbral.
+ * 2. Si está en un dispositivo móvil con Web Share API (navigator.canShare con File), abre la hoja de compartir nativa.
+ * 3. En navegador web (Chrome móvil/PC), descarga mediante enlace en el DOM y revoca con delay de 10s.
+ */
+async function descargarOCompartirJson(payloadObj, nombreArchivo, toastExito = "Archivo exportado.") {
+  const jsonStr = typeof payloadObj === "string" ? payloadObj : JSON.stringify(payloadObj, null, 2);
+
+  // 1. APK Android nativo con UNUmbralNative: guardar directo en Descargas
+  if (window.UNUmbralNative && typeof window.UNUmbralNative.saveTextFile === "function") {
+    try {
+      const guardado = window.UNUmbralNative.saveTextFile(jsonStr, nombreArchivo, "application/json");
+      if (guardado) {
+        showToast(`Archivo guardado en Descargas/UNUmbral: ${nombreArchivo}`);
+        return true;
+      }
+    } catch (e) {
+      console.warn("Fallo puente nativo saveTextFile:", e);
+    }
+  }
+
+  // 2. Dispositivo móvil con Web Share API (WhatsApp, Drive, Files, etc.)
+  const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof esNativo === "function" && esNativo());
+  if (esMovil && typeof navigator !== "undefined" && typeof navigator.share === "function" && typeof File !== "undefined") {
+    try {
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const file = new File([blob], nombreArchivo, { type: "application/json" });
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: nombreArchivo,
+          text: "Horario compartido desde UNUmbral"
+        });
+        showToast(toastExito);
+        return true;
+      }
+    } catch (shareErr) {
+      if (shareErr && shareErr.name === "AbortError") {
+        return true;
+      }
+      console.warn("Web Share no completado, usando descarga estándar:", shareErr);
+    }
+  }
+
+  // 3. Descarga web estándar con soporte para Chrome móvil (DOM append + delay en revokeObjectURL)
+  try {
+    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.style.display = "none";
+    a.href = url;
+    a.download = nombreArchivo;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) a.parentNode.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 10000);
+    showToast(toastExito);
+    return true;
+  } catch (err) {
+    console.error("Error al exportar archivo:", err);
+    showToast("Error al exportar el archivo: " + err.message, true);
+    return false;
+  }
+}
+
 async function exportScheduleForFriends() {
   const [{ list: cursos, map: cursosMap }, classes] = await Promise.all([
     cargarCursos(),
@@ -3197,14 +3357,8 @@ async function exportScheduleForFriends() {
     })
   };
 
-  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `UNUmbral_Horario_${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast("Archivo de horario exportado.");
+  const nombreArchivo = `UNUmbral_Horario_${new Date().toISOString().slice(0, 10)}.json`;
+  await descargarOCompartirJson(exportPayload, nombreArchivo, "Archivo de horario exportado.");
 }
 
 async function importScheduleFromFriends(file) {
@@ -3225,16 +3379,31 @@ async function importScheduleFromFriends(file) {
     if (!confirm) return;
 
     const existentes = await db.cursos.toArray();
+    const clasesExistentes = await db.clases.toArray();
     const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
+
+    const firmasExistentes = new Set(clasesExistentes.map(c =>
+      `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`
+    ));
+
+    const clasesParaInsertar = [];
+    for (const c of r.clases) {
+      const sig = `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`;
+      if (!firmasExistentes.has(sig)) {
+        firmasExistentes.add(sig);
+        clasesParaInsertar.push({ ...c, id: uuid() });
+      }
+    }
 
     await db.transaction("rw", db.cursos, db.clases, async () => {
       if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
-      for (const c of r.clases) {
-        await db.clases.put({ ...c, id: uuid() });
-      }
+      if (clasesParaInsertar.length) await db.clases.bulkPut(clasesParaInsertar);
     });
 
-    showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${r.clases.length} clases).`);
+    await limpiarCursosResidualesNumericos();
+    await deduplicarClasesEnBd();
+
+    showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${clasesParaInsertar.length} clases agregadas).`);
     switchTab("view-horario");
   } catch (err) {
     console.error(err);
@@ -3714,16 +3883,31 @@ async function procesarTextoQrEscaneado(rawText) {
 
 async function ejecutarImportacionHorario(data) {
   const existentes = await db.cursos.toArray();
+  const clasesExistentes = await db.clases.toArray();
   const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
+
+  const firmasExistentes = new Set(clasesExistentes.map(c =>
+    `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`
+  ));
+
+  const clasesParaInsertar = [];
+  for (const c of r.clases) {
+    const sig = `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`;
+    if (!firmasExistentes.has(sig)) {
+      firmasExistentes.add(sig);
+      clasesParaInsertar.push({ ...c, id: uuid() });
+    }
+  }
 
   await db.transaction("rw", db.cursos, db.clases, async () => {
     if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
-    for (const c of r.clases) {
-      await db.clases.put({ ...c, id: uuid() });
-    }
+    if (clasesParaInsertar.length) await db.clases.bulkPut(clasesParaInsertar);
   });
 
-  showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${r.clases.length} clases).`);
+  await limpiarCursosResidualesNumericos();
+  await deduplicarClasesEnBd();
+
+  showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${clasesParaInsertar.length} clases agregadas).`);
   if (typeof reprogramarTodo === "function") reprogramarTodo();
   switchTab("view-horario");
 }
@@ -3752,14 +3936,8 @@ async function exportFullBackup() {
     ajustes: ajustes || []
   };
 
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `UNUmbral_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast("Copia de seguridad generada.");
+  const nombreArchivo = `UNUmbral_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+  await descargarOCompartirJson(payload, nombreArchivo, "Copia de seguridad generada.");
 }
 
 async function importFullBackup(file) {
@@ -4522,6 +4700,8 @@ async function init() {
       new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout IndexedDB")), 3000))
     ]);
     await checkAndMigrateLegacyDB();
+    await limpiarCursosResidualesNumericos();
+    await deduplicarClasesEnBd();
   } catch (err) {
     console.warn("Aviso abriendo IndexedDB:", err);
   }

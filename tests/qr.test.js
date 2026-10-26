@@ -130,3 +130,28 @@ test("rechaza formatos corruptos o sin prefijo UNU1:", () => {
   assert.throws(() => descomprimirHorarioDeQr("OTRO_FORMATO:abc"), /prefijo UNU1:/);
   assert.throws(() => descomprimirHorarioDeQr("UNU1:contenido_invalido_no_json"), /decodificando|incompatible|corrupta/);
 });
+
+test("comprimirHorarioParaQr y descomprimirHorarioDeQr con UUIDs reales conservan vinculación de clases", () => {
+  const cursos = [
+    { id: "e88d1d8a-9e12-4f7b-bf38-a1489eef3bf4", nombre: "Auditoría y Seguridad", color: "#F5D0FE", aula: "Lab 1", profesor: "Ing. Ferrari", creditos: 3 },
+    { id: "7c132519-7578-4bfb-92ea-2849890a8845", nombre: "Sistemas Distribuidos", color: "#FECACA", aula: "Lab 2", profesor: "Mg. Bardales", creditos: 4 }
+  ];
+  const clases = [
+    { curso_id: "e88d1d8a-9e12-4f7b-bf38-a1489eef3bf4", dia_semana: "MIERCOLES", hora_inicio: "14:50", hora_fin: "16:30", aula: "Lab 1" },
+    { curso_id: "7c132519-7578-4bfb-92ea-2849890a8845", dia_semana: "JUEVES", hora_inicio: "19:30", hora_fin: "21:10", aula: "Lab 2" }
+  ];
+
+  const qrList = comprimirHorarioParaQr({ tipo: "unumbral-horario-compartido", version: 2, cursos, clases });
+  assert.equal(qrList.length, 1);
+
+  const res = descomprimirHorarioDeQr(qrList[0]);
+  assert.equal(res.horario.cursos.length, 2);
+  assert.equal(res.horario.cursos[0].nombre, "Auditoría y Seguridad");
+  assert.equal(res.horario.cursos[1].nombre, "Sistemas Distribuidos");
+  // Los IDs asignados en descompresión son compactos ("0", "1")
+  assert.equal(res.horario.cursos[0].id, "0");
+  assert.equal(res.horario.cursos[1].id, "1");
+  // Las clases apuntan congruentemente a "0" y "1"
+  assert.equal(res.horario.clases[0].curso_id, "0");
+  assert.equal(res.horario.clases[1].curso_id, "1");
+});
