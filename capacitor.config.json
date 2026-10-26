@@ -1,0 +1,11 @@
+{
+  "appId": "com.teverde.unumbral",
+  "appName": "UNUmbral",
+  "webDir": "www",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon",
+      "iconColor": "#22432C"
+    }
+  }
+}

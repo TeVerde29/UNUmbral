@@ -1,0 +1,33 @@
+{
+  "name": "unumbral",
+  "version": "1.0.0",
+  "description": "UNUmbral - Organizador universitario 100% offline para horarios, notas y tareas con notificaciones locales.",
+  "main": "app.js",
+  "directories": {
+    "lib": "lib",
+    "test": "tests"
+  },
+  "scripts": {
+    "build:web": "node scripts/build-web.js",
+    "sync": "npm run build:web && npx cap sync android",
+    "test": "node --test tests/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TeVerde29/umbral.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/TeVerde29/umbral/issues"
+  },
+  "homepage": "https://github.com/TeVerde29/umbral#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/local-notifications": "^8.3.1"
+  }
+}

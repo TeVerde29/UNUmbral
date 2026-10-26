@@ -162,6 +162,38 @@ python -m http.server 8080
 
 ---
 
+## Compilar el APK (Android Nativo con Alertas Locales)
+
+UNUmbral cuenta con soporte nativo para Android mediante **Capacitor**, lo que permite programar alertas y notificaciones locales 100% offline que suenan incluso con la aplicación cerrada y sin conexión a internet.
+
+> **Nota importante para el usuario:** Los datos del APK (IndexedDB en el WebView nativo) son **independientes** de la versión web PWA instalada desde Chrome. Si ya usabas la versión web antes de migrar al APK: ve a **Compartir → Crear Backup Completo** en la web, guarda el archivo `.json`, instala el APK en tu celular y pulsa **Restaurar Backup**.
+
+### Requisitos previos
+- **Node.js LTS** (v18 o superior).
+- **Android Studio** (con SDK de Android instalado) o Android Command Line Tools con Java JDK 17+.
+
+### Pasos de compilación:
+1. Instalar dependencias y sincronizar activos web con el proyecto nativo:
+   ```bash
+   npm install
+   npm run sync
+   ```
+2. Abrir el proyecto en Android Studio:
+   ```bash
+   npx cap open android
+   ```
+3. En Android Studio, seleccionar en el menú superior:  
+   **Build → Build Bundle(s) / APK(s) → Build APK(s)**
+4. O compilar directamente desde terminal con Gradle:
+   ```bash
+   cd android
+   ./gradlew assembleDebug
+   ```
+   El archivo generado se ubicará en `android/app/build/outputs/apk/debug/app-debug.apk`.
+5. Transfiere e instala el APK directamente en tu teléfono Android. Al abrirlo, otorga los permisos de notificación para disfrutar de alarmas exactas para tus clases y entregas.
+
+---
+
 ## Pruebas Automatizadas
 
 Ejecuta la suite de pruebas unitarias con Node.js (sin dependencias externas):

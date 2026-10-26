@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UNUmbral</string>
+    <string name="title_activity_main">UNUmbral</string>
+    <string name="package_name">com.teverde.unumbral</string>
+    <string name="custom_url_scheme">com.teverde.unumbral</string>
+</resources>

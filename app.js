@@ -2324,6 +2324,43 @@ async function eliminarTarea() {
   else renderTareas();
 }
 
+async function scheduleTestNotification() {
+  const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
+  if (!LocalNotifications) {
+    showToast("Las alertas programadas requieren instalar el APK en Android. (En web este modo es simulado).");
+    setTimeout(() => {
+      showToast("🔔 [Simulación] ¡Alerta en 10 s! Cálculo II en 10 min · Aula 3 · Dr. Pérez");
+    }, 10000);
+    return;
+  }
+
+  try {
+    const permStatus = await LocalNotifications.requestPermissions();
+    if (permStatus.display !== "granted") {
+      alert("Debes permitir las notificaciones en el sistema para recibir alertas.");
+      return;
+    }
+
+    const atDate = new Date(Date.now() + 10000);
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: 9999,
+          title: "UNUmbral · Prueba de Alerta",
+          body: "¡Alerta offline funcionando! Tu clase o tarea te avisará a tiempo.",
+          schedule: { at: atDate, allowWhileIdle: true },
+          smallIcon: "ic_stat_icon",
+          iconColor: "#22432C"
+        }
+      ]
+    });
+    showToast("Alerta programada en 10 s. Puedes cerrar la app para probarla.");
+  } catch (err) {
+    console.error("Error programando notificación de prueba:", err);
+    showToast("Error programando notificación: " + (err.message || err));
+  }
+}
+
 /* =====================================================================
    13. EVENTOS Y FORMULARIOS
    ===================================================================== */
@@ -2484,6 +2521,11 @@ function wireGlobalEvents() {
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
+  const btnTestNotif = $("#btn-test-notification");
+  if (btnTestNotif) {
+    btnTestNotif.addEventListener("click", scheduleTestNotification);
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
@@ -2532,7 +2574,7 @@ async function init() {
     navigator.storage.persist().catch(() => {});
   }
 
-  if ("serviceWorker" in navigator) {
+  if ("serviceWorker" in navigator && (typeof esNativo !== "function" || !esNativo())) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
 
