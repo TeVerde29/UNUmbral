@@ -40,7 +40,15 @@ const ICONS = {
   book: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
   edit: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-  layers: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
+  layers: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`,
+  x: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  message: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+  ban: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`,
+  rotateCcw: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>`,
+  alertCircle: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  chart: `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  star: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
 };
 
 /* SISTEMA DE CALIFICACIÓN UNIVERSITARIO (ESCALA VIGESIMAL 0–20)
@@ -63,7 +71,13 @@ const PASTEL_COLOR_MAP = {
   "#F87171": "#FECACA",
   "#2DD4BF": "#99F6E4",
   "#AFC49A": "#DDE8C8",
-  "#294635": "#C5D6B8"
+  "#294635": "#C5D6B8",
+  "#84CC16": "#ECFCCB",
+  "#D946EF": "#FAE8FF",
+  "#8B5CF6": "#EDE9FE",
+  "#EF4444": "#FEE2E2",
+  "#0EA5E9": "#E0F2FE",
+  "#78716C": "#F5F5F4"
 };
 
 function normalizarColorPastel(hex) {
@@ -183,18 +197,22 @@ db.version(4).stores({
   excepciones: "id, fecha, tipo, clase_id",
   ajustes:     "clave"
 }).upgrade(async (tx) => {
-  await tx.table("cursos").toCollection().modify(c => {
-    if (typeof c.creditos !== "number" || c.creditos <= 0) {
-      c.creditos = 3;
-    }
-  });
+  try {
+    await tx.table("cursos").toCollection().modify(c => {
+      if (typeof c.creditos !== "number" || c.creditos <= 0) {
+        c.creditos = 3;
+      }
+    });
 
-  const defaults = typeof getAjustesDefaults === "function" ? getAjustesDefaults() : {};
-  for (const [clave, valor] of Object.entries(defaults)) {
-    const existing = await tx.table("ajustes").get(clave);
-    if (!existing) {
-      await tx.table("ajustes").put({ clave, valor });
+    const defaults = typeof getAjustesDefaults === "function" ? getAjustesDefaults() : {};
+    for (const [clave, valor] of Object.entries(defaults)) {
+      const existing = await tx.table("ajustes").get(clave).catch(() => null);
+      if (!existing) {
+        await tx.table("ajustes").put({ clave, valor }).catch(() => {});
+      }
     }
+  } catch (err) {
+    console.warn("Aviso en upgrade v4:", err);
   }
 });
 
@@ -799,12 +817,12 @@ async function renderHoy() {
                     <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.titulo)}</div>
                     <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
                       ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:600;">${escapeHtml(t.materia)}</span> · ` : ""}
-                      <span>⏱️ ${t._estimadoMinutos || 45} min</span>
-                      <span>· ⭐ Nivel ${t.importancia || 1}</span>
+                      <span>${ICONS.clock} ${t._estimadoMinutos || 45} min</span>
+                      <span>· Nivel ${t.importancia || 1}</span>
                     </div>
                   </div>
                   <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 8px; flex-shrink:0;">
-                    ✓ Lista
+                    ${ICONS.check} Lista
                   </button>
                 </div>
               `).join("")}
@@ -1011,7 +1029,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
 
           if (umbralCruzado) {
             const restante = Math.max(0, resPrev.maxFaltasPermitidas - faltasDespues);
-            const msg = `⚠️ ¡Atención! Has alcanzado el ${umbralCruzado}% de faltas en ${c?.materia || "el curso"}. Te quedan ${restante} faltas permitidas.`;
+            const msg = `¡Atención! Has alcanzado el ${umbralCruzado}% de faltas en ${c?.materia || "el curso"}. Te quedan ${restante} faltas permitidas.`;
             showToast(msg, true);
             if (typeof dispararNotificacionInmediata === "function") {
               dispararNotificacionInmediata(`Alerta de Inasistencia (${umbralCruzado}%)`, msg, "urgente");
@@ -1027,7 +1045,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
             fecha: fechaHoyStr,
             estado: nuevoEstado
           });
-          showToast(nuevoEstado === "presente" ? "✓ Asistencia registrada" : "Justificación registrada");
+          showToast(nuevoEstado === "presente" ? "Asistencia registrada" : "Justificación registrada");
         }
       }
 
@@ -1099,22 +1117,22 @@ function renderClassCardHTML(c, opts = {}) {
           !cancelada ? `
             <div class="class-card-attendance" onclick="event.stopPropagation();">
               <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ✓ Asistí
+                ${ICONS.check} Asistí
               </button>
               <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ✗ Falté
+                ${ICONS.x} Falté
               </button>
               <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                💬 Justif.
+                ${ICONS.message} Justif.
               </button>
               <button type="button" class="asist-pill-btn" style="margin-left:auto;opacity:0.8;" data-action="cancelar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}" title="Cancelar solo la sesión de hoy">
-                🚫 Cancelar
+                ${ICONS.ban} Cancelar
               </button>
             </div>
           ` : `
             <div class="class-card-attendance" onclick="event.stopPropagation();">
               <button type="button" class="asist-pill-btn" data-action="restaurar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ↩ Restaurar sesión
+                ${ICONS.rotateCcw} Restaurar sesión
               </button>
             </div>
           `
@@ -1696,10 +1714,10 @@ async function renderTareas() {
       `;
     };
 
-    html += renderGroup("⚠️ Tareas Vencidas", grupos.vencidas, "danger");
-    html += renderGroup("📅 Para Hoy", grupos.hoy, "warning");
-    html += renderGroup("⏳ Para Mañana", grupos.manana, "neutral");
-    html += renderGroup("🗓️ Esta Semana", grupos.resto, "neutral");
+    html += renderGroup("Tareas Vencidas", grupos.vencidas, "danger");
+    html += renderGroup("Para Hoy", grupos.hoy, "warning");
+    html += renderGroup("Para Mañana", grupos.manana, "neutral");
+    html += renderGroup("Esta Semana", grupos.resto, "neutral");
     html += renderGroup("Más Adelante", grupos.masAdelante, "neutral");
     html += renderGroup("Sin Fecha Límite", grupos.sinFecha, "neutral");
 
@@ -1884,7 +1902,7 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
   if (feriado) {
     itemsHtml += `
       <div class="holiday-banner" style="margin-bottom:6px;">
-        <span>🎉 Feriado: ${escapeHtml(ferObj?.motivo || "Día No Laborable")}</span>
+        <span>${ICONS.star} Feriado: ${escapeHtml(ferObj?.motivo || "Día No Laborable")}</span>
       </div>`;
   }
 
@@ -1919,7 +1937,7 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
     const cursoNombre = cursosMap[t.curso_id]?.nombre || "General";
     itemsHtml += `
       <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-subtle);border-radius:var(--radius-sm);font-size:12px;border:1px solid var(--border-hairline);">
-        <span style="color:${t.completada ? '#10b981' : '#f59e0b'};font-weight:700;">${t.completada ? '✓' : '○'}</span>
+        <span style="color:${t.completada ? '#10b981' : '#f59e0b'};display:inline-flex;align-items:center;">${t.completada ? ICONS.check : '<span style="font-size:10px;">○</span>'}</span>
         <div style="flex:1;">
           <span style="${t.completada ? 'text-decoration:line-through;opacity:0.7;' : ''}">${escapeHtml(t.titulo)}</span>
           <div style="color:var(--text-secondary);font-size:11px;">${escapeHtml(cursoNombre)} · Nivel ${t.importancia || 3}</div>
@@ -2114,11 +2132,11 @@ function toggleGraficosRendimiento() {
 
   if (graficosRendimientoVisibles) {
     cont.classList.remove("hidden");
-    if (btn) btn.textContent = "📊 Ocultar Gráfica";
+    if (btn) btn.innerHTML = `${ICONS.chart} Ocultar Gráfica`;
     actualizarGraficosRendimiento(cursosCacheadosParaGrafico);
   } else {
     cont.classList.add("hidden");
-    if (btn) btn.textContent = "📊 Comparativa Gráfica";
+    if (btn) btn.innerHTML = `${ICONS.chart} Comparativa Gráfica`;
   }
 }
 
@@ -2288,7 +2306,7 @@ function renderCursoCardHTML(c, r, ses) {
           <span class="grade-status-pill ${info.tone}">${info.label}</span>
           <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
           <button type="button" class="asist-pill-btn" data-action="asistencia" data-id="${escapeHtml(c.id)}" style="margin-left:auto;font-size:11px;" title="Ver registro y límite de faltas">
-            📊 Asistencia
+            ${ICONS.chart} Asistencia
           </button>
         </span>
       </button>
@@ -2886,13 +2904,13 @@ async function renderAjustesExcepciones() {
   excepciones.sort((a, b) => (a.fecha > b.fecha ? 1 : -1));
   listEl.innerHTML = excepciones.map(ex => {
     const cursoNombre = ex.curso_id ? (cursoMap.get(ex.curso_id) || "Curso") : "Todos los cursos";
-    const tipoLabel = ex.tipo === "feriado" ? "🎉 Feriado" : "🚫 Clase cancelada";
+    const tipoLabel = ex.tipo === "feriado" ? "Feriado" : "Clase cancelada";
     return `
       <div class="exception-item">
         <div class="exception-item-details">
           <strong>${tipoLabel}: ${escapeHtml(ex.motivo || "Sin motivo")}</strong>
           <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
-            📅 ${ex.fecha} · <span>${escapeHtml(cursoNombre)}</span>
+            ${ex.fecha} · <span>${escapeHtml(cursoNombre)}</span>
           </div>
         </div>
         <button type="button" class="btn-danger btn-sm" data-action="delete-excepcion" data-id="${ex.id}" style="padding:4px 8px;font-size:11px;">Eliminar</button>
@@ -3015,9 +3033,9 @@ async function openAsistenciaModal(cursoId) {
           </div>
           <div style="display:flex;gap:4px;">
             ${s.cancelada ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surface-subtle);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
-              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar presente">✓</button>
-              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar falta">✗</button>
-              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar justificada">💬</button>
+              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar presente">${ICONS.check}</button>
+              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar falta">${ICONS.x}</button>
+              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar justificada">${ICONS.message}</button>
             `}
           </div>
         </div>
@@ -3758,7 +3776,7 @@ async function scheduleTestNotification() {
   if (!LocalNotifications) {
     showToast("Las alertas programadas requieren instalar el APK en Android. (En web este modo es simulado).");
     setTimeout(() => {
-      showToast("🔔 [Simulación] ¡Alerta en 10 s! Cálculo II en 10 min · Aula 3 · Dr. Pérez");
+      showToast("[Simulación] ¡Alerta en 10 s! Cálculo II en 10 min · Aula 3 · Dr. Pérez");
     }, 10000);
     return;
   }
@@ -4271,6 +4289,9 @@ function inicializarDeepLinks() {
 async function init() {
   applyTheme(state.theme);
 
+  const dateEl = $("#current-date-label");
+  if (dateEl) dateEl.textContent = formatReadableDate();
+
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().catch(() => {});
   }
@@ -4280,10 +4301,13 @@ async function init() {
   }
 
   try {
-    await db.open();
+    await Promise.race([
+      db.open(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout IndexedDB")), 3000))
+    ]);
     await checkAndMigrateLegacyDB();
   } catch (err) {
-    console.error("Error abriendo IndexedDB:", err);
+    console.warn("Aviso abriendo IndexedDB:", err);
   }
 
   wireGlobalEvents();
@@ -4299,4 +4323,10 @@ async function init() {
   }, 60000);
 }
 
-document.addEventListener("DOMContentLoaded", init);
+if (typeof window !== "undefined" && typeof document !== "undefined" && typeof document.getElementById === "function") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+}
