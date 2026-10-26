@@ -270,10 +270,19 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
     const hInicio = to24Hour(c.hora_inicio);
     const hFin = to24Hour(c.hora_fin);
     if (c.curso_id) {
-      clases.push({ id: c.id || uuid(), curso_id: c.curso_id, dia_semana: c.dia_semana, hora_inicio: hInicio, hora_fin: hFin, aula: c.aula || "" });
-      return;
+      // curso_id puede ser un ID interno o el nombre del curso (importación por QR entre dispositivos)
+      let cursoResuelto = cursosExistentes.find(ce => ce.id === c.curso_id);
+      if (!cursoResuelto) {
+        cursoResuelto = cursosExistentes.find(ce => normalizarNombre(ce.nombre) === normalizarNombre(c.curso_id));
+      }
+      if (cursoResuelto) {
+        clases.push({ id: c.id || uuid(), curso_id: cursoResuelto.id, dia_semana: c.dia_semana, hora_inicio: hInicio, hora_fin: hFin, aula: c.aula || "" });
+        return;
+      }
+      // Si no se encontró por ID ni por nombre, tratar como curso nuevo por nombre
     }
-    const curso = obtenerCurso(c.materia, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
+    const nombreCurso = c.materia || c.curso_id;
+    const curso = obtenerCurso(nombreCurso, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
     if (!curso) return;
     clases.push({
       id: c.id || uuid(),
@@ -3265,6 +3274,7 @@ async function openModalQrSchedule() {
   }
 
   const idsCursosValidos = new Set(cursosUnicos.map(c => c.id));
+  const mapaIdANombre = new Map(cursosUnicos.map(c => [c.id, c.nombre]));
   const clasesUnicas = [];
   const vistasClase = new Set();
 
@@ -3290,7 +3300,7 @@ async function openModalQrSchedule() {
       creditos: c.creditos || 3
     })),
     clases: clasesUnicas.map(k => ({
-      curso_id: k.curso_id,
+      curso_id: mapaIdANombre.get(k.curso_id) || "",
       dia_semana: k.dia_semana,
       hora_inicio: k.hora_inicio,
       hora_fin: k.hora_fin,
