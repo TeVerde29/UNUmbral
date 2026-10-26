@@ -305,6 +305,32 @@
         </div>
       </div>
 
+      <!-- Ciclo Académico y Asistencia -->
+      <div class="section-header" style="margin-top: 28px;">
+        <div>
+          <h2 class="section-title">Ciclo Académico y Asistencia</h2>
+          <p class="section-subtitle">Define las fechas del semestre para el cálculo de sesiones y control de faltas</p>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="ajuste-ciclo-inicio">Fecha de Inicio del Ciclo</label>
+            <input type="date" id="ajuste-ciclo-inicio" class="field">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ajuste-ciclo-fin">Fecha de Fin del Ciclo</label>
+            <input type="date" id="ajuste-ciclo-fin" class="field">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label" for="ajuste-limite-faltas">Límite Máximo de Faltas (%)</label>
+          <input type="number" id="ajuste-limite-faltas" class="field" min="5" max="50" step="1" value="30">
+          <span class="form-hint">Dispara alertas tempranas automáticas al cruzar el 10 %, 20 % y 30 % de inasistencias.</span>
+        </div>
+      </div>
+
       <!-- Alertas y Notificaciones Locales (Capacitor APK) -->
       <div class="section-header" style="margin-top: 28px;">
         <div>
@@ -321,6 +347,87 @@
           </button>
         </div>
         <p class="form-hint" style="margin-top: 8px;">Programa una alerta local de prueba a 10 segundos para verificar que suena incluso con la aplicación cerrada.</p>
+
+        <hr style="border:0; border-top: 1px solid var(--border-hairline); margin: 16px 0;">
+
+        <div class="settings-toggle-group">
+          <label class="settings-toggle-item">
+            <div>
+              <strong>Avisos de Clases (30 y 10 min antes)</strong>
+              <p>Notificaciones antes de iniciar cada sesión programada.</p>
+            </div>
+            <input type="checkbox" id="ajuste-notif-clases" class="toggle-checkbox" checked>
+          </label>
+
+          <label class="settings-toggle-item">
+            <div>
+              <strong>Alertas de Tareas (Nivel 1 al 3)</strong>
+              <p>Inician 48 h antes del vencimiento y se repiten cada 8 h.</p>
+            </div>
+            <input type="checkbox" id="ajuste-notif-tareas" class="toggle-checkbox" checked>
+          </label>
+
+          <label class="settings-toggle-item">
+            <div>
+              <strong>Alertas Insistentes (Nivel 4 y 5)</strong>
+              <p>Canal urgente cada 4 h y avisos a 2 h, 30 min y 10 min antes.</p>
+            </div>
+            <input type="checkbox" id="ajuste-notif-urgentes" class="toggle-checkbox" checked>
+          </label>
+
+          <label class="settings-toggle-item">
+            <div>
+              <strong>Nivel 5 ignora horas de silencio</strong>
+              <p>Alerta con sonido y vibración máxima incluso en periodo nocturno.</p>
+            </div>
+            <input type="checkbox" id="ajuste-nivel5-silencio" class="toggle-checkbox" checked>
+          </label>
+
+          <label class="settings-toggle-item">
+            <div>
+              <strong>Resumen Matutino Diario</strong>
+              <p>Notificación a primera hora con las clases y tareas del día.</p>
+            </div>
+            <input type="checkbox" id="ajuste-resumen-activo" class="toggle-checkbox" checked>
+          </label>
+        </div>
+
+        <div class="form-row" style="margin-top: 14px;">
+          <div class="form-group">
+            <label class="form-label" for="ajuste-resumen-hora">Hora del Resumen</label>
+            <input type="time" id="ajuste-resumen-hora" class="field" value="07:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ajuste-silencio-desde">Silencio: Desde</label>
+            <input type="time" id="ajuste-silencio-desde" class="field" value="22:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ajuste-silencio-hasta">Silencio: Hasta</label>
+            <input type="time" id="ajuste-silencio-hasta" class="field" value="07:00">
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 10px;">
+          <div class="form-group">
+            <label class="form-label" for="ajuste-huecos-desde">Ventana Huecos: Desde</label>
+            <input type="time" id="ajuste-huecos-desde" class="field" value="07:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ajuste-huecos-hasta">Ventana Huecos: Hasta</label>
+            <input type="time" id="ajuste-huecos-hasta" class="field" value="22:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="ajuste-huecos-min">Mínimo Hueco (min)</label>
+            <input type="number" id="ajuste-huecos-min" class="field" min="15" max="180" step="5" value="30">
+          </div>
+        </div>
+
+        <div class="settings-card-actions" style="margin-top: 16px;">
+          <button id="btn-save-ajustes" class="btn-primary">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span>Guardar Ajustes</span>
+          </button>
+        </div>
       </div>
 
       <!-- Copia de seguridad total -->
@@ -552,9 +659,15 @@
         <input type="hidden" id="curso-color" value="#BAE6FD">
       </div>
 
-      <div class="form-group">
-        <label class="form-label" for="curso-notas">Comentarios o Enlaces (Opcional)</label>
-        <input type="text" id="curso-notas" class="field" placeholder="Enlace a sílabo, aula virtual, Drive o apuntes…" enterkeyhint="done">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="curso-creditos">Créditos del Curso</label>
+          <input type="number" id="curso-creditos" class="field" min="1" max="10" step="1" value="3" required enterkeyhint="next">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="curso-notas">Comentarios o Enlaces (Opcional)</label>
+          <input type="text" id="curso-notas" class="field" placeholder="Sílabo, Drive, apuntes…" enterkeyhint="done">
+        </div>
       </div>
 
       <p id="curso-sesiones-info" class="form-hint hidden"></p>
@@ -752,6 +865,7 @@
 <!-- LIBRERÍAS LOCALES OFFLINE -->
 <script src="lib/dexie.min.js"></script>
 <script src="lib/plataforma.js"></script>
+<script src="lib/ajustes.js"></script>
 <script src="app.js"></script>
 
 </body>

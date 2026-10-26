@@ -88,9 +88,11 @@ function sanitizarCursoImportado(c) {
     ? ev.practicas.map((p, idx) => ({
         id: String((p && p.id) || uuid()),
         titulo: String((p && p.titulo) || `Práctica ${idx + 1}`).trim().slice(0, 40),
-        nota: sanitizarNota(p && p.nota)
+        nota: sanitizarNota(p && p.nota),
+        fecha: typeof (p && p.fecha) === "string" ? p.fecha : null
       }))
     : [];
+  const creditos = typeof c.creditos === "number" && c.creditos > 0 ? Math.min(10, Math.max(1, Math.round(c.creditos))) : 3;
   return {
     id: String(c.id || uuid()),
     nombre,
@@ -98,9 +100,12 @@ function sanitizarCursoImportado(c) {
     aula: String(c.aula || "").trim(),
     color: normalizarColorPastel(c.color),
     notas: String(c.notas || "").trim(),
+    creditos,
     evaluacion: {
       parcial: sanitizarNota(ev.parcial),
       final: sanitizarNota(ev.final),
+      fecha_parcial: typeof ev.fecha_parcial === "string" ? ev.fecha_parcial : null,
+      fecha_final: typeof ev.fecha_final === "string" ? ev.fecha_final : null,
       practicas
     }
   };
@@ -166,6 +171,31 @@ db.version(3).stores({
     cl.hora_inicio = to24Hour(cl.hora_inicio);
     cl.hora_fin = to24Hour(cl.hora_fin);
   });
+});
+
+/* Versión 4: eventos, asistencia por sesión, excepciones de calendario y ajustes de ciclo / notificaciones */
+db.version(4).stores({
+  cursos:      "id, nombre",
+  clases:      "id, curso_id, dia_semana",
+  tareas:      "id, curso_id, fecha_limite, importancia, completada, fecha_creacion",
+  eventos:     "id, curso_id, fecha, tipo",
+  asistencia:  "id, curso_id, clase_id, fecha, estado, &[clase_id+fecha]",
+  excepciones: "id, fecha, tipo, clase_id",
+  ajustes:     "clave"
+}).upgrade(async (tx) => {
+  await tx.table("cursos").toCollection().modify(c => {
+    if (typeof c.creditos !== "number" || c.creditos <= 0) {
+      c.creditos = 3;
+    }
+  });
+
+  const defaults = typeof getAjustesDefaults === "function" ? getAjustesDefaults() : {};
+  for (const [clave, valor] of Object.entries(defaults)) {
+    const existing = await tx.table("ajustes").get(clave);
+    if (!existing) {
+      await tx.table("ajustes").put({ clave, valor });
+    }
+  }
 });
 
 /* =====================================================================
@@ -1575,6 +1605,7 @@ async function openNewCursoModal(origin) {
   $("#curso-nombre").value = "";
   $("#curso-profesor").value = "";
   $("#curso-aula").value = "";
+  $("#curso-creditos").value = "3";
   $("#curso-notas").value = "";
   $("#curso-form-error").classList.add("hidden");
   $("#btn-delete-curso").classList.add("hidden");
@@ -1599,6 +1630,7 @@ async function openEditCursoModal(id) {
   $("#curso-nombre").value = c.nombre || "";
   $("#curso-profesor").value = c.profesor || "";
   $("#curso-aula").value = c.aula || "";
+  $("#curso-creditos").value = c.creditos || 3;
   $("#curso-notas").value = c.notas || "";
   setCursoColor(c.color || COLOR_CURSO_DEFECTO);
   $("#curso-form-error").classList.add("hidden");
@@ -1640,6 +1672,9 @@ async function guardarCurso(e) {
     return;
   }
 
+  const creditosRaw = parseInt($("#curso-creditos").value, 10);
+  const creditos = Number.isFinite(creditosRaw) && creditosRaw > 0 ? Math.min(10, Math.max(1, creditosRaw)) : 3;
+
   const previo = id ? existentes.find(c => c.id === id) : null;
   const curso = {
     id: id || uuid(),
@@ -1647,6 +1682,7 @@ async function guardarCurso(e) {
     profesor: $("#curso-profesor").value.trim(),
     aula: $("#curso-aula").value.trim(),
     color: $("#curso-color").value || COLOR_CURSO_DEFECTO,
+    creditos,
     notas: $("#curso-notas").value.trim(),
     evaluacion: (previo && previo.evaluacion) || evaluacionVacia()
   };
@@ -1996,6 +2032,7 @@ function setImportanceStars(val) {
    12. VISTA: AJUSTES, COMPARTIR & BACKUPS
    ===================================================================== */
 function renderAjustes() {
+  cargarAjustesUI();
   if (navigator.storage && navigator.storage.persisted) {
     navigator.storage.persisted().then(persisted => {
       const dot = $("#db-indicator-dot");
@@ -2010,6 +2047,95 @@ function renderAjustes() {
       }
     });
   }
+}
+
+async function getAjuste(clave, fallback) {
+  try {
+    const entry = await db.ajustes.get(clave);
+    return entry !== undefined ? entry.valor : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function setAjuste(clave, valor) {
+  try {
+    await db.ajustes.put({ clave, valor });
+  } catch (err) {
+    console.warn("Error guardando ajuste:", clave, err);
+  }
+}
+
+async function cargarAjustesUI() {
+  const defaults = typeof getAjustesDefaults === "function" ? getAjustesDefaults() : {};
+  let ajustesList = [];
+  try {
+    ajustesList = await db.ajustes.toArray();
+  } catch (err) {
+    console.warn("Error cargando ajustes:", err);
+  }
+
+  const map = { ...defaults };
+  ajustesList.forEach(a => {
+    map[a.clave] = a.valor;
+  });
+
+  const setVal = (id, val) => { const el = $(id); if (el) el.value = val ?? ""; };
+  const setChk = (id, val) => { const el = $(id); if (el) el.checked = Boolean(val); };
+
+  setVal("#ajuste-ciclo-inicio", map.ciclo_inicio);
+  setVal("#ajuste-ciclo-fin", map.ciclo_fin);
+  setVal("#ajuste-limite-faltas", map.limite_faltas_pct ?? 30);
+
+  setChk("#ajuste-notif-clases", map.notif_clases);
+  setChk("#ajuste-notif-tareas", map.notif_tareas);
+  setChk("#ajuste-notif-urgentes", map.notif_urgentes);
+  setChk("#ajuste-nivel5-silencio", map.nivel5_ignora_silencio);
+  setChk("#ajuste-resumen-activo", map.resumen_activo);
+
+  setVal("#ajuste-resumen-hora", map.resumen_hora ?? "07:00");
+  setVal("#ajuste-silencio-desde", map.silencio_desde ?? "22:00");
+  setVal("#ajuste-silencio-hasta", map.silencio_hasta ?? "07:00");
+
+  setVal("#ajuste-huecos-desde", map.huecos_ventana_desde ?? "07:00");
+  setVal("#ajuste-huecos-hasta", map.huecos_ventana_hasta ?? "22:00");
+  setVal("#ajuste-huecos-min", map.huecos_min ?? 30);
+}
+
+async function guardarAjustesUI() {
+  const getVal = (id, dflt) => $(id) ? $(id).value : dflt;
+  const getChk = (id, dflt) => $(id) ? $(id).checked : dflt;
+
+  const inicio = getVal("#ajuste-ciclo-inicio", "");
+  const fin = getVal("#ajuste-ciclo-fin", "");
+  if (inicio && fin && inicio >= fin) {
+    alert("La fecha de inicio del ciclo debe ser anterior a la fecha de fin.");
+    return;
+  }
+
+  const updates = {
+    ciclo_inicio: inicio || null,
+    ciclo_fin: fin || null,
+    limite_faltas_pct: parseInt(getVal("#ajuste-limite-faltas", "30"), 10) || 30,
+    notif_clases: getChk("#ajuste-notif-clases", true),
+    notif_tareas: getChk("#ajuste-notif-tareas", true),
+    notif_urgentes: getChk("#ajuste-notif-urgentes", true),
+    nivel5_ignora_silencio: getChk("#ajuste-nivel5-silencio", true),
+    resumen_activo: getChk("#ajuste-resumen-activo", true),
+    resumen_hora: getVal("#ajuste-resumen-hora", "07:00"),
+    silencio_desde: getVal("#ajuste-silencio-desde", "22:00"),
+    silencio_hasta: getVal("#ajuste-silencio-hasta", "07:00"),
+    huecos_ventana_desde: getVal("#ajuste-huecos-desde", "07:00"),
+    huecos_ventana_hasta: getVal("#ajuste-huecos-hasta", "22:00"),
+    huecos_min: parseInt(getVal("#ajuste-huecos-min", "30"), 10) || 30
+  };
+
+  const clean = typeof sanitizarAjustes === "function" ? sanitizarAjustes(updates) : updates;
+  for (const [clave, valor] of Object.entries(clean)) {
+    await db.ajustes.put({ clave, valor });
+  }
+
+  showToast("Ajustes guardados correctamente.");
 }
 
 async function exportScheduleForFriends() {
@@ -2096,19 +2222,27 @@ async function importScheduleFromFriends(file) {
 }
 
 async function exportFullBackup() {
-  const [cursos, classes, tasks] = await Promise.all([
+  const [cursos, classes, tasks, eventos, asistencia, excepciones, ajustes] = await Promise.all([
     db.cursos.toArray(),
     db.clases.toArray(),
-    db.tareas.toArray()
+    db.tareas.toArray(),
+    db.eventos.toArray(),
+    db.asistencia.toArray(),
+    db.excepciones.toArray(),
+    db.ajustes.toArray()
   ]);
 
   const payload = {
     tipo: "unumbral-backup-total",
-    version: 2,
+    version: 4,
     fecha_creacion: new Date().toISOString(),
-    cursos: cursos,
+    cursos,
     clases: classes,
-    tareas: tasks
+    tareas: tasks,
+    eventos: eventos || [],
+    asistencia: asistencia || [],
+    excepciones: excepciones || [],
+    ajustes: ajustes || []
   };
 
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -2133,11 +2267,11 @@ async function importFullBackup(file) {
 
     const ok = await confirmDialog(
       "Restaurar Copia",
-      "Esto integrará los cursos, notas, clases y tareas del respaldo a la base de datos actual. ¿Continuar?"
+      "Esto integrará los cursos, notas, clases, tareas, eventos y asistencia del respaldo a la base de datos actual. ¿Continuar?"
     );
     if (!ok) return;
 
-    await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+    await db.transaction("rw", [db.cursos, db.clases, db.tareas, db.eventos, db.asistencia, db.excepciones, db.ajustes], async () => {
       if (Array.isArray(data.cursos) && data.cursos.length > 0) {
         const cursosSanitizados = data.cursos.map(sanitizarCursoImportado).filter(Boolean);
         if (cursosSanitizados.length) await db.cursos.bulkPut(cursosSanitizados);
@@ -2147,9 +2281,23 @@ async function importFullBackup(file) {
       if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
       if (r.clases.length) await db.clases.bulkPut(r.clases);
       if (r.tareas.length) await db.tareas.bulkPut(r.tareas);
+
+      if (Array.isArray(data.eventos) && data.eventos.length) {
+        await db.eventos.bulkPut(data.eventos);
+      }
+      if (Array.isArray(data.asistencia) && data.asistencia.length) {
+        await db.asistencia.bulkPut(data.asistencia);
+      }
+      if (Array.isArray(data.excepciones) && data.excepciones.length) {
+        await db.excepciones.bulkPut(data.excepciones);
+      }
+      if (Array.isArray(data.ajustes) && data.ajustes.length) {
+        await db.ajustes.bulkPut(data.ajustes);
+      }
     });
 
     showToast("Copia de seguridad restaurada.");
+    await cargarAjustesUI();
     switchTab("view-hoy");
   } catch (err) {
     console.error(err);
@@ -2524,6 +2672,11 @@ function wireGlobalEvents() {
   const btnTestNotif = $("#btn-test-notification");
   if (btnTestNotif) {
     btnTestNotif.addEventListener("click", scheduleTestNotification);
+  }
+
+  const btnSaveAjustes = $("#btn-save-ajustes");
+  if (btnSaveAjustes) {
+    btnSaveAjustes.addEventListener("click", guardarAjustesUI);
   }
 
   document.addEventListener("keydown", (e) => {
