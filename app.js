@@ -50,7 +50,27 @@ const NOTA_MAX = 20;
 const NOTA_APROBATORIA = 10.5;
 const NOTA_UMBRAL_RIESGO = 14; // si necesitas más de esto en lo que falta, el curso está en riesgo
 const NOTA_EPS = 1e-9;
-const COLOR_CURSO_DEFECTO = "#38BDF8";
+const COLOR_CURSO_DEFECTO = "#BAE6FD";
+
+/* Mapa de conversión automática de colores intensos antiguos a tonos pasteles */
+const PASTEL_COLOR_MAP = {
+  "#38BDF8": "#BAE6FD",
+  "#E879F9": "#F5D0FE",
+  "#FACC15": "#FEF08A",
+  "#4ADE80": "#BBF7D0",
+  "#FB923C": "#FED7AA",
+  "#818CF8": "#C7D2FE",
+  "#F87171": "#FECACA",
+  "#2DD4BF": "#99F6E4",
+  "#AFC49A": "#DDE8C8",
+  "#294635": "#C5D6B8"
+};
+
+function normalizarColorPastel(hex) {
+  if (!hex) return COLOR_CURSO_DEFECTO;
+  const upper = String(hex).trim().toUpperCase();
+  return PASTEL_COLOR_MAP[upper] || upper;
+}
 
 const ESTADO_NOTA_INFO = {
   "sin-notas":   { label: "Sin notas",          tone: "st-neutral" },
@@ -98,6 +118,22 @@ db.version(2).stores({
   if (r.tareas.length) await tx.table("tareas").bulkAdd(r.tareas);
 });
 
+/* Versión 3: convierte colores de cursos a gama pastel y normaliza horas (soporta 12h AM/PM y 24h) */
+db.version(3).stores({
+  cursos: "id, nombre",
+  clases: "id, curso_id, dia_semana",
+  tareas: "id, curso_id, fecha_limite, importancia, completada, fecha_creacion",
+  ajustes: "clave"
+}).upgrade(async (tx) => {
+  await tx.table("cursos").toCollection().modify(c => {
+    c.color = normalizarColorPastel(c.color);
+  });
+  await tx.table("clases").toCollection().modify(cl => {
+    cl.hora_inicio = to24Hour(cl.hora_inicio);
+    cl.hora_fin = to24Hour(cl.hora_fin);
+  });
+});
+
 /* =====================================================================
    2.1 CAPA DE DATOS: CURSOS, CLASES ENRIQUECIDAS Y MIGRACIÓN
    ===================================================================== */
@@ -135,7 +171,7 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
         nombre: limpio,
         profesor: d.profesor || "",
         aula: d.aula || "",
-        color: d.color || COLOR_CURSO_DEFECTO,
+        color: normalizarColorPastel(d.color || COLOR_CURSO_DEFECTO),
         notas: d.notas || "",
         evaluacion: evaluacionVacia()
       };
@@ -149,8 +185,10 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
 
   const clases = [];
   (clasesPlanas || []).forEach(c => {
+    const hInicio = to24Hour(c.hora_inicio);
+    const hFin = to24Hour(c.hora_fin);
     if (c.curso_id) {
-      clases.push({ id: c.id || uuid(), curso_id: c.curso_id, dia_semana: c.dia_semana, hora_inicio: c.hora_inicio, hora_fin: c.hora_fin, aula: c.aula || "" });
+      clases.push({ id: c.id || uuid(), curso_id: c.curso_id, dia_semana: c.dia_semana, hora_inicio: hInicio, hora_fin: hFin, aula: c.aula || "" });
       return;
     }
     const curso = obtenerCurso(c.materia, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
@@ -159,8 +197,8 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
       id: c.id || uuid(),
       curso_id: curso.id,
       dia_semana: c.dia_semana,
-      hora_inicio: c.hora_inicio,
-      hora_fin: c.hora_fin,
+      hora_inicio: hInicio,
+      hora_fin: hFin,
       // Solo se guarda el aula en la sesión si es distinta a la habitual del curso
       aula: c.aula && c.aula !== curso.aula ? c.aula : ""
     });
@@ -170,7 +208,7 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
     if (Object.prototype.hasOwnProperty.call(t, "curso_id")) return t;
     const { materia, ...resto } = t;
     const esGeneral = !materia || normalizarNombre(materia) === "general";
-    const curso = esGeneral ? null : obtenerCurso(materia, { color: "#AFC49A" });
+    const curso = esGeneral ? null : obtenerCurso(materia, { color: "#DDE8C8" });
     return { ...resto, curso_id: curso ? curso.id : "" };
   });
 
@@ -181,7 +219,10 @@ async function cargarCursos() {
   const list = await db.cursos.toArray();
   list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
   const map = {};
-  list.forEach(c => { map[c.id] = c; });
+  list.forEach(c => {
+    c.color = normalizarColorPastel(c.color);
+    map[c.id] = c;
+  });
   return { list, map };
 }
 
@@ -191,7 +232,7 @@ function enriquecerClase(clase, cursosMap) {
   return {
     ...clase,
     materia: curso ? curso.nombre : "Curso eliminado",
-    color: (curso && curso.color) || "#AFC49A",
+    color: normalizarColorPastel((curso && curso.color) || "#DDE8C8"),
     profesor: (curso && curso.profesor) || "",
     aula: clase.aula || (curso && curso.aula) || ""
   };
@@ -342,10 +383,48 @@ function escapeHtml(str) {
 
 function pad2(n) { return String(n).padStart(2, "0"); }
 
+/**
+ * Convierte cualquier hora ("14:30" o "02:30 PM" o "8:00 am") al formato 24h "HH:MM"
+ * requerido por <input type="time"> y el cálculo interno de minutos.
+ */
+function to24Hour(str) {
+  if (!str) return "08:00";
+  const s = String(str).trim().toUpperCase();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/);
+  if (!m) return "08:00";
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const mer = m[3];
+  if (mer === "PM" && h < 12) h += 12;
+  else if (mer === "AM" && h === 12) h = 0;
+  h = Math.max(0, Math.min(23, h));
+  return `${pad2(h)}:${pad2(Math.max(0, Math.min(59, min)))}`;
+}
+
 function timeToMinutes(hhmm) {
   if (!hhmm) return 0;
-  const [h, m] = hhmm.split(":").map(Number);
+  const [h, m] = to24Hour(hhmm).split(":").map(Number);
   return h * 60 + m;
+}
+
+/** Formatea una cantidad de minutos desde medianoche al formato 12 horas ("08:00 AM", "05:20 PM"). */
+function formatMinutes12(totalMins) {
+  const mins = ((Math.round(totalMins) % 1440) + 1440) % 1440;
+  const h24 = Math.floor(mins / 60);
+  const m = mins % 60;
+  const mer = h24 >= 12 ? "PM" : "AM";
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${pad2(h12)}:${pad2(m)} ${mer}`;
+}
+
+/** Formatea cualquier cadena de hora ("17:20" o "05:20 PM") en formato de 12 horas con AM/PM. */
+function formatTime12(hhmm) {
+  if (!hhmm) return "";
+  return formatMinutes12(timeToMinutes(hhmm));
+}
+
+function formatTimeRange12(start, end) {
+  return `${formatTime12(start)} – ${formatTime12(end)}`;
 }
 
 function overlaps(startA, endA, startB, endB) {
@@ -393,7 +472,7 @@ function formatRelativeDue(isoDateStr) {
   const diffHours = Math.round(diffMs / (1000 * 60 * 60));
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-  const timeStr = `${pad2(target.getHours())}:${pad2(target.getMinutes())}`;
+  const timeStr = formatTime12(`${pad2(target.getHours())}:${pad2(target.getMinutes())}`);
 
   if (diffMs < 0) {
     const overdueDays = Math.abs(diffDays);
@@ -624,7 +703,7 @@ function renderLiveStatusCard(classesToday) {
     container.innerHTML = `
       <div class="live-card-eyebrow">
         <span class="live-dot pulse"></span>
-        <span style="color:var(--status-success)">En Curso · ${currentClass.hora_inicio} a ${currentClass.hora_fin}</span>
+        <span style="color:var(--status-success)">En Curso · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}</span>
       </div>
       <div class="live-card-title">${escapeHtml(currentClass.materia)}</div>
       <div class="live-card-meta">
@@ -656,7 +735,7 @@ function renderLiveStatusCard(classesToday) {
       </div>
       <div class="live-card-title">${escapeHtml(nextClass.materia)}</div>
       <div class="live-card-meta">
-        <span class="live-meta-item">${ICONS.clock} ${nextClass.hora_inicio} – ${nextClass.hora_fin} (en ${countdown})</span>
+        <span class="live-meta-item">${ICONS.clock} ${formatTimeRange12(nextClass.hora_inicio, nextClass.hora_fin)} (en ${countdown})</span>
         <span class="live-meta-item">${ICONS.location} ${escapeHtml(nextClass.aula || "Sin aula")}</span>
         <span class="live-meta-item">${ICONS.person} ${escapeHtml(nextClass.profesor || "Profesor(a)")}</span>
       </div>`;
@@ -677,14 +756,14 @@ function renderLiveStatusCard(classesToday) {
 }
 
 function renderClassCardHTML(c) {
-  const color = c.color || "#38BDF8";
+  const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
   return `
     <div class="class-card" data-id="${c.id}">
       <div class="class-card-stripe" style="background:${color}"></div>
       <div class="class-card-main">
         <div class="class-card-title">${escapeHtml(c.materia)}</div>
         <div class="class-card-details">
-          <span class="class-time-tag">${ICONS.clock} ${c.hora_inicio} – ${c.hora_fin}</span>
+          <span class="class-time-tag">${ICONS.clock} ${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
           ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
           ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
         </div>
@@ -797,7 +876,7 @@ function wireMatrixJumpBar(container) {
       } else {
         const th = $(`th[data-day="${target}"]`, scrollWrapper);
         if (th) {
-          const targetLeft = th.offsetLeft - 78;
+          const targetLeft = th.offsetLeft - 106;
           scrollWrapper.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
         }
       }
@@ -828,12 +907,12 @@ function renderMatrixTableHTML(classes) {
   minMinutes = Math.max(360, minMinutes);  // no antes de 06:00
   maxMinutes = Math.min(1440, maxMinutes); // no después de 24:00
 
-  // 3. Crear lista de slots de 30 minutos
+  // 3. Crear lista de slots de 30 minutos (en formato de 12 horas AM/PM)
   const rawSlots = [];
   for (let m = minMinutes; m < maxMinutes; m += 30) {
-    const startStr = `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
     const nextM = m + 30;
-    const endStr = `${pad2(Math.floor(nextM / 60))}:${pad2(nextM % 60)}`;
+    const startStr = formatMinutes12(m);
+    const endStr = formatMinutes12(nextM);
 
     const hasActivity = classes.some(c =>
       activeDays.includes(c.dia_semana) &&
@@ -864,7 +943,7 @@ function renderMatrixTableHTML(classes) {
             isBreak: true,
             start: bStart,
             end: bEnd,
-            label: `${pad2(Math.floor(bStart / 60))}:${pad2(bStart % 60)} – ${pad2(Math.floor(bEnd / 60))}:${pad2(bEnd % 60)}`
+            label: `${formatMinutes12(bStart)} – ${formatMinutes12(bEnd)}`
           });
         } else {
           emptyStreak.forEach(s => processedSlots.push(s));
@@ -880,7 +959,7 @@ function renderMatrixTableHTML(classes) {
         isBreak: true,
         start: bStart,
         end: bEnd,
-        label: `${pad2(Math.floor(bStart / 60))}:${pad2(bStart % 60)} – ${pad2(Math.floor(bEnd / 60))}:${pad2(bEnd % 60)}`
+        label: `${formatMinutes12(bStart)} – ${formatMinutes12(bEnd)}`
       });
     } else {
       emptyStreak.forEach(s => processedSlots.push(s));
@@ -945,15 +1024,16 @@ function renderMatrixTableHTML(classes) {
         span = Math.max(1, span);
         activeSpanUntil[d] = classEnd;
 
-        const color = c.color || "#38BDF8";
+        const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
         const textColor = getContrastTextColor(color);
-        const borderColor = darkenColor(color, 0.28);
+        const borderColor = darkenColor(color, 0.24);
+        const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
 
         cellsHtml += `
           <td rowspan="${span}" class="matrix-class-cell">
-            <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${c.hora_inicio} – ${c.hora_fin})">
+            <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${rangoHora12})">
               <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
-              <div class="matrix-cell-card-time">${c.hora_inicio} – ${c.hora_fin}</div>
+              <div class="matrix-cell-card-time">${rangoHora12}</div>
               ${c.aula || c.profesor ? `
                 <div class="matrix-cell-card-meta">
                   ${c.aula ? `<span class="meta-badge">${escapeHtml(c.aula)}</span>` : ""}
@@ -1687,6 +1767,13 @@ async function actualizarPreviewCursoClase() {
   $("#class-aula").placeholder = curso.aula ? `Habitual: ${curso.aula}` : "Ej: Aula 204, Lab B (opcional)";
 }
 
+function actualizarHintsHoraClase() {
+  const hIni = $("#hint-hora-inicio");
+  const hFin = $("#hint-hora-fin");
+  if (hIni) hIni.textContent = formatTime12($("#class-hora-inicio").value || "08:00");
+  if (hFin) hFin.textContent = formatTime12($("#class-hora-fin").value || "10:00");
+}
+
 async function openNewClassModal(preselectedDay, preselectedCursoId) {
   const dia = preselectedDay || state.selectedDay || "LUNES";
   const count = await db.cursos.count();
@@ -1704,6 +1791,7 @@ async function openNewClassModal(preselectedDay, preselectedCursoId) {
   $("#class-aula").value = "";
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.add("hidden");
+  actualizarHintsHoraClase();
 
   await populateClassCursoSelect(preselectedCursoId || "");
   $("#modal-class-backdrop").classList.remove("hidden");
@@ -1717,11 +1805,12 @@ async function openEditClassModal(id) {
   $("#modal-class-title").textContent = "Editar Clase";
   $("#class-id").value = c.id;
   $("#class-dia").value = c.dia_semana || "LUNES";
-  $("#class-hora-inicio").value = c.hora_inicio || "08:00";
-  $("#class-hora-fin").value = c.hora_fin || "10:00";
+  $("#class-hora-inicio").value = to24Hour(c.hora_inicio || "08:00");
+  $("#class-hora-fin").value = to24Hour(c.hora_fin || "10:00");
   $("#class-aula").value = c.aula || "";
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.remove("hidden");
+  actualizarHintsHoraClase();
 
   await populateClassCursoSelect(c.curso_id);
   $("#modal-class-backdrop").classList.remove("hidden");
@@ -1828,7 +1917,7 @@ async function exportScheduleForFriends() {
     return;
   }
 
-  // Exporta cursos sin las notas personales + sesiones enriquecidas para máxima compatibilidad
+  // Exporta cursos sin las notas personales + sesiones enriquecidas en formato 12h AM/PM y colores pasteles
   const exportPayload = {
     tipo: "umbral-horario-compartido",
     version: 2,
@@ -1837,7 +1926,7 @@ async function exportScheduleForFriends() {
       nombre: c.nombre,
       profesor: c.profesor || "",
       aula: c.aula || "",
-      color: c.color || COLOR_CURSO_DEFECTO,
+      color: normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO),
       notas: c.notas || ""
     })),
     clases: classes.map(c => {
@@ -1845,11 +1934,11 @@ async function exportScheduleForFriends() {
       return {
         materia: cur ? cur.nombre : "Curso",
         dia_semana: c.dia_semana,
-        hora_inicio: c.hora_inicio,
-        hora_fin: c.hora_fin,
+        hora_inicio: formatTime12(c.hora_inicio),
+        hora_fin: formatTime12(c.hora_fin),
         aula: c.aula || (cur && cur.aula) || "",
         profesor: (cur && cur.profesor) || "",
-        color: (cur && cur.color) || COLOR_CURSO_DEFECTO,
+        color: normalizarColorPastel((cur && cur.color) || COLOR_CURSO_DEFECTO),
         notas: (cur && cur.notas) || ""
       };
     })
@@ -1968,12 +2057,12 @@ async function loadDemoSemester() {
   );
   if (!ok) return;
 
-  const cIA   = { id: uuid(), nombre: "Inteligencia Artificial y Sistemas Expertos", profesor: "Dr. Agurto", aula: "Aula 1", color: "#38BDF8", notas: "Repositorio del curso y guías de laboratorio", evaluacion: { parcial: 14, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 15 }, { id: uuid(), titulo: "Práctica 2", nota: 13 }, { id: uuid(), titulo: "Trabajo heurísticas", nota: 16 }] } };
-  const cTop  = { id: uuid(), nombre: "Tópicos Avanzados en Ingeniería de Software", profesor: "Ing. Chaparro", aula: "Laboratorio de Redes", color: "#818CF8", notas: "Arquitectura limpia y despliegue continuo", evaluacion: { parcial: 12, final: 15, practicas: [{ id: uuid(), titulo: "Lab CI/CD", nota: 14 }, { id: uuid(), titulo: "Entrega Arquitectura", nota: 16 }] } };
-  const cForm = { id: uuid(), nombre: "Formulación y Evaluación de Proyectos", profesor: "Dra. Vargas", aula: "Aula 204", color: "#4ADE80", notas: "Flujo de caja, VAN y TIR", evaluacion: { parcial: 9, final: null, practicas: [{ id: uuid(), titulo: "Control 1", nota: 10 }, { id: uuid(), titulo: "Avance Estudio Mercado", nota: 11 }] } };
-  const cAud  = { id: uuid(), nombre: "Auditoría y Seguridad en Informática", profesor: "Ing. Silva", aula: "Lab Sistemas", color: "#E879F9", notas: "Normativa ISO 27001 y pruebas OWASP", evaluacion: { parcial: 13, final: null, practicas: [{ id: uuid(), titulo: "Informe OWASP", nota: 14 }, { id: uuid(), titulo: "Práctica 2", nota: null }] } };
-  const cDist = { id: uuid(), nombre: "Sistemas Distribuidos", profesor: "Ing. Mendoza", aula: "Lab Redes", color: "#FB923C", notas: "Consenso Raft y tolerancia a fallos", evaluacion: { parcial: 8, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 9 }, { id: uuid(), titulo: "Laboratorio RPC", nota: 8 }] } };
-  const cPrac = { id: uuid(), nombre: "Prácticas Pre Profesionales II", profesor: "Ing. Castillo", aula: "Oficina de TI", color: "#FACC15", notas: "Supervisión e informes mensuales", evaluacion: { parcial: 17, final: 18, practicas: [{ id: uuid(), titulo: "Informe 1", nota: 17 }, { id: uuid(), titulo: "Informe 2", nota: 18 }] } };
+  const cIA   = { id: uuid(), nombre: "Inteligencia Artificial y Sistemas Expertos", profesor: "Dr. Agurto", aula: "Aula 1", color: "#BAE6FD", notas: "Repositorio del curso y guías de laboratorio", evaluacion: { parcial: 14, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 15 }, { id: uuid(), titulo: "Práctica 2", nota: 13 }, { id: uuid(), titulo: "Trabajo heurísticas", nota: 16 }] } };
+  const cTop  = { id: uuid(), nombre: "Tópicos Avanzados en Ingeniería de Software", profesor: "Ing. Chaparro", aula: "Laboratorio de Redes", color: "#C7D2FE", notas: "Arquitectura limpia y despliegue continuo", evaluacion: { parcial: 12, final: 15, practicas: [{ id: uuid(), titulo: "Lab CI/CD", nota: 14 }, { id: uuid(), titulo: "Entrega Arquitectura", nota: 16 }] } };
+  const cForm = { id: uuid(), nombre: "Formulación y Evaluación de Proyectos", profesor: "Dra. Vargas", aula: "Aula 204", color: "#BBF7D0", notas: "Flujo de caja, VAN y TIR", evaluacion: { parcial: 9, final: null, practicas: [{ id: uuid(), titulo: "Control 1", nota: 10 }, { id: uuid(), titulo: "Avance Estudio Mercado", nota: 11 }] } };
+  const cAud  = { id: uuid(), nombre: "Auditoría y Seguridad en Informática", profesor: "Ing. Silva", aula: "Lab Sistemas", color: "#F5D0FE", notas: "Normativa ISO 27001 y pruebas OWASP", evaluacion: { parcial: 13, final: null, practicas: [{ id: uuid(), titulo: "Informe OWASP", nota: 14 }, { id: uuid(), titulo: "Práctica 2", nota: null }] } };
+  const cDist = { id: uuid(), nombre: "Sistemas Distribuidos", profesor: "Ing. Mendoza", aula: "Lab Redes", color: "#FED7AA", notas: "Consenso Raft y tolerancia a fallos", evaluacion: { parcial: 8, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 9 }, { id: uuid(), titulo: "Laboratorio RPC", nota: 8 }] } };
+  const cPrac = { id: uuid(), nombre: "Prácticas Pre Profesionales II", profesor: "Ing. Castillo", aula: "Oficina de TI", color: "#FEF08A", notas: "Supervisión e informes mensuales", evaluacion: { parcial: 17, final: 18, practicas: [{ id: uuid(), titulo: "Informe 1", nota: 17 }, { id: uuid(), titulo: "Informe 2", nota: 18 }] } };
 
   const demoCursos = [cIA, cTop, cForm, cAud, cDist, cPrac];
 
@@ -2153,6 +2242,8 @@ function wireGlobalEvents() {
 
   // Eventos del modal de Clase (asignación al horario)
   $("#class-curso").addEventListener("change", actualizarPreviewCursoClase);
+  $("#class-hora-inicio").addEventListener("input", actualizarHintsHoraClase);
+  $("#class-hora-fin").addEventListener("input", actualizarHintsHoraClase);
   $("#btn-new-curso-from-class").addEventListener("click", () => {
     openNewCursoModal("clase");
   });
@@ -2198,7 +2289,7 @@ function wireGlobalEvents() {
 
     if (conflict) {
       const nombreConflicto = (cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase";
-      errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${conflict.hora_inicio}–${conflict.hora_fin}, ${DIAS_LABEL[conflict.dia_semana]}).`;
+      errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}, ${DIAS_LABEL[conflict.dia_semana]}).`;
       errorEl.classList.remove("hidden");
       return;
     }

@@ -424,11 +424,17 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="class-hora-inicio">Hora Inicio *</label>
+          <div class="form-label-row">
+            <label class="form-label" for="class-hora-inicio">Hora Inicio *</label>
+            <span id="hint-hora-inicio" class="time-12h-badge">08:00 AM</span>
+          </div>
           <input type="time" id="class-hora-inicio" class="field" required value="08:00">
         </div>
         <div class="form-group">
-          <label class="form-label" for="class-hora-fin">Hora Fin *</label>
+          <div class="form-label-row">
+            <label class="form-label" for="class-hora-fin">Hora Fin *</label>
+            <span id="hint-hora-fin" class="time-12h-badge">10:00 AM</span>
+          </div>
           <input type="time" id="class-hora-fin" class="field" required value="10:00">
         </div>
       </div>
@@ -480,20 +486,20 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Color del Curso</label>
+        <label class="form-label">Color Pastel del Curso</label>
         <div class="color-palette-picker" id="curso-color-picker">
-          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" title="Celeste / Cyan"></button>
-          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" title="Fucsia / Magenta"></button>
-          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" title="Amarillo"></button>
-          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" title="Verde Manzana"></button>
-          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" title="Naranja Cálido"></button>
-          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" title="Índigo"></button>
-          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" title="Coral / Rojo"></button>
-          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" title="Turquesa / Teal"></button>
-          <button type="button" class="color-swatch" data-color="#AFC49A" style="background:#AFC49A" title="Tea Green (Ricra)"></button>
-          <button type="button" class="color-swatch" data-color="#294635" style="background:#294635" title="Forest Green"></button>
+          <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" title="Celeste Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" title="Lavanda Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" title="Vainilla Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" title="Menta Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" title="Durazno Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" title="Índigo Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" title="Coral Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" title="Turquesa Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" title="Matcha Pastel (Ricra)"></button>
+          <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" title="Salvia Pastel (Ricra)"></button>
         </div>
-        <input type="hidden" id="curso-color" value="#38BDF8">
+        <input type="hidden" id="curso-color" value="#BAE6FD">
       </div>
 
       <div class="form-group">

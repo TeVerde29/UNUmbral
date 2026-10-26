@@ -948,9 +948,9 @@ button:active, .btn-primary:active, .btn-secondary:active {
   top: 0;
   left: 0;
   z-index: 30;
-  width: 78px;
-  min-width: 78px;
-  max-width: 78px;
+  width: 106px;
+  min-width: 106px;
+  max-width: 106px;
   background: #DEE3D7;
   color: #152018;
   border-right: 2px solid var(--border-subtle);
@@ -970,16 +970,16 @@ button:active, .btn-primary:active, .btn-secondary:active {
   background: #F4F6EE;
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 600;
   text-align: center;
-  padding: 6px 3px;
+  padding: 6px 4px;
   border: 1px solid var(--border-subtle);
   border-right: 2px solid var(--border-subtle);
   white-space: nowrap;
-  width: 78px;
-  min-width: 78px;
-  max-width: 78px;
+  width: 106px;
+  min-width: 106px;
+  max-width: 106px;
   vertical-align: middle !important;
 }
 
@@ -1081,9 +1081,9 @@ button:active, .btn-primary:active, .btn-secondary:active {
 
 .meta-badge {
   display: inline-block;
-  padding: 1px 4px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(17, 26, 19, 0.11);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1091,7 +1091,7 @@ button:active, .btn-primary:active, .btn-secondary:active {
 }
 
 [data-theme="dark"] .meta-badge {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(17, 26, 19, 0.13);
 }
 
 /* Fila de Receso Universitario (Horas libres agrupadas) */
@@ -2206,6 +2206,21 @@ button:active, .btn-primary:active, .btn-secondary:active {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.time-12h-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--deep-leaf);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+
+[data-theme="dark"] .time-12h-badge {
+  color: var(--accent);
 }
 
 .curso-preview {
