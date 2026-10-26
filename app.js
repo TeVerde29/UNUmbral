@@ -1034,11 +1034,8 @@ function renderMatrixTableHTML(classes) {
             <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${rangoHora12})">
               <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
               <div class="matrix-cell-card-time">${rangoHora12}</div>
-              ${c.aula || c.profesor ? `
-                <div class="matrix-cell-card-meta">
-                  ${c.aula ? `<span class="meta-badge">${escapeHtml(c.aula)}</span>` : ""}
-                  ${c.profesor ? `<span class="meta-badge">${escapeHtml(c.profesor)}</span>` : ""}
-                </div>` : ""}
+              ${c.aula ? `<div class="matrix-cell-card-aula">${escapeHtml(c.aula)}</div>` : ""}
+              ${c.profesor ? `<div class="matrix-cell-card-prof">${escapeHtml(c.profesor)}</div>` : ""}
             </div>
           </td>`;
       } else {

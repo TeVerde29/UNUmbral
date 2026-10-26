@@ -1,5 +1,5 @@
 // Service Worker para funcionamiento 100% offline
-const CACHE_NAME = "umbral-ricra-v3";
+const CACHE_NAME = "umbral-ricra-v4";
 const ASSETS = [
   "./",
   "./index.html",
