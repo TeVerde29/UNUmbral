@@ -12,16 +12,20 @@
   /* Marca Ricra */
   --tea-green:       #AFC49A;
   --forest-green:    #294635;
+  --forest-shadow:   #294635;
   --deep-leaf:       #4F7256;
   --sage-green:      #829B78;
   --light-matcha:    #DDE8C8;
+  --accent-teal:     #2D6A4F;
 
   /* Superficies Apple Glass */
   --bg:              #F4F6EE;
   --bg-gradient:     linear-gradient(180deg, #F8F9F3 0%, #EEF2E6 100%);
   --surface:         rgba(255, 255, 255, 0.88);
+  --surface-card:    rgba(255, 255, 255, 0.94);
   --surface-solid:   #FFFFFF;
-  --surface-subtle:  rgba(238, 242, 232, 0.7);
+  --surface-subtle:  rgba(238, 242, 232, 0.78);
+  --surface-hover:   #EBF0E3;
   --surface-active:  #E4EAD9;
   --chrome-bg:       rgba(247, 248, 241, 0.82);
 
@@ -85,11 +89,15 @@
 
 /* --- TOKENS TEMA OSCURO (APPLE OBSIDIAN MATCHA) --- */
 [data-theme="dark"] {
+  --forest-shadow:   #24382A;
+  --accent-teal:     #52B788;
   --bg:              #0D140F;
   --bg-gradient:     linear-gradient(180deg, #0F1711 0%, #0B100C 100%);
   --surface:         rgba(22, 33, 25, 0.78);
+  --surface-card:    rgba(22, 33, 25, 0.92);
   --surface-solid:   #152118;
-  --surface-subtle:  rgba(28, 43, 32, 0.65);
+  --surface-subtle:  rgba(28, 43, 32, 0.78);
+  --surface-hover:   #1E2E22;
   --surface-active:  #24382A;
   --chrome-bg:       rgba(13, 20, 15, 0.82);
 
@@ -1889,13 +1897,15 @@ button:active, .btn-primary:active, .btn-secondary:active {
   }
 }
 
-.modal {
+.modal,
+.modal-sheet {
   width: 100%;
   max-width: 500px;
   background: var(--surface-solid);
+  color: var(--text-primary);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
-  border: 1px solid var(--border-hairline);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-lg);
   max-height: 90vh;
   display: flex;
@@ -1904,7 +1914,8 @@ button:active, .btn-primary:active, .btn-secondary:active {
 }
 
 @media (min-width: 600px) {
-  .modal {
+  .modal,
+  .modal-sheet {
     border-radius: var(--radius-lg);
   }
 }
@@ -1920,20 +1931,61 @@ button:active, .btn-primary:active, .btn-secondary:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  text-align: left;
 }
 
-.modal-header h2 {
+.modal-header h2,
+.modal-header h3 {
   font-family: var(--font-display);
   font-size: 16.5px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0;
 }
 
-.modal-close-btn {
-  font-size: 16px;
+.modal-subtitle {
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
+  line-height: 1.35;
+  margin: 3px 0 0 0;
+}
+
+.modal-close-btn,
+.btn-icon-close {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.btn-icon-sm {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .modal-body {
@@ -2205,7 +2257,7 @@ button:active, .btn-primary:active, .btn-secondary:active {
    ===================================================================== */
 .courses-overview {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
   gap: 8px;
   margin-bottom: 14px;
 }
@@ -2214,12 +2266,13 @@ button:active, .btn-primary:active, .btn-secondary:active {
   background: var(--surface);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 10px 8px;
+  padding: 10px 6px;
   text-align: center;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 3px;
 }
 
 .overview-value {
@@ -2244,6 +2297,7 @@ button:active, .btn-primary:active, .btn-secondary:active {
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 
 .course-card {

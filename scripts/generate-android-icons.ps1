@@ -115,5 +115,91 @@ foreach ($entry in $launcherSizes.GetEnumerator()) {
     $roundBmp.Dispose()
 }
 
+# 3. Generate notification icons (ic_stat_icon silhouette + ic_stat_logo full color) from logo-original.png
+function Create-StatSilhouette($src, $size) {
+    # First scale logo-original onto a white bitmap of $size x $size
+    $scaled = New-Object System.Drawing.Bitmap($size, $size)
+    $g = [System.Drawing.Graphics]::FromImage($scaled)
+    $g.Clear([System.Drawing.Color]::White)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    Draw-Centered $g $src $size $size 0.92
+    $g.Dispose()
+
+    # Convert darkness/color of teacup + leaves + "UNUmbral" text into white silhouette with smooth alpha
+    $out = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    for ($y = 0; $y -lt $size; $y++) {
+        for ($x = 0; $x -lt $size; $x++) {
+            $p = $scaled.GetPixel($x, $y)
+            $lum = (0.299 * $p.R) + (0.587 * $p.G) + (0.114 * $p.B)
+            # White/cream background has lum > 228 -> alpha 0
+            # Dark forest green outlines & "UNUmbral" text have lum ~ 45-80 -> alpha 255
+            # Medium sage green tea/leaves have lum ~ 150-195 -> alpha ~ 140-200
+            if ($lum -ge 228) {
+                $out.SetPixel($x, $y, [System.Drawing.Color]::FromArgb(0, 255, 255, 255))
+            } else {
+                $norm = (228.0 - $lum) / 165.0
+                if ($norm -gt 1.0) { $norm = 1.0 }
+                $alpha = [int][Math]::Round($norm * 255.0)
+                $out.SetPixel($x, $y, [System.Drawing.Color]::FromArgb($alpha, 255, 255, 255))
+            }
+        }
+    }
+    $scaled.Dispose()
+    return $out
+}
+
+function Create-StatColorLogo($src, $size) {
+    $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+
+    # Rounded rect clip (squircle-like 22% radius)
+    $r = [int]($size * 0.22)
+    $d = $r * 2
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $path.AddArc(0, 0, $d, $d, 180, 90)
+    $path.AddArc($size - $d, 0, $d, $d, 270, 90)
+    $path.AddArc($size - $d, $size - $d, $d, $d, 0, 90)
+    $path.AddArc(0, $size - $d, $d, $d, 90, 90)
+    $path.CloseFigure()
+    $g.SetClip($path)
+
+    $bgBrush = New-Object System.Drawing.SolidBrush($bgColor)
+    $g.FillRectangle($bgBrush, 0, 0, $size, $size)
+    Draw-Centered $g $src $size $size 0.90
+
+    $bgBrush.Dispose()
+    $path.Dispose()
+    $g.Dispose()
+    return $bmp
+}
+
+$statSizes = @{
+    "drawable"         = 96
+    "drawable-mdpi"    = 48
+    "drawable-hdpi"    = 72
+    "drawable-xhdpi"   = 96
+    "drawable-xxhdpi"  = 144
+    "drawable-xxxhdpi" = 192
+}
+
+foreach ($entry in $statSizes.GetEnumerator()) {
+    $folder = Join-Path $resBase $entry.Key
+    if (-not (Test-Path $folder)) { New-Item -ItemType Directory -Path $folder | Out-Null }
+    $size = $entry.Value
+
+    $silBmp = Create-StatSilhouette $srcLogo $size
+    $silBmp.Save((Join-Path $folder "ic_stat_icon.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    $silBmp.Dispose()
+
+    $colBmp = Create-StatColorLogo $srcLogo $size
+    $colBmp.Save((Join-Path $folder "ic_stat_logo.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+    $colBmp.Dispose()
+}
+
 $srcLogo.Dispose()
-Write-Host "All Android icons regenerated with UNUmbral green tea branding."
+Write-Host "All Android launcher and notification icons regenerated with UNUmbral green tea branding."

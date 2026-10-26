@@ -2239,22 +2239,20 @@ async function actualizarSimulador(cursosPreloaded) {
   }
 
   list.innerHTML = sim.cursosSim.map(c => {
-    const tone = c.rendimiento.promedio !== null
-      ? (c.rendimiento.promedio >= 10.5 ? "st-ok" : "st-warn")
-      : "st-neutral";
+    const infoEstado = ESTADO_NOTA_INFO[c.rendimiento.estado] || { label: c.rendimiento.estado, tone: "st-neutral" };
     const faltantesTexto = c.componentesFaltantes === 0
       ? "Evaluaciones completas"
       : `${c.componentesFaltantes} componente(s) faltante(s)`;
 
     return `
-      <div style="background:var(--surface-hover); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:10px 12px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <div style="font-weight:700; font-size:13px; color:var(--text-primary);">${escapeHtml(c.nombre)}</div>
-          <div style="font-size:11px; color:var(--text-secondary);">${c.creditos} crédito(s) · ${faltantesTexto}</div>
+      <div style="background:var(--surface-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:11px 13px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
+        <div style="min-width:0; flex:1;">
+          <div style="font-weight:700; font-size:13.5px; color:var(--text-primary); line-height:1.3; margin-bottom:2px;">${escapeHtml(c.nombre)}</div>
+          <div style="font-size:11.5px; color:var(--text-secondary); line-height:1.3;">${c.creditos} crédito(s) · ${faltantesTexto}</div>
         </div>
-        <div style="text-align:right;">
-          <div style="font-weight:700; font-size:14px; color:var(--deep-leaf);">${c.rendimiento.promedio !== null ? formatNota(c.rendimiento.promedio) : "—"}</div>
-          <span class="grade-status-pill ${tone}" style="font-size:10px; padding:2px 6px;">${c.rendimiento.estado}</span>
+        <div style="text-align:right; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+          <div style="font-weight:700; font-size:14.5px; color:var(--deep-leaf); font-family:var(--font-mono);">${c.rendimiento.promedio !== null ? formatNota(c.rendimiento.promedio) : (c.rendimiento.sinNotas ? "—" : formatNota(c.rendimiento.acumulado))}</div>
+          <span class="grade-status-pill ${infoEstado.tone}" style="font-size:10px; padding:2px 7px;">${infoEstado.label}</span>
         </div>
       </div>`;
   }).join("");
@@ -3303,21 +3301,13 @@ function renderQrEnDisplay(textoQr) {
 
   if (typeof qrcode === "function") {
     try {
-      const qr = qrcode(0, "M");
+      const qr = qrcode(0, "L");
       qr.addData(textoQr);
       qr.make();
-      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 3 });
       return;
-    } catch {
-      try {
-        const qr = qrcode(0, "L");
-        qr.addData(textoQr);
-        qr.make();
-        container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
-        return;
-      } catch (err) {
-        console.error("Error generando QR:", err);
-      }
+    } catch (err) {
+      console.error("Error generando QR:", err);
     }
   }
 
@@ -3346,12 +3336,12 @@ function descargarQrPng() {
   if (!canvas || typeof qrcode !== "function") return;
 
   try {
-    const qr = qrcode(0, "M");
+    const qr = qrcode(0, "L");
     qr.addData(qrPartesActuales[qrParteIndiceActual]);
     qr.make();
     const count = qr.getModuleCount();
-    const cellSize = 8;
-    const margin = 16;
+    const cellSize = 10;
+    const margin = 30;
     canvas.width = count * cellSize + margin * 2;
     canvas.height = count * cellSize + margin * 2;
     const ctx = canvas.getContext("2d");
@@ -3377,29 +3367,38 @@ function descargarQrPng() {
 async function openModalQrScanner() {
   partesQrAcumuladas = [];
   const statusEl = $("#qr-scanner-status");
-  if (statusEl) statusEl.textContent = "Apunta la cámara al código QR de UNUmbral o sube una foto.";
+  if (statusEl) statusEl.textContent = "Abriendo cámara… Apunta al código QR o sube una imagen.";
   const txtManual = $("#textarea-qr-manual");
   if (txtManual) txtManual.value = "";
 
   const camWrap = $("#qr-camera-wrap");
   const video = $("#qr-scanner-video");
 
-  if ("BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && video && camWrap) {
+  $("#modal-qr-scanner-backdrop").classList.remove("hidden");
+
+  if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function" && video && camWrap) {
     try {
       qrScannerStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
       });
       video.srcObject = qrScannerStream;
       camWrap.classList.remove("hidden");
+      await video.play().catch(() => {});
+      if (statusEl) statusEl.textContent = "Apunta la cámara al código QR de UNUmbral o carga una foto.";
       iniciarDeteccionCamara(video);
     } catch {
       camWrap.classList.add("hidden");
+      if (statusEl) statusEl.textContent = "Permiso de cámara no otorgado o cámara no disponible. Carga una foto del código QR.";
     }
   } else if (camWrap) {
     camWrap.classList.add("hidden");
+    if (statusEl) statusEl.textContent = "Carga una foto del código QR o pega el código de texto.";
   }
-
-  $("#modal-qr-scanner-backdrop").classList.remove("hidden");
 }
 
 function closeModalQrScanner() {
@@ -3413,25 +3412,79 @@ function closeModalQrScanner() {
 }
 
 async function iniciarDeteccionCamara(video) {
-  if (!("BarcodeDetector" in window)) return;
-  const detector = new BarcodeDetector({ formats: ["qr_code"] });
+  const detector = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
+  const scanCanvas = document.createElement("canvas");
+  const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
+
   const interval = setInterval(async () => {
     if (!qrScannerStream || $("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
       clearInterval(interval);
       return;
     }
     try {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        const barcodes = await detector.detect(video);
-        if (barcodes.length > 0 && barcodes[0].rawValue) {
-          clearInterval(interval);
-          procesarTextoQrEscaneado(barcodes[0].rawValue);
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        if (typeof window.jsQR === "function" && scanCtx) {
+          const maxDim = 640;
+          const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+          const w = Math.max(1, Math.round(video.videoWidth * scale));
+          const h = Math.max(1, Math.round(video.videoHeight * scale));
+          scanCanvas.width = w;
+          scanCanvas.height = h;
+          scanCtx.drawImage(video, 0, 0, w, h);
+          const imgData = scanCtx.getImageData(0, 0, w, h);
+          const code = window.jsQR(imgData.data, w, h, { inversionAttempts: "dontInvert" });
+          if (code && code.data) {
+            clearInterval(interval);
+            procesarTextoQrEscaneado(code.data);
+            return;
+          }
+        }
+        if (detector) {
+          const barcodes = await detector.detect(video);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            clearInterval(interval);
+            procesarTextoQrEscaneado(barcodes[0].rawValue);
+            return;
+          }
         }
       }
     } catch {
-      // Ignorar cuadros borrosos
+      // Ignorar cuadros en movimiento
     }
-  }, 300);
+  }, 250);
+}
+
+function cargarImagenDesdeArchivo(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = (e) => {
+      URL.revokeObjectURL(url);
+      reject(e);
+    };
+    img.src = url;
+  });
+}
+
+function intentarJsQrEnRegion(img, sx, sy, sw, sh, targetMaxDim) {
+  if (typeof window.jsQR !== "function") return null;
+  const canvas = document.createElement("canvas");
+  const scale = targetMaxDim / Math.max(sw, sh);
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  const imgData = ctx.getImageData(0, 0, w, h);
+  const code = window.jsQR(imgData.data, w, h, { inversionAttempts: "attemptBoth" });
+  return code && code.data ? code.data : null;
 }
 
 async function procesarArchivoImagenQr(file) {
@@ -3439,21 +3492,50 @@ async function procesarArchivoImagenQr(file) {
   const statusEl = $("#qr-scanner-status");
   if (statusEl) statusEl.textContent = "Analizando imagen de código QR...";
 
-  if ("BarcodeDetector" in window) {
-    try {
+  try {
+    const img = await cargarImagenDesdeArchivo(file);
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
+
+    // 1. Intentar jsQR en imagen completa a distintas escalas (para QR guardado o foto directa)
+    for (const dim of [900, 1400, 600, 1800]) {
+      const res = intentarJsQrEnRegion(img, 0, 0, iw, ih, dim);
+      if (res) {
+        procesarTextoQrEscaneado(res);
+        return;
+      }
+    }
+
+    // 2. Intentar jsQR en recortes centrales (para capturas de pantalla verticales del teléfono)
+    const crops = [
+      [iw * 0.08, ih * 0.18, iw * 0.84, ih * 0.56],
+      [iw * 0.12, ih * 0.22, iw * 0.76, ih * 0.48],
+      [iw * 0.05, ih * 0.12, iw * 0.90, ih * 0.72]
+    ];
+    for (const [sx, sy, sw, sh] of crops) {
+      for (const dim of [800, 1200]) {
+        const res = intentarJsQrEnRegion(img, sx, sy, sw, sh, dim);
+        if (res) {
+          procesarTextoQrEscaneado(res);
+          return;
+        }
+      }
+    }
+
+    // 3. Fallback con BarcodeDetector nativo si existe
+    if ("BarcodeDetector" in window) {
       const detector = new BarcodeDetector({ formats: ["qr_code"] });
-      const bmp = await createImageBitmap(file);
-      const barcodes = await detector.detect(bmp);
+      const barcodes = await detector.detect(img);
       if (barcodes.length > 0 && barcodes[0].rawValue) {
         procesarTextoQrEscaneado(barcodes[0].rawValue);
         return;
       }
-    } catch (err) {
-      console.warn("Fallo BarcodeDetector en imagen:", err);
     }
+  } catch (err) {
+    console.warn("Fallo analizando imagen QR:", err);
   }
 
-  showToast("No se detectó un código QR legible en la imagen. Usa la opción de texto o asegúrate de que esté bien iluminada.", true);
+  showToast("No se detectó un código QR legible en la imagen. Asegúrate de subir una imagen nítida del QR.", true);
   if (statusEl) statusEl.textContent = "No se detectó código QR en la imagen.";
 }
 
@@ -3797,7 +3879,8 @@ async function scheduleTestNotification() {
           body: "¡Alerta offline funcionando! Tu clase o tarea te avisará a tiempo.",
           schedule: { at: atDate, allowWhileIdle: true },
           smallIcon: "ic_stat_icon",
-          iconColor: "#22432C"
+          largeIcon: "ic_stat_logo",
+          iconColor: "#294635"
         }
       ]
     });

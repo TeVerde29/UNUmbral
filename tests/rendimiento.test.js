@@ -100,6 +100,16 @@ test("generarSvgBarrasComparativas y generarSvgEvolucionCurso devuelven SVG vál
   assert.ok(svgBarras.includes("<svg"));
   assert.ok(svgBarras.includes("10.5 Mín."));
   assert.ok(svgBarras.includes("Cálculo II"));
+  assert.ok(!svgBarras.includes("NaN"));
+
+  // También debe soportar cursos crudos desde IndexedDB y objeto de opciones sin generar NaN
+  const cursosCrudos = [
+    { id: "1", nombre: "Auditoría y Sistemas", evaluacion: { parcial: null, final: null, practicas: [] } },
+    { id: "2", nombre: "Formulación y Evaluación", evaluacion: { parcial: 14, final: null, practicas: [{ nota: 16 }] } }
+  ];
+  const svgCrudos = generarSvgBarrasComparativas(cursosCrudos, { width: 400, barHeight: 26 });
+  assert.ok(svgCrudos.includes("<svg"));
+  assert.ok(!svgCrudos.includes("NaN"));
 
   const curso = {
     nombre: "Cálculo II",
