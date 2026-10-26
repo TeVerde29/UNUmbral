@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="description" content="Horario universitario y organizador de tareas offline con estética Apple y Design Ricra">
-  <title>UniFlow · Horario & Tareas Universitario</title>
+  <title>Umbral · Horario & Tareas Universitario</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="stylesheet" href="estilos.css">
@@ -26,7 +26,7 @@
         </svg>
       </div>
       <div>
-        <h1 class="brand-title">UniFlow</h1>
+        <h1 class="brand-title">Umbral</h1>
         <span class="brand-subtitle" id="current-date-label">Cargando fecha…</span>
       </div>
     </div>
@@ -100,7 +100,7 @@
         </div>
         <button id="btn-add-class" class="btn-secondary btn-sm">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Materia
+          Clase
         </button>
       </div>
 
@@ -115,8 +115,48 @@
         <button class="day-tab" data-day="DOMINGO"><span>Dom</span></button>
       </div>
 
+      <!-- Barra de navegación rápida y controles para la Parrilla Semanal -->
+      <div id="matrix-toolbar" class="matrix-toolbar hidden">
+        <div class="matrix-jump-scroll" id="matrix-jump-bar">
+          <button class="matrix-jump-chip active" data-jump="all">Semana</button>
+          <button class="matrix-jump-chip" data-jump="LUNES">Lun</button>
+          <button class="matrix-jump-chip" data-jump="MARTES">Mar</button>
+          <button class="matrix-jump-chip" data-jump="MIERCOLES">Mié</button>
+          <button class="matrix-jump-chip" data-jump="JUEVES">Jue</button>
+          <button class="matrix-jump-chip" data-jump="VIERNES">Vie</button>
+          <button class="matrix-jump-chip" data-jump="SABADO">Sáb</button>
+          <button class="matrix-jump-chip" data-jump="DOMINGO">Dom</button>
+        </div>
+        <button id="btn-toggle-compact" class="matrix-compact-btn" title="Alternar agrupación de horas libres">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+          <span id="compact-toggle-text">Compacto</span>
+        </button>
+      </div>
+
       <!-- Contenedor dinámico del horario -->
       <div id="schedule-container" class="schedule-body">
+        <!-- Renderizado dinámico -->
+      </div>
+    </section>
+
+    <!-- VISTA 2.5: MIS CURSOS & NOTAS (ESCALA 0–20, MÍNIMO 10.5) -->
+    <section id="view-cursos" class="view-panel">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Mis Cursos y Notas</h2>
+          <p class="section-subtitle">Escala 0 a 20 · (Parcial + Final + Prom. Prácticas) ÷ 3 · Aprueba con 10.5</p>
+        </div>
+        <button id="btn-add-curso" class="btn-primary btn-sm">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Curso
+        </button>
+      </div>
+
+      <!-- Resumen general del ciclo -->
+      <div id="cursos-resumen" class="courses-overview hidden"></div>
+
+      <!-- Lista de cursos registrados -->
+      <div id="cursos-list" class="cards-list">
         <!-- Renderizado dinámico -->
       </div>
     </section>
@@ -156,12 +196,45 @@
         </button>
       </div>
 
-      <!-- Filtro selector de materia -->
-      <div class="subject-filter-row">
-        <label for="select-filter-materia">Filtrar por Asignatura:</label>
-        <select id="select-filter-materia" class="select-clean">
-          <option value="">Todas las materias</option>
-        </select>
+      <!-- Selector y Filtro de Asignaturas con Diseño Apple / Ricra -->
+      <div class="subject-filter-container">
+        <div class="subject-filter-header">
+          <span class="subject-filter-label">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            <span>Asignatura</span>
+          </span>
+
+          <!-- Selector interactivo personalizado -->
+          <div class="subject-dropdown-wrapper">
+            <button type="button" id="btn-subject-dropdown-toggle" class="subject-select-btn" aria-haspopup="listbox" aria-expanded="false" title="Filtrar tareas por asignatura">
+              <span class="subject-select-indicator" id="subject-indicator-dot"></span>
+              <span class="subject-select-text" id="subject-current-label">Todas las materias</span>
+              <span class="subject-select-badge" id="subject-current-count">0</span>
+              <svg class="subject-select-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            <!-- Menú flotante / Popover de asignaturas -->
+            <div id="subject-dropdown-menu" class="subject-dropdown-menu hidden" role="listbox">
+              <div class="subject-dropdown-header">
+                <span>Filtrar Asignatura</span>
+                <span class="subject-dropdown-hint" id="subject-dropdown-total-hint">0 materias</span>
+              </div>
+              <div class="subject-dropdown-list" id="subject-dropdown-options">
+                <!-- Opciones generadas dinámicamente con color, detalles y tareas -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chips táctiles horizontales para selección rápida en móvil -->
+        <div class="subject-chips-scroll" id="subject-quick-chips">
+          <!-- Renderizado dinámico de chips horizontales -->
+        </div>
       </div>
 
       <!-- Lista de tareas -->
@@ -278,6 +351,14 @@
       <span>Horario</span>
     </button>
 
+    <button class="nav-tab" data-view="view-cursos" aria-label="Vista Cursos y Notas">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span>Cursos</span>
+    </button>
+
     <button class="nav-tab" data-view="view-tareas" aria-label="Vista Tareas">
       <div class="nav-tab-icon-wrap">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -303,11 +384,11 @@
 
 </div>
 
-<!-- DIÁLOGO MODAL: NUEVA / EDITAR CLASE (HORARIO) -->
+<!-- DIÁLOGO MODAL: NUEVA / EDITAR CLASE (SOLO CURSO + DÍA + HORA) -->
 <div id="modal-class-backdrop" class="modal-backdrop hidden">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-class-title">
     <div class="modal-header">
-      <h2 id="modal-class-title">Añadir Materia</h2>
+      <h2 id="modal-class-title">Añadir Clase al Horario</h2>
       <button class="icon-btn modal-close-btn" id="modal-class-close" aria-label="Cerrar">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
@@ -316,14 +397,19 @@
       <input type="hidden" id="class-id">
 
       <div class="form-group">
-        <label class="form-label">Asignatura / Materia *</label>
-        <input type="text" id="class-materia" class="field" placeholder="Ej: Cálculo II, Algoritmos, Física…" required list="datalist-materias">
-        <datalist id="datalist-materias"></datalist>
+        <div class="form-label-row">
+          <label class="form-label" for="class-curso">Curso registrado *</label>
+          <button type="button" class="btn-text-action" id="btn-new-curso-from-class">+ Nuevo curso</button>
+        </div>
+        <select id="class-curso" class="field" required>
+          <option value="" disabled selected>Elige un curso…</option>
+        </select>
+        <div id="class-curso-preview" class="curso-preview hidden"></div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Día de la semana *</label>
+          <label class="form-label" for="class-dia">Día de la semana *</label>
           <select id="class-dia" class="field" required>
             <option value="LUNES">Lunes</option>
             <option value="MARTES">Martes</option>
@@ -338,53 +424,151 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Hora Inicio *</label>
+          <label class="form-label" for="class-hora-inicio">Hora Inicio *</label>
           <input type="time" id="class-hora-inicio" class="field" required value="08:00">
         </div>
         <div class="form-group">
-          <label class="form-label">Hora Fin *</label>
+          <label class="form-label" for="class-hora-fin">Hora Fin *</label>
           <input type="time" id="class-hora-fin" class="field" required value="10:00">
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Aula / Laboratorio</label>
-          <input type="text" id="class-aula" class="field" placeholder="Ej: Aula 204, Lab B">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Profesor(a)</label>
-          <input type="text" id="class-profesor" class="field" placeholder="Ej: Dr. Gómez">
-        </div>
-      </div>
-
       <div class="form-group">
-        <label class="form-label">Color de Referencia</label>
-        <div class="color-palette-picker" id="class-color-picker">
-          <button type="button" class="color-swatch selected" data-color="#AFC49A" style="background:#AFC49A" title="Tea Green"></button>
-          <button type="button" class="color-swatch" data-color="#294635" style="background:#294635" title="Forest Green"></button>
-          <button type="button" class="color-swatch" data-color="#4F7256" style="background:#4F7256" title="Deep Leaf"></button>
-          <button type="button" class="color-swatch" data-color="#829B78" style="background:#829B78" title="Sage Green"></button>
-          <button type="button" class="color-swatch" data-color="#94621A" style="background:#94621A" title="Amber"></button>
-          <button type="button" class="color-swatch" data-color="#35687A" style="background:#35687A" title="Slate Teal"></button>
-          <button type="button" class="color-swatch" data-color="#2D6A4F" style="background:#2D6A4F" title="Emerald"></button>
-          <button type="button" class="color-swatch" data-color="#B23B38" style="background:#B23B38" title="Crimson"></button>
-        </div>
-        <input type="hidden" id="class-color" value="#AFC49A">
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Notas o Enlaces (Opcional)</label>
-        <input type="text" id="class-notas" class="field" placeholder="Enlace a repositorio, Drive o apuntes…">
+        <label class="form-label" for="class-aula">Aula de esta sesión (solo si cambia)</label>
+        <input type="text" id="class-aula" class="field" placeholder="Dejar vacío para usar el aula del curso">
       </div>
 
       <div id="class-form-error" class="form-error hidden"></div>
 
       <div class="modal-footer">
-        <button type="button" id="btn-delete-class" class="btn-danger hidden">Eliminar</button>
+        <button type="button" id="btn-delete-class" class="btn-danger hidden">Quitar</button>
         <div class="modal-footer-right">
           <button type="button" class="btn-secondary" id="btn-cancel-class">Cancelar</button>
           <button type="submit" class="btn-primary" id="btn-save-class">Guardar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DIÁLOGO MODAL: NUEVO / EDITAR CURSO (CATÁLOGO) -->
+<div id="modal-curso-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-curso-title">
+    <div class="modal-header">
+      <h2 id="modal-curso-title">Nuevo Curso</h2>
+      <button class="icon-btn modal-close-btn" id="modal-curso-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <form id="form-curso" class="modal-body">
+      <input type="hidden" id="curso-id">
+
+      <div class="form-group">
+        <label class="form-label" for="curso-nombre">Nombre del Curso *</label>
+        <input type="text" id="curso-nombre" class="field" placeholder="Ej: Cálculo II, Sistemas Distribuidos, Física…" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="curso-profesor">Profesor(a)</label>
+          <input type="text" id="curso-profesor" class="field" placeholder="Ej: Dr. Agurto">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="curso-aula">Aula / Laboratorio habitual</label>
+          <input type="text" id="curso-aula" class="field" placeholder="Ej: Aula 204, Lab B">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Color del Curso</label>
+        <div class="color-palette-picker" id="curso-color-picker">
+          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" title="Celeste / Cyan"></button>
+          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" title="Fucsia / Magenta"></button>
+          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" title="Amarillo"></button>
+          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" title="Verde Manzana"></button>
+          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" title="Naranja Cálido"></button>
+          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" title="Índigo"></button>
+          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" title="Coral / Rojo"></button>
+          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" title="Turquesa / Teal"></button>
+          <button type="button" class="color-swatch" data-color="#AFC49A" style="background:#AFC49A" title="Tea Green (Ricra)"></button>
+          <button type="button" class="color-swatch" data-color="#294635" style="background:#294635" title="Forest Green"></button>
+        </div>
+        <input type="hidden" id="curso-color" value="#38BDF8">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="curso-notas">Comentarios o Enlaces (Opcional)</label>
+        <input type="text" id="curso-notas" class="field" placeholder="Enlace a sílabo, aula virtual, Drive o apuntes…">
+      </div>
+
+      <p id="curso-sesiones-info" class="form-hint hidden"></p>
+      <div id="curso-form-error" class="form-error hidden"></div>
+
+      <div class="modal-footer">
+        <button type="button" id="btn-delete-curso" class="btn-danger hidden">Eliminar</button>
+        <div class="modal-footer-right">
+          <button type="button" class="btn-secondary" id="btn-cancel-curso">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btn-save-curso">Guardar Curso</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- DIÁLOGO MODAL: NOTAS DEL CURSO (ESCALA 0–20, PARCIAL + FINAL + PRÁCTICAS) -->
+<div id="modal-notas-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-notas-title">
+    <div class="modal-header">
+      <div class="notas-modal-title-wrap">
+        <span id="notas-curso-dot" class="curso-preview-dot"></span>
+        <div>
+          <h2 id="modal-notas-title">Notas del Curso</h2>
+          <span id="notas-curso-sub" class="notas-modal-sub">Escala 0 a 20</span>
+        </div>
+      </div>
+      <button class="icon-btn modal-close-btn" id="modal-notas-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <form id="form-notas" class="modal-body" novalidate>
+      <input type="hidden" id="notas-curso-id">
+
+      <!-- Tarjeta de promedio / simulador en vivo -->
+      <div id="notas-resumen" class="grade-summary st-neutral"></div>
+
+      <!-- Exámenes únicos (Parcial y Final) -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label" for="nota-parcial">Examen Parcial (0–20)</label>
+          <input type="number" id="nota-parcial" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="nota-final">Examen Final (0–20)</label>
+          <input type="number" id="nota-final" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar">
+        </div>
+      </div>
+
+      <!-- Prácticas, tareas y trabajos continuos -->
+      <div class="practicas-section">
+        <div class="practicas-header">
+          <div>
+            <span class="form-label">Prácticas, Tareas y Trabajos</span>
+            <span id="practicas-promedio" class="practicas-avg-badge">Promedio: —</span>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" id="btn-add-practica">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Añadir
+          </button>
+        </div>
+        <div id="practicas-list" class="practicas-list"></div>
+      </div>
+
+      <div id="notas-form-error" class="form-error hidden"></div>
+
+      <div class="modal-footer">
+        <div class="modal-footer-right">
+          <button type="button" class="btn-secondary" id="btn-cancel-notas">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btn-save-notas">Guardar Notas</button>
         </div>
       </div>
     </form>
@@ -410,9 +594,9 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Asignatura</label>
-          <select id="task-materia" class="field">
-            <option value="General">General / Otra</option>
+          <label class="form-label" for="task-curso">Curso</label>
+          <select id="task-curso" class="field">
+            <option value="">General / Otra</option>
           </select>
         </div>
         <div class="form-group">
@@ -462,13 +646,13 @@
   <div class="action-sheet">
     <div class="action-sheet-title">Acceso Rápido</div>
     <div class="action-sheet-options">
-      <button type="button" class="action-sheet-option" id="btn-quick-create-task">
+      <button type="button" class="action-sheet-option" id="btn-quick-create-curso">
         <div class="icon-bubble" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
         </div>
         <div>
-          <strong>Nueva Tarea o Evaluación</strong>
-          <small>Fecha de entrega y escala de importancia</small>
+          <strong>Registrar Nuevo Curso</strong>
+          <small>Nombre, profesor, aula, color y notas (0–20)</small>
         </div>
       </button>
       <button type="button" class="action-sheet-option" id="btn-quick-create-class">
@@ -476,8 +660,17 @@
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
         </div>
         <div>
-          <strong>Nueva Materia en el Horario</strong>
-          <small>Día, hora, aula y profesor</small>
+          <strong>Añadir Clase al Horario</strong>
+          <small>Elige un curso registrado y ponle día y hora</small>
+        </div>
+      </button>
+      <button type="button" class="action-sheet-option" id="btn-quick-create-task">
+        <div class="icon-bubble" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </div>
+        <div>
+          <strong>Nueva Tarea o Entrega</strong>
+          <small>Fecha límite y escala de importancia</small>
         </div>
       </button>
     </div>

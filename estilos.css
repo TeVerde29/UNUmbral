@@ -1,6 +1,6 @@
 /* =====================================================================
    DESIGN RICRA + APPLE HUMAN INTERFACE DESIGN (TEA GREEN)
-   UniFlow — Academic Planner & Task Organizer (Offline)
+   Umbral — Horario Universitario & Organizador de Tareas Offline
    Estética Apple: Materiales translúcidos (vibrancy/blur), spring physics,
    tipografía óptica, listas agrupadas (inset groups) y cero emojis.
    ===================================================================== */
@@ -813,61 +813,328 @@ button:active, .btn-primary:active, .btn-secondary:active {
   border-color: var(--accent);
 }
 
-/* Matriz Semanal */
-.matrix-scroll-wrapper {
-  overflow-x: auto;
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+/* =====================================================================
+   PARRILLA SEMANAL (ESTILO HORARIO UNIVERSITARIO ACADÉMICO)
+   ===================================================================== */
+.matrix-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 4px 0;
 }
 
+.matrix-jump-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex: 1;
+}
+.matrix-jump-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.matrix-jump-chip {
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.matrix-jump-chip:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.matrix-jump-chip.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.matrix-compact-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.matrix-compact-btn:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.matrix-compact-btn.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-color: var(--border-focus);
+}
+
+/* Contenedor desplazable de la tabla */
+.matrix-scroll-wrapper {
+  position: relative;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-sm);
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Tabla de Horario Universitario */
 .matrix-grid-table {
   width: 100%;
-  min-width: 540px;
+  min-width: 680px;
   border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 11px;
+  user-select: none;
 }
 
-.matrix-grid-table th {
-  background: var(--surface-subtle);
-  padding: 7px 4px;
-  font-size: 11.5px;
+/* Encabezados de columna (Días) */
+.matrix-grid-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #E8ECE3;
+  color: #1E2A21;
+  font-family: var(--font-display);
   font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
   text-align: center;
-  border-bottom: 1px solid var(--border-hairline);
-  border-right: 1px solid var(--border-hairline);
+  padding: 10px 4px;
+  border: 1px solid var(--border-subtle);
+  border-bottom: 2px solid var(--border-focus);
+  min-width: 105px;
+}
+
+[data-theme="dark"] .matrix-grid-table thead th {
+  background: #19271E;
+  color: #F1F5EB;
+  border-color: #2D3D31;
+  border-bottom-color: var(--accent);
+}
+
+/* Esquina superior izquierda (HORA) */
+.matrix-grid-table thead th.matrix-hour-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
+  background: #DEE3D7;
+  color: #152018;
+  border-right: 2px solid var(--border-subtle);
+}
+
+[data-theme="dark"] .matrix-grid-table thead th.matrix-hour-header {
+  background: #203126;
+  color: #F1F5EB;
+  border-right-color: #2D3D31;
+}
+
+/* Columna de Horas lateral */
+.matrix-grid-table td.matrix-hour-col {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: #F4F6EE;
   color: var(--text-secondary);
-  letter-spacing: 0.02em;
-}
-
-.matrix-grid-table td {
-  height: 48px;
-  vertical-align: top;
-  border-bottom: 1px solid var(--border-hairline);
-  border-right: 1px solid var(--border-hairline);
-  padding: 2px;
-}
-
-.matrix-hour-col {
-  width: 48px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  text-align: center;
-  color: var(--text-tertiary);
-  background: var(--surface-subtle);
+  font-size: 10px;
   font-weight: 600;
+  text-align: center;
+  padding: 6px 3px;
+  border: 1px solid var(--border-subtle);
+  border-right: 2px solid var(--border-subtle);
+  white-space: nowrap;
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
   vertical-align: middle !important;
 }
 
-.matrix-cell-block {
-  border-radius: 4px;
-  padding: 4px 5px;
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 1.2;
+[data-theme="dark"] .matrix-grid-table td.matrix-hour-col {
+  background: #141F16;
+  color: var(--text-secondary);
+  border-color: #253328;
+  border-right-color: #2E3E31;
+}
+
+/* Celdas generales */
+.matrix-grid-table td {
+  height: 38px;
+  vertical-align: middle;
+  border: 1px solid var(--border-hairline);
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.matrix-grid-table td.matrix-empty-cell {
+  background: transparent;
+  transition: background 0.12s ease;
+}
+
+.matrix-grid-table td.matrix-empty-cell:hover {
+  background: rgba(175, 196, 154, 0.12);
+}
+
+/* Celda con clase asignada (rowspan) */
+.matrix-grid-table td.matrix-class-cell {
+  padding: 3px !important;
+  vertical-align: middle !important;
+}
+
+/* Tarjeta de Asignatura tipo Horario Universitario (Image 5) */
+.matrix-cell-card {
+  width: 100%;
+  height: 100%;
+  min-height: calc(100% - 2px);
+  border-radius: var(--radius-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 6px 5px;
+  box-sizing: border-box;
   cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(0, 0, 0, 0.22);
+  transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
+}
+
+.matrix-cell-card:hover {
+  transform: scale(0.985);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .matrix-cell-card {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.matrix-cell-card-title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.matrix-cell-card-time {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.92;
+  margin-top: 3px;
+  letter-spacing: -0.02em;
+}
+
+.matrix-cell-card-meta {
+  font-size: 9.5px;
+  font-weight: 600;
+  margin-top: 2px;
+  opacity: 0.88;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.meta-badge {
+  display: inline-block;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.1);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+[data-theme="dark"] .meta-badge {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Fila de Receso Universitario (Horas libres agrupadas) */
+.matrix-break-row td {
+  height: 30px;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(175, 196, 154, 0.07),
+    rgba(175, 196, 154, 0.07) 8px,
+    rgba(175, 196, 154, 0.14) 8px,
+    rgba(175, 196, 154, 0.14) 16px
+  );
+  border: 1px solid var(--border-subtle);
+}
+
+[data-theme="dark"] .matrix-break-row td {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(41, 70, 53, 0.15),
+    rgba(41, 70, 53, 0.15) 8px,
+    rgba(41, 70, 53, 0.28) 8px,
+    rgba(41, 70, 53, 0.28) 16px
+  );
+}
+
+.matrix-break-cell {
+  text-align: center;
+  vertical-align: middle !important;
+  padding: 4px 10px;
+}
+
+.break-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 /* =====================================================================
@@ -934,24 +1201,286 @@ button:active, .btn-primary:active, .btn-secondary:active {
   border-color: var(--accent);
 }
 
-.subject-filter-row {
+/* =====================================================================
+   SELECTOR DE ASIGNATURAS PERSONALIZADO (DESIGN RICRA & APPLE)
+   ===================================================================== */
+.subject-filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.subject-filter-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  gap: 10px;
 }
 
-.select-clean {
+.subject-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.subject-dropdown-wrapper {
+  position: relative;
+  max-width: 72%;
+}
+
+.subject-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   background: var(--surface);
-  border: 1px solid var(--border-hairline);
+  border: 1px solid var(--border-subtle);
   color: var(--text-primary);
+  font-family: var(--font-text);
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.16s ease;
+  user-select: none;
+  max-width: 100%;
+}
+
+.subject-select-btn:hover {
+  background: var(--surface-active);
+  border-color: var(--border-focus);
+}
+
+.subject-select-btn.open {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.subject-select-btn.open .subject-select-chevron {
+  transform: rotate(180deg);
+}
+
+.subject-select-indicator {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tea-green);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.12);
+}
+
+.subject-select-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+.subject-select-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  line-height: 1.2;
+}
+
+.subject-select-chevron {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+/* Menú Popover de Asignaturas */
+.subject-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  min-width: 250px;
+  max-width: 320px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg), 0 8px 24px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  overflow: hidden;
+  animation: popoverFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .subject-dropdown-menu {
+  background: rgba(22, 33, 25, 0.96);
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.subject-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px 14px;
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface-subtle);
+}
+
+.subject-dropdown-hint {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.subject-dropdown-list {
+  max-height: 250px;
+  overflow-y: auto;
+  padding: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.subject-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
-  outline: none;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+
+.subject-dropdown-item:hover {
+  background: var(--surface-active);
+}
+
+.subject-dropdown-item.selected {
+  background: var(--accent-subtle);
+}
+
+.subject-item-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.12);
+}
+
+.subject-item-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.subject-item-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject-item-sub {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subject-item-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.subject-item-check {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+/* Chips horizontales de acceso rápido */
+.subject-chips-scroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 4px 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.subject-chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.subject-quick-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.subject-quick-chip:hover {
+  background: var(--surface-active);
+  color: var(--text-primary);
+  border-color: var(--border-focus);
+}
+
+.subject-quick-chip.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.subject-quick-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.subject-quick-chip-count {
+  font-size: 9.5px;
+  font-weight: 700;
+  opacity: 0.85;
 }
 
 /* =====================================================================
@@ -1455,6 +1984,451 @@ button:active, .btn-primary:active, .btn-secondary:active {
 .toast.error {
   background: var(--status-danger);
   color: #FFFFFF;
+}
+
+/* =====================================================================
+   VISTA CURSOS Y NOTAS (SISTEMA 0–20, MÍNIMO 10.5)
+   ===================================================================== */
+.courses-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.overview-tile {
+  background: var(--surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 10px 8px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.overview-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.overview-tile.st-ok .overview-value {
+  color: var(--status-success);
+}
+
+.overview-tile.st-warn .overview-value {
+  color: var(--status-warning);
+}
+
+.overview-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.course-card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 13px 14px 13px 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.course-card-main {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.course-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.course-edit-btn {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.grade-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.grade-cell {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 6px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.grade-cell-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grade-cell-value {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.grade-cell.is-empty .grade-cell-value {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.grade-cell-avg.st-ok {
+  background: var(--status-success-bg);
+  border-color: rgba(45, 106, 79, 0.25);
+}
+.grade-cell-avg.st-ok .grade-cell-value,
+.grade-cell-avg.st-ok .grade-cell-label {
+  color: var(--status-success);
+}
+
+.grade-cell-avg.st-warn {
+  background: var(--status-warning-bg);
+  border-color: rgba(148, 98, 26, 0.25);
+}
+.grade-cell-avg.st-warn .grade-cell-value,
+.grade-cell-avg.st-warn .grade-cell-label {
+  color: var(--status-warning);
+}
+
+.grade-cell-avg.st-bad {
+  background: var(--status-danger-bg);
+  border-color: rgba(178, 59, 56, 0.25);
+}
+.grade-cell-avg.st-bad .grade-cell-value,
+.grade-cell-avg.st-bad .grade-cell-label {
+  color: var(--status-danger);
+}
+
+.grade-cell-avg.st-info {
+  background: var(--status-info-bg);
+  border-color: rgba(53, 104, 122, 0.25);
+}
+.grade-cell-avg.st-info .grade-cell-value,
+.grade-cell-avg.st-info .grade-cell-label {
+  color: var(--status-info);
+}
+
+.course-card-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grade-status-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.grade-status-pill.st-ok {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.grade-status-pill.st-warn {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.grade-status-pill.st-bad {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.grade-status-pill.st-info {
+  background: var(--status-info-bg);
+  color: var(--status-info);
+}
+
+.grade-status-pill.st-neutral {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+}
+
+.course-hint {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* Selector de curso dentro del modal de horario */
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.curso-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 9px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+}
+
+.curso-preview-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--tea-green);
+}
+
+.curso-preview-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.curso-preview-text strong {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Modal de notas y calculadora en vivo */
+.notas-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.notas-modal-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.grade-summary {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grade-summary-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.grade-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grade-summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grade-summary-value {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.grade-summary-value small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  margin-left: 3px;
+}
+
+.grade-progress {
+  position: relative;
+  height: 7px;
+  background: var(--surface-solid);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  overflow: visible;
+}
+
+.grade-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.grade-summary.st-ok .grade-progress-fill { background: var(--status-success); }
+.grade-summary.st-warn .grade-progress-fill { background: var(--status-warning); }
+.grade-summary.st-bad .grade-progress-fill { background: var(--status-danger); }
+.grade-summary.st-info .grade-progress-fill { background: var(--status-info); }
+
+.grade-progress-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transform: translateX(-1px);
+}
+
+.grade-progress-scale {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  line-height: 1;
+}
+
+.grade-progress-scale-mark {
+  position: absolute;
+  transform: translateX(-50%);
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.grade-summary-msg {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.38;
+}
+
+.practicas-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.practicas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.practicas-avg-badge {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--deep-leaf);
+  background: var(--surface-subtle);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-hairline);
+}
+
+[data-theme="dark"] .practicas-avg-badge {
+  color: var(--accent);
+}
+
+.practicas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.practicas-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+
+.practica-row {
+  display: grid;
+  grid-template-columns: 1fr 92px 34px;
+  gap: 7px;
+  align-items: center;
+}
+
+.grade-input {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-align: center;
+}
+
+.practica-remove {
+  width: 34px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.field.invalid {
+  border-color: var(--status-danger);
+  background: var(--status-danger-bg);
 }
 
 /* UTILIDAD */

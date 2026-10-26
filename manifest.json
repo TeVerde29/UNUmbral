@@ -1,6 +1,6 @@
 {
-  "name": "UniFlow · Horario y Tareas",
-  "short_name": "UniFlow",
+  "name": "Umbral · Horario y Tareas",
+  "short_name": "Umbral",
   "description": "Horario universitario y organizador de tareas offline",
   "start_url": "./index.html",
   "display": "standalone",

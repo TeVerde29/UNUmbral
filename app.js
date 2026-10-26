@@ -1,6 +1,6 @@
 /* =====================================================================
    DESIGN RICRA + APPLE HUMAN INTERFACE DESIGN (TEA GREEN)
-   UniFlow — Horario Universitario & Tareas Offline
+   Umbral — Horario Universitario & Tareas Offline
    100% Vanilla JS + Dexie.js (IndexedDB). Sin emojis, diseño profesional.
    ===================================================================== */
 "use strict";
@@ -36,18 +36,275 @@ const ICONS = {
   calendar: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
   checkCircle: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
   tasks: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
-  chevronRight: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`
+  chevronRight: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>`,
+  book: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  edit: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  close: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  layers: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`
+};
+
+/* SISTEMA DE CALIFICACIÓN UNIVERSITARIO (ESCALA VIGESIMAL 0–20)
+   Promedio final = (Examen parcial + Examen final + Promedio de prácticas) / 3
+   Promedio de prácticas = suma de prácticas calificadas / cantidad calificada */
+const NOTA_MAX = 20;
+const NOTA_APROBATORIA = 10.5;
+const NOTA_UMBRAL_RIESGO = 14; // si necesitas más de esto en lo que falta, el curso está en riesgo
+const NOTA_EPS = 1e-9;
+const COLOR_CURSO_DEFECTO = "#38BDF8";
+
+const ESTADO_NOTA_INFO = {
+  "sin-notas":   { label: "Sin notas",          tone: "st-neutral" },
+  "en-curso":    { label: "En curso",           tone: "st-info" },
+  "en-riesgo":   { label: "En riesgo",          tone: "st-warn" },
+  "asegurado":   { label: "Aprobación segura",  tone: "st-ok" },
+  "sin-opcion":  { label: "Sin opción",         tone: "st-bad" },
+  "aprobado":    { label: "Aprobado",           tone: "st-ok" },
+  "desaprobado": { label: "Desaprobado",        tone: "st-bad" }
+};
+
+const COMPONENTE_LABEL = {
+  parcial: "el examen parcial",
+  final: "el examen final",
+  pp: "el promedio de prácticas"
 };
 
 /* =====================================================================
    2. BASE DE DATOS LOCAL (IndexedDB via Dexie)
    ===================================================================== */
-const db = new Dexie("UniFlowDB");
+const db = new Dexie("UmbralDB");
 db.version(1).stores({
   clases: "id, materia, dia_semana, hora_inicio, hora_fin, aula, profesor",
   tareas: "id, titulo, materia, fecha_limite, importancia, completada, fecha_creacion",
   ajustes: "clave"
 });
+
+/* Versión 2: catálogo de cursos (con notas) separado de las sesiones del horario.
+   - cursos: nombre, profesor, aula, color, notas (comentarios) y evaluacion
+   - clases: solo curso_id + día + horas (+ aula opcional si esa sesión es en otra aula)
+   - tareas: se vinculan por curso_id ("" = General) */
+db.version(2).stores({
+  cursos: "id, nombre",
+  clases: "id, curso_id, dia_semana",
+  tareas: "id, curso_id, fecha_limite, importancia, completada, fecha_creacion",
+  ajustes: "clave"
+}).upgrade(async (tx) => {
+  const clasesPlanas = await tx.table("clases").toArray();
+  const tareasPlanas = await tx.table("tareas").toArray();
+  const r = convertirFormatoPlano(clasesPlanas, tareasPlanas, []);
+  if (r.cursosNuevos.length) await tx.table("cursos").bulkAdd(r.cursosNuevos);
+  await tx.table("clases").clear();
+  if (r.clases.length) await tx.table("clases").bulkAdd(r.clases);
+  await tx.table("tareas").clear();
+  if (r.tareas.length) await tx.table("tareas").bulkAdd(r.tareas);
+});
+
+/* =====================================================================
+   2.1 CAPA DE DATOS: CURSOS, CLASES ENRIQUECIDAS Y MIGRACIÓN
+   ===================================================================== */
+function normalizarNombre(str) {
+  return String(str || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function evaluacionVacia() {
+  return { parcial: null, final: null, practicas: [] };
+}
+
+/**
+ * Convierte datos del formato antiguo (cada clase con materia/profesor/color propios)
+ * al formato relacional: cursos + clases con curso_id + tareas con curso_id.
+ * Reutiliza los cursos existentes que coincidan por nombre (sin distinguir tildes ni mayúsculas).
+ * Las clases y tareas que ya tienen curso_id se respetan tal cual.
+ */
+function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cursosSueltos) {
+  const porNombre = new Map((cursosExistentes || []).map(c => [normalizarNombre(c.nombre), c]));
+  const cursosNuevos = [];
+
+  const obtenerCurso = (nombre, datos) => {
+    const limpio = String(nombre || "").trim();
+    if (!limpio) return null;
+    const clave = normalizarNombre(limpio);
+    let curso = porNombre.get(clave);
+    if (!curso) {
+      const d = datos || {};
+      curso = {
+        id: uuid(),
+        nombre: limpio,
+        profesor: d.profesor || "",
+        aula: d.aula || "",
+        color: d.color || COLOR_CURSO_DEFECTO,
+        notas: d.notas || "",
+        evaluacion: evaluacionVacia()
+      };
+      porNombre.set(clave, curso);
+      cursosNuevos.push(curso);
+    }
+    return curso;
+  };
+
+  (cursosSueltos || []).forEach(c => obtenerCurso(c.nombre, c));
+
+  const clases = [];
+  (clasesPlanas || []).forEach(c => {
+    if (c.curso_id) {
+      clases.push({ id: c.id || uuid(), curso_id: c.curso_id, dia_semana: c.dia_semana, hora_inicio: c.hora_inicio, hora_fin: c.hora_fin, aula: c.aula || "" });
+      return;
+    }
+    const curso = obtenerCurso(c.materia, { profesor: c.profesor, aula: c.aula, color: c.color, notas: c.notas });
+    if (!curso) return;
+    clases.push({
+      id: c.id || uuid(),
+      curso_id: curso.id,
+      dia_semana: c.dia_semana,
+      hora_inicio: c.hora_inicio,
+      hora_fin: c.hora_fin,
+      // Solo se guarda el aula en la sesión si es distinta a la habitual del curso
+      aula: c.aula && c.aula !== curso.aula ? c.aula : ""
+    });
+  });
+
+  const tareas = (tareasPlanas || []).map(t => {
+    if (Object.prototype.hasOwnProperty.call(t, "curso_id")) return t;
+    const { materia, ...resto } = t;
+    const esGeneral = !materia || normalizarNombre(materia) === "general";
+    const curso = esGeneral ? null : obtenerCurso(materia, { color: "#AFC49A" });
+    return { ...resto, curso_id: curso ? curso.id : "" };
+  });
+
+  return { cursosNuevos, clases, tareas };
+}
+
+async function cargarCursos() {
+  const list = await db.cursos.toArray();
+  list.sort((a, b) => (a.nombre || "").localeCompare(b.nombre || "", "es"));
+  const map = {};
+  list.forEach(c => { map[c.id] = c; });
+  return { list, map };
+}
+
+/** Une una sesión del horario con los datos de su curso para poder renderizarla. */
+function enriquecerClase(clase, cursosMap) {
+  const curso = cursosMap[clase.curso_id];
+  return {
+    ...clase,
+    materia: curso ? curso.nombre : "Curso eliminado",
+    color: (curso && curso.color) || "#AFC49A",
+    profesor: (curso && curso.profesor) || "",
+    aula: clase.aula || (curso && curso.aula) || ""
+  };
+}
+
+async function obtenerClasesEnriquecidas() {
+  const [clases, { map }] = await Promise.all([db.clases.toArray(), cargarCursos()]);
+  return clases.map(c => enriquecerClase(c, map));
+}
+
+function enriquecerTarea(tarea, cursosMap) {
+  const curso = tarea.curso_id ? cursosMap[tarea.curso_id] : null;
+  return { ...tarea, materia: curso ? curso.nombre : "General" };
+}
+
+async function obtenerTareasEnriquecidas() {
+  const [tareas, { map }] = await Promise.all([db.tareas.toArray(), cargarCursos()]);
+  return tareas.map(t => enriquecerTarea(t, map));
+}
+
+/* =====================================================================
+   2.2 CÁLCULO DE NOTAS (ESCALA 0–20, APRUEBA CON 10.5)
+   ===================================================================== */
+function toNota(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function formatNota(n) {
+  return n === null || n === undefined ? "—" : n.toFixed(2);
+}
+
+/** Redondea hacia arriba a 2 decimales: la nota mínima necesaria nunca debe quedarse corta. */
+function ceil2(n) {
+  return Math.ceil(n * 100 - NOTA_EPS) / 100;
+}
+
+function unirComponentes(claves) {
+  const nombres = claves.map(k => COMPONENTE_LABEL[k]);
+  if (nombres.length <= 1) return nombres.join("");
+  return nombres.slice(0, -1).join(", ") + " y " + nombres[nombres.length - 1];
+}
+
+/**
+ * Calcula el rendimiento de un curso.
+ * - pp: promedio de las prácticas que ya tienen nota (provisional si hay prácticas sin calificar)
+ * - promedio: (parcial + final + pp) / 3, solo cuando los 3 componentes existen
+ * - acumulado: puntos ya asegurados sobre el promedio final (suma conocida / 3)
+ * - requerido: nota promedio necesaria en los componentes faltantes para llegar a 10.5
+ */
+function calcularRendimiento(evaluacion) {
+  const ev = evaluacion || {};
+  const parcial = toNota(ev.parcial);
+  const final = toNota(ev.final);
+  const practicas = Array.isArray(ev.practicas) ? ev.practicas : [];
+  const calificadas = practicas.map(p => toNota(p.nota)).filter(n => n !== null);
+  const pp = calificadas.length ? calificadas.reduce((a, b) => a + b, 0) / calificadas.length : null;
+  const ppProvisional = calificadas.length > 0 && calificadas.length < practicas.length;
+
+  const componentes = { parcial, final, pp };
+  const faltantesClaves = Object.keys(componentes).filter(k => componentes[k] === null);
+  const conocidos = Object.values(componentes).filter(n => n !== null);
+  const sumaConocida = conocidos.reduce((a, b) => a + b, 0);
+  const faltantes = faltantesClaves.length;
+  const acumulado = sumaConocida / 3;
+  const promedio = faltantes === 0 ? acumulado : null;
+
+  let estado;
+  let requerido = null;
+
+  if (conocidos.length === 0) {
+    estado = "sin-notas";
+  } else if (faltantes === 0) {
+    estado = promedio >= NOTA_APROBATORIA - NOTA_EPS ? "aprobado" : "desaprobado";
+  } else {
+    requerido = (NOTA_APROBATORIA * 3 - sumaConocida) / faltantes;
+    if (requerido <= NOTA_EPS) estado = "asegurado";
+    else if (requerido > NOTA_MAX + NOTA_EPS) estado = "sin-opcion";
+    else if (requerido > NOTA_UMBRAL_RIESGO) estado = "en-riesgo";
+    else estado = "en-curso";
+  }
+
+  return {
+    parcial, final, pp, ppProvisional,
+    practicasCalificadas: calificadas.length,
+    practicasTotal: practicas.length,
+    promedio, acumulado, faltantes, faltantesClaves,
+    requerido: requerido === null ? null : ceil2(Math.max(0, requerido)),
+    estado
+  };
+}
+
+function mensajeRendimiento(r) {
+  const faltaTexto = unirComponentes(r.faltantesClaves);
+  const aviso = r.ppProvisional ? " Hay prácticas sin calificar: resultado provisional." : "";
+  switch (r.estado) {
+    case "sin-notas":
+      return "Registra tus notas para ver tu promedio y cuánto necesitas para aprobar.";
+    case "aprobado":
+      return `Aprobaste con ${formatNota(r.promedio)}.${aviso}`;
+    case "desaprobado":
+      return `Te faltan ${formatNota(ceil2(NOTA_APROBATORIA - r.promedio))} puntos para llegar a ${NOTA_APROBATORIA}.${aviso}`;
+    case "asegurado":
+      return `Ya apruebas aunque saques 0 en ${faltaTexto}.`;
+    case "sin-opcion":
+      return `Aun con 20 en ${faltaTexto} no alcanzarías ${NOTA_APROBATORIA}.`;
+    default:
+      return r.faltantes === 1
+        ? `Necesitas ${formatNota(r.requerido)} en ${faltaTexto} para aprobar.`
+        : `Necesitas promediar ${formatNota(r.requerido)} entre ${faltaTexto} para aprobar.`;
+  }
+}
 
 /* =====================================================================
    3. ESTADO DE LA APLICACIÓN
@@ -59,7 +316,10 @@ const state = {
   tasksFilter: "pendientes", // pendientes, urgentes, proximas, todas, completadas
   tasksMateriaFilter: "",
   tasksSearchQuery: "",
-  theme: localStorage.getItem("uniflow-theme") || "dark"
+  matrixCompact: localStorage.getItem("umbral-matrix-compact") !== "false",
+  theme: localStorage.getItem("umbral-theme") || localStorage.getItem("uniflow-theme") || "dark",
+  // Si el modal de curso se abrió desde el formulario de clase, al guardar se vuelve a él
+  cursoModalOrigin: null // null | "clase" | { abrirClase: true, dia: "LUNES" }
 };
 
 /* =====================================================================
@@ -90,6 +350,27 @@ function timeToMinutes(hhmm) {
 
 function overlaps(startA, endA, startB, endB) {
   return startA < endB && endA > startB;
+}
+
+function getContrastTextColor(hex) {
+  if (!hex || hex.length < 6) return "#FFFFFF";
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  const r = parseInt(h.substring(0, 2), 16) || 0;
+  const g = parseInt(h.substring(2, 4), 16) || 0;
+  const b = parseInt(h.substring(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 155 ? "#111A13" : "#FFFFFF";
+}
+
+function darkenColor(hex, factor = 0.28) {
+  if (!hex || hex.length < 6) return "rgba(0,0,0,0.3)";
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map(c => c + c).join("");
+  let r = Math.max(0, Math.floor((parseInt(h.substring(0, 2), 16) || 0) * (1 - factor)));
+  let g = Math.max(0, Math.floor((parseInt(h.substring(2, 4), 16) || 0) * (1 - factor)));
+  let b = Math.max(0, Math.floor((parseInt(h.substring(4, 6), 16) || 0) * (1 - factor)));
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 function getTodayDayKey() {
@@ -196,6 +477,7 @@ function confirmDialog(title, message) {
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("umbral-theme", theme);
   localStorage.setItem("uniflow-theme", theme);
 
   if (theme === "dark") {
@@ -223,6 +505,7 @@ function switchTab(tabId) {
 
   if (tabId === "view-hoy") renderHoy();
   else if (tabId === "view-horario") renderHorario();
+  else if (tabId === "view-cursos") renderCursos();
   else if (tabId === "view-tareas") renderTareas();
   else if (tabId === "view-ajustes") renderAjustes();
 
@@ -236,7 +519,7 @@ async function renderHoy() {
   $("#current-date-label").textContent = formatReadableDate();
 
   const todayKey = getTodayDayKey();
-  const classesToday = await db.clases.where("dia_semana").equals(todayKey).toArray();
+  const classesToday = (await obtenerClasesEnriquecidas()).filter(c => c.dia_semana === todayKey);
   classesToday.sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio));
 
   const badgeEl = $("#badge-clases-hoy");
@@ -261,7 +544,7 @@ async function renderHoy() {
   }
 
   // Radar de tareas urgentes
-  const allTasks = await db.tareas.toArray();
+  const allTasks = await obtenerTareasEnriquecidas();
   const pendingTasks = allTasks.filter(t => !t.completada);
 
   const navCountEl = $("#nav-count-tareas");
@@ -394,7 +677,7 @@ function renderLiveStatusCard(classesToday) {
 }
 
 function renderClassCardHTML(c) {
-  const color = c.color || "#AFC49A";
+  const color = c.color || "#38BDF8";
   return `
     <div class="class-card" data-id="${c.id}">
       <div class="class-card-stripe" style="background:${color}"></div>
@@ -416,14 +699,20 @@ function renderClassCardHTML(c) {
 async function renderHorario() {
   const container = $("#schedule-container");
   const dayTabsEl = $("#day-tabs-container");
+  const matrixToolbarEl = $("#matrix-toolbar");
 
   $("#btn-mode-agenda").classList.toggle("active", state.scheduleMode === "agenda");
   $("#btn-mode-matrix").classList.toggle("active", state.scheduleMode === "matrix");
 
-  const allClasses = await db.clases.toArray();
+  const allClasses = await obtenerClasesEnriquecidas();
+  const cursosCount = await db.cursos.count();
+  const emptyAction = cursosCount === 0
+    ? { label: "Registrar mi primer curso", hint: "Primero registra tus cursos (nombre, profesor, aula y color); luego solo eliges el curso y la hora." }
+    : null;
 
   if (state.scheduleMode === "agenda") {
     dayTabsEl.classList.remove("hidden");
+    if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
 
     $$(".day-tab", dayTabsEl).forEach(btn => {
       btn.classList.toggle("active", btn.dataset.day === state.selectedDay);
@@ -436,9 +725,9 @@ async function renderHorario() {
       container.innerHTML = `
         <div class="empty-card" style="margin-top:14px;">
           <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
-          <strong>Sin materias para el ${DIAS_LABEL[state.selectedDay].toLowerCase()}</strong>
-          <p>Pulsa el botón de abajo para registrar tu primera clase en este día.</p>
-          <button class="btn-primary btn-sm" id="btn-add-class-empty" style="margin-top:10px;">Añadir Materia</button>
+          <strong>Sin clases para el ${DIAS_LABEL[state.selectedDay].toLowerCase()}</strong>
+          <p>${emptyAction ? emptyAction.hint : "Elige uno de tus cursos y asígnale la hora en este día."}</p>
+          <button class="btn-primary btn-sm" id="btn-add-class-empty" style="margin-top:10px;">${emptyAction ? emptyAction.label : "Añadir Clase"}</button>
         </div>`;
       const btn = $("#btn-add-class-empty", container);
       if (btn) btn.addEventListener("click", () => openNewClassModal(state.selectedDay));
@@ -455,16 +744,26 @@ async function renderHorario() {
     });
 
   } else {
-    // MODO MATRIZ SEMANAL
+    // MODO MATRIZ SEMANAL (PARRILLA ACADÉMICA)
     dayTabsEl.classList.add("hidden");
+    if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
+
+    // Actualizar texto del botón de compactación
+    const compactBtn = $("#btn-toggle-compact");
+    const compactText = $("#compact-toggle-text");
+    if (compactBtn && compactText) {
+      compactBtn.classList.toggle("active", state.matrixCompact);
+      compactText.textContent = state.matrixCompact ? "Compacto" : "Completo";
+    }
 
     if (allClasses.length === 0) {
+      if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
       container.innerHTML = `
         <div class="empty-card">
           <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
           <strong>Horario no configurado</strong>
-          <p>Registra tus clases para visualizar la distribución semanal.</p>
-          <button class="btn-primary btn-sm" id="btn-add-class-empty-mat" style="margin-top:10px;">Añadir Materia</button>
+          <p>${emptyAction ? emptyAction.hint : "Asigna día y hora a tus cursos para ver la distribución semanal."}</p>
+          <button class="btn-primary btn-sm" id="btn-add-class-empty-mat" style="margin-top:10px;">${emptyAction ? emptyAction.label : "Añadir Clase"}</button>
         </div>`;
       const btn = $("#btn-add-class-empty-mat", container);
       if (btn) btn.addEventListener("click", () => openNewClassModal("LUNES"));
@@ -472,66 +771,214 @@ async function renderHorario() {
     }
 
     container.innerHTML = renderMatrixTableHTML(allClasses);
-    $$(".matrix-cell-block", container).forEach(b => {
-      b.addEventListener("click", () => openEditClassModal(b.dataset.id));
+
+    // Eventos para editar al pulsar una celda
+    $$(".matrix-cell-card", container).forEach(card => {
+      card.addEventListener("click", () => openEditClassModal(card.dataset.id));
     });
+
+    wireMatrixJumpBar(container);
   }
 }
 
+function wireMatrixJumpBar(container) {
+  const scrollWrapper = $(".matrix-scroll-wrapper", container);
+  if (!scrollWrapper) return;
+
+  const jumpChips = $$(".matrix-jump-chip", $("#matrix-toolbar"));
+  jumpChips.forEach(chip => {
+    chip.onclick = () => {
+      jumpChips.forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+
+      const target = chip.dataset.jump;
+      if (target === "all") {
+        scrollWrapper.scrollTo({ left: 0, behavior: "smooth" });
+      } else {
+        const th = $(`th[data-day="${target}"]`, scrollWrapper);
+        if (th) {
+          const targetLeft = th.offsetLeft - 78;
+          scrollWrapper.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+        }
+      }
+    };
+  });
+}
+
 function renderMatrixTableHTML(classes) {
-  let minHour = 7;
-  let maxHour = 21;
+  // 1. Días activos: por defecto Lunes a Sábado si hay clases en Sábado (igual que Image 5)
+  const hasSunday = classes.some(c => c.dia_semana === "DOMINGO");
+  const hasSaturday = classes.some(c => c.dia_semana === "SABADO");
+
+  let activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
+  if (hasSaturday || hasSunday) activeDays.push("SABADO");
+  if (hasSunday) activeDays.push("DOMINGO");
+
+  // 2. Límites horarios globales calculados sobre clases reales
+  let minMinutes = 480;  // 08:00
+  let maxMinutes = 1290; // 21:30
 
   classes.forEach(c => {
-    const h1 = Math.floor(timeToMinutes(c.hora_inicio) / 60);
-    const h2 = Math.ceil(timeToMinutes(c.hora_fin) / 60);
-    if (h1 < minHour) minHour = Math.max(0, h1);
-    if (h2 > maxHour) maxHour = Math.min(24, h2);
+    const s = timeToMinutes(c.hora_inicio);
+    const e = timeToMinutes(c.hora_fin);
+    if (s < minMinutes) minMinutes = Math.floor(s / 30) * 30;
+    if (e > maxMinutes) maxMinutes = Math.ceil(e / 30) * 30;
   });
 
-  const hours = [];
-  for (let h = minHour; h < maxHour; h++) hours.push(h);
+  minMinutes = Math.max(360, minMinutes);  // no antes de 06:00
+  maxMinutes = Math.min(1440, maxMinutes); // no después de 24:00
 
-  const byDayAndHour = {};
-  DIAS.forEach(d => { byDayAndHour[d] = {}; });
+  // 3. Crear lista de slots de 30 minutos
+  const rawSlots = [];
+  for (let m = minMinutes; m < maxMinutes; m += 30) {
+    const startStr = `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+    const nextM = m + 30;
+    const endStr = `${pad2(Math.floor(nextM / 60))}:${pad2(nextM % 60)}`;
 
-  classes.forEach(c => {
-    const startHour = Math.floor(timeToMinutes(c.hora_inicio) / 60);
-    byDayAndHour[c.dia_semana][startHour] = c;
+    const hasActivity = classes.some(c =>
+      activeDays.includes(c.dia_semana) &&
+      overlaps(m, nextM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin))
+    );
+
+    rawSlots.push({
+      start: m,
+      end: nextM,
+      label: `${startStr} – ${endStr}`,
+      hasActivity
+    });
+  }
+
+  // 4. Compactar horas libres consecutivas (recesos) si matrixCompact está activo
+  let processedSlots = [];
+  if (state.matrixCompact) {
+    let emptyStreak = [];
+    for (let i = 0; i < rawSlots.length; i++) {
+      const slot = rawSlots[i];
+      if (!slot.hasActivity) {
+        emptyStreak.push(slot);
+      } else {
+        if (emptyStreak.length >= 3) {
+          const bStart = emptyStreak[0].start;
+          const bEnd = emptyStreak[emptyStreak.length - 1].end;
+          processedSlots.push({
+            isBreak: true,
+            start: bStart,
+            end: bEnd,
+            label: `${pad2(Math.floor(bStart / 60))}:${pad2(bStart % 60)} – ${pad2(Math.floor(bEnd / 60))}:${pad2(bEnd % 60)}`
+          });
+        } else {
+          emptyStreak.forEach(s => processedSlots.push(s));
+        }
+        emptyStreak = [];
+        processedSlots.push(slot);
+      }
+    }
+    if (emptyStreak.length >= 3) {
+      const bStart = emptyStreak[0].start;
+      const bEnd = emptyStreak[emptyStreak.length - 1].end;
+      processedSlots.push({
+        isBreak: true,
+        start: bStart,
+        end: bEnd,
+        label: `${pad2(Math.floor(bStart / 60))}:${pad2(bStart % 60)} – ${pad2(Math.floor(bEnd / 60))}:${pad2(bEnd % 60)}`
+      });
+    } else {
+      emptyStreak.forEach(s => processedSlots.push(s));
+    }
+  } else {
+    processedSlots = rawSlots;
+  }
+
+  // 5. Agrupar clases por día
+  const classesByDay = {};
+  activeDays.forEach(d => {
+    classesByDay[d] = classes.filter(c => c.dia_semana === d);
   });
 
-  let ths = DIAS.map(d => `<th>${DIAS_CORTO[d]}</th>`).join("");
+  // 6. Generar HTML con rowspan exacto por duración
+  const activeSpanUntil = {};
+  activeDays.forEach(d => { activeSpanUntil[d] = -1; });
+
+  let ths = activeDays.map(d => `<th data-day="${d}">${escapeHtml(d)}</th>`).join("");
   let rowsHtml = "";
 
-  hours.forEach(h => {
-    let cells = "";
-    DIAS.forEach(d => {
-      const c = byDayAndHour[d][h];
+  for (let r = 0; r < processedSlots.length; r++) {
+    const slot = processedSlots[r];
+
+    if (slot.isBreak) {
+      rowsHtml += `
+        <tr class="matrix-break-row">
+          <td class="matrix-hour-col">${slot.label}</td>
+          <td colspan="${activeDays.length}" class="matrix-break-cell">
+            <span class="break-pill">
+              ${ICONS.clock} Receso universitario (${slot.label})
+            </span>
+          </td>
+        </tr>`;
+      continue;
+    }
+
+    let cellsHtml = "";
+
+    activeDays.forEach(d => {
+      if (activeSpanUntil[d] > slot.start) {
+        return; // Cubierto por celda previa con rowspan
+      }
+
+      // Buscar si alguna clase empieza en este intervalo
+      const c = classesByDay[d].find(x =>
+        timeToMinutes(x.hora_inicio) <= slot.start &&
+        timeToMinutes(x.hora_fin) > slot.start
+      );
+
       if (c) {
-        const color = c.color || "#AFC49A";
-        cells += `<td>
-          <div class="matrix-cell-block" data-id="${c.id}" style="background:${color}22;color:${color};border-left:3px solid ${color};" title="${escapeHtml(c.materia)} (${c.hora_inicio}-${c.hora_fin})">
-            ${escapeHtml(c.materia)}
-          </div>
-        </td>`;
+        const classEnd = timeToMinutes(c.hora_fin);
+        let span = 0;
+        for (let nextR = r; nextR < processedSlots.length; nextR++) {
+          const nextSlot = processedSlots[nextR];
+          if (!nextSlot.isBreak && nextSlot.start < classEnd) {
+            span++;
+          } else {
+            break;
+          }
+        }
+        span = Math.max(1, span);
+        activeSpanUntil[d] = classEnd;
+
+        const color = c.color || "#38BDF8";
+        const textColor = getContrastTextColor(color);
+        const borderColor = darkenColor(color, 0.28);
+
+        cellsHtml += `
+          <td rowspan="${span}" class="matrix-class-cell">
+            <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${c.hora_inicio} – ${c.hora_fin})">
+              <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
+              <div class="matrix-cell-card-time">${c.hora_inicio} – ${c.hora_fin}</div>
+              ${c.aula || c.profesor ? `
+                <div class="matrix-cell-card-meta">
+                  ${c.aula ? `<span class="meta-badge">${escapeHtml(c.aula)}</span>` : ""}
+                  ${c.profesor ? `<span class="meta-badge">${escapeHtml(c.profesor)}</span>` : ""}
+                </div>` : ""}
+            </div>
+          </td>`;
       } else {
-        cells += `<td></td>`;
+        cellsHtml += `<td class="matrix-empty-cell"></td>`;
       }
     });
 
     rowsHtml += `
       <tr>
-        <td class="matrix-hour-col">${pad2(h)}:00</td>
-        ${cells}
+        <td class="matrix-hour-col">${slot.label}</td>
+        ${cellsHtml}
       </tr>`;
-  });
+  }
 
   return `
     <div class="matrix-scroll-wrapper">
       <table class="matrix-grid-table">
         <thead>
           <tr>
-            <th class="matrix-hour-col">Hora</th>
+            <th class="matrix-hour-header">HORA</th>
             ${ths}
           </tr>
         </thead>
@@ -540,24 +987,156 @@ function renderMatrixTableHTML(classes) {
         </tbody>
       </table>
     </div>
-    <p class="form-hint" style="margin-top:10px;text-align:center">Toca cualquier bloque para ver y editar los detalles de la asignatura.</p>`;
+    <p class="form-hint" style="margin-top:10px;text-align:center">Toca cualquier bloque para editar la clase. Desliza horizontalmente para navegar entre días.</p>`;
+}
+
+/* =====================================================================
+   INTERFAZ DEL SELECTOR Y FILTRO DE ASIGNATURAS (DESIGN RICRA)
+   ===================================================================== */
+function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjectMap) {
+  const currentSub = state.tasksMateriaFilter ? subjectMap[state.tasksMateriaFilter] : null;
+
+  // 1. Actualizar disparador / botón selector
+  const dotEl = $("#subject-indicator-dot");
+  const labelEl = $("#subject-current-label");
+  const countEl = $("#subject-current-count");
+
+  if (dotEl && labelEl && countEl) {
+    if (currentSub) {
+      dotEl.style.background = currentSub.color || "#38BDF8";
+      labelEl.textContent = currentSub.materia;
+      countEl.textContent = `${currentSub.taskCount}`;
+    } else {
+      dotEl.style.background = "var(--tea-green)";
+      labelEl.textContent = "Todas las materias";
+      countEl.textContent = `${totalPendingCount}`;
+    }
+  }
+
+  // 2. Menú desplegable Popover
+  const hintEl = $("#subject-dropdown-total-hint");
+  if (hintEl) {
+    hintEl.textContent = `${subjectsList.length} ${subjectsList.length === 1 ? "materia" : "materias"}`;
+  }
+
+  const optionsContainer = $("#subject-dropdown-options");
+  if (optionsContainer) {
+    let optionsHtml = `
+      <div class="subject-dropdown-item ${!state.tasksMateriaFilter ? "selected" : ""}" data-subject="">
+        <span class="subject-item-indicator" style="background:var(--tea-green)"></span>
+        <div class="subject-item-info">
+          <span class="subject-item-title">Todas las materias</span>
+          <span class="subject-item-sub">Ver tareas de todas las asignaturas (${allTasks.length} registradas)</span>
+        </div>
+        <span class="subject-item-count">${totalPendingCount}</span>
+        ${!state.tasksMateriaFilter ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+      </div>`;
+
+    subjectsList.forEach(sub => {
+      const isSelected = state.tasksMateriaFilter === sub.key;
+      const subtitle = [sub.aula, sub.profesor].filter(Boolean).join(" · ") || "Asignatura del horario";
+
+      optionsHtml += `
+        <div class="subject-dropdown-item ${isSelected ? "selected" : ""}" data-subject="${escapeHtml(sub.key)}">
+          <span class="subject-item-indicator" style="background:${sub.color || "#38BDF8"}"></span>
+          <div class="subject-item-info">
+            <span class="subject-item-title">${escapeHtml(sub.materia)}</span>
+            <span class="subject-item-sub">${escapeHtml(subtitle)}</span>
+          </div>
+          <span class="subject-item-count">${sub.taskCount}</span>
+          ${isSelected ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+        </div>`;
+    });
+
+    optionsContainer.innerHTML = optionsHtml;
+
+    $$(".subject-dropdown-item", optionsContainer).forEach(item => {
+      item.onclick = (e) => {
+        e.stopPropagation();
+        state.tasksMateriaFilter = item.dataset.subject;
+        const menu = $("#subject-dropdown-menu");
+        const btn = $("#btn-subject-dropdown-toggle");
+        if (menu) menu.classList.add("hidden");
+        if (btn) {
+          btn.classList.remove("open");
+          btn.setAttribute("aria-expanded", "false");
+        }
+        renderTareas();
+      };
+    });
+  }
+
+  // 3. Chips horizontales táctiles para celular
+  const chipsContainer = $("#subject-quick-chips");
+  if (chipsContainer) {
+    if (subjectsList.length === 0) {
+      chipsContainer.innerHTML = "";
+    } else {
+      let chipsHtml = `
+        <button type="button" class="subject-quick-chip ${!state.tasksMateriaFilter ? "active" : ""}" data-subject="">
+          <span class="subject-quick-chip-dot" style="background:var(--tea-green)"></span>
+          <span>Todas</span>
+          <span class="subject-quick-chip-count">${totalPendingCount}</span>
+        </button>`;
+
+      subjectsList.forEach(sub => {
+        const isSelected = state.tasksMateriaFilter === sub.key;
+        chipsHtml += `
+          <button type="button" class="subject-quick-chip ${isSelected ? "active" : ""}" data-subject="${escapeHtml(sub.key)}">
+            <span class="subject-quick-chip-dot" style="background:${sub.color || "#38BDF8"}"></span>
+            <span>${escapeHtml(sub.materia)}</span>
+            <span class="subject-quick-chip-count">${sub.taskCount}</span>
+          </button>`;
+      });
+
+      chipsContainer.innerHTML = chipsHtml;
+
+      $$(".subject-quick-chip", chipsContainer).forEach(chip => {
+        chip.onclick = () => {
+          state.tasksMateriaFilter = chip.dataset.subject;
+          renderTareas();
+        };
+      });
+    }
+  }
 }
 
 /* =====================================================================
    9. VISTA: TAREAS (FILTROS Y ESCALA 1 A 5)
    ===================================================================== */
 async function renderTareas() {
-  const allTasks = await db.tareas.toArray();
-  const allClasses = await db.clases.toArray();
+  const [rawTasks, { list: cursos, map: cursosMap }] = await Promise.all([db.tareas.toArray(), cargarCursos()]);
+  const allTasks = rawTasks.map(t => enriquecerTarea(t, cursosMap));
 
-  const selectMateria = $("#select-filter-materia");
-  const uniqueSubjects = Array.from(new Set(allClasses.map(c => c.materia))).filter(Boolean).sort();
-  allTasks.forEach(t => {
-    if (t.materia && !uniqueSubjects.includes(t.materia)) uniqueSubjects.push(t.materia);
+  // Mapa de asignaturas por clave (id del curso, o "general" para tareas sin curso)
+  const subjectMap = {};
+  cursos.forEach(c => {
+    subjectMap[c.id] = {
+      key: c.id,
+      materia: c.nombre,
+      color: c.color || COLOR_CURSO_DEFECTO,
+      aula: c.aula || "",
+      profesor: c.profesor || "",
+      taskCount: 0
+    };
   });
 
-  selectMateria.innerHTML = `<option value="">Todas las materias (${allTasks.length})</option>` +
-    uniqueSubjects.map(s => `<option value="${escapeHtml(s)}" ${state.tasksMateriaFilter === s ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+  allTasks.forEach(t => {
+    const key = t.curso_id && subjectMap[t.curso_id] ? t.curso_id : "general";
+    if (!subjectMap[key]) {
+      subjectMap[key] = { key, materia: "General", color: "#AFC49A", aula: "", profesor: "", taskCount: 0 };
+    }
+    t._subjectKey = key;
+    if (!t.completada) subjectMap[key].taskCount++;
+  });
+
+  // Si el curso filtrado fue eliminado, volver a "Todas"
+  if (state.tasksMateriaFilter && !subjectMap[state.tasksMateriaFilter]) state.tasksMateriaFilter = "";
+
+  const subjectsList = Object.values(subjectMap).sort((a, b) => a.materia.localeCompare(b.materia, "es"));
+  const totalPendingCount = allTasks.filter(t => !t.completada).length;
+
+  renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjectMap);
 
   let list = allTasks;
   const nowMs = Date.now();
@@ -577,7 +1156,7 @@ async function renderTareas() {
   }
 
   if (state.tasksMateriaFilter) {
-    list = list.filter(t => t.materia === state.tasksMateriaFilter);
+    list = list.filter(t => t._subjectKey === state.tasksMateriaFilter);
   }
 
   if (state.tasksSearchQuery) {
@@ -661,60 +1240,490 @@ function wireTaskCardEvents(containerEl) {
 }
 
 /* =====================================================================
-   10. MODAL: AGREGAR / EDITAR CLASE (HORARIO)
+   9.5 VISTA: MIS CURSOS Y NOTAS
    ===================================================================== */
-async function populateSubjectDatalist() {
-  const classes = await db.clases.toArray();
-  const subjects = Array.from(new Set(classes.map(c => c.materia))).filter(Boolean);
-  const datalist = $("#datalist-materias");
-  datalist.innerHTML = subjects.map(s => `<option value="${escapeHtml(s)}">`).join("");
+function refrescarVistaActual() {
+  const t = state.currentTab;
+  if (t === "view-hoy") renderHoy();
+  else if (t === "view-horario") renderHorario();
+  else if (t === "view-cursos") renderCursos();
+  else if (t === "view-tareas") renderTareas();
 }
 
-function openNewClassModal(preselectedDay) {
-  $("#modal-class-title").textContent = "Añadir Materia al Horario";
+async function renderCursos() {
+  const [{ list: cursos }, clases] = await Promise.all([cargarCursos(), db.clases.toArray()]);
+  const resumenEl = $("#cursos-resumen");
+  const listEl = $("#cursos-list");
+
+  if (cursos.length === 0) {
+    resumenEl.innerHTML = "";
+    resumenEl.classList.add("hidden");
+    listEl.innerHTML = `
+      <div class="empty-card">
+        <div class="empty-card-icon-wrap">${ICONS.book}</div>
+        <strong>Aún no registras cursos</strong>
+        <p>Registra cada curso una sola vez con su profesor, aula y color. Luego armas el horario eligiendo el curso y la hora, y aquí llevas tus notas.</p>
+        <button class="btn-primary btn-sm" id="btn-add-curso-empty" style="margin-top:10px;">Registrar Curso</button>
+      </div>`;
+    $("#btn-add-curso-empty", listEl).addEventListener("click", () => openNewCursoModal());
+    return;
+  }
+
+  const sesionesPorCurso = {};
+  clases.forEach(c => {
+    const s = sesionesPorCurso[c.curso_id] || (sesionesPorCurso[c.curso_id] = { count: 0, minutos: 0 });
+    s.count++;
+    s.minutos += Math.max(0, timeToMinutes(c.hora_fin) - timeToMinutes(c.hora_inicio));
+  });
+
+  const filas = cursos.map(c => ({
+    curso: c,
+    r: calcularRendimiento(c.evaluacion),
+    sesiones: sesionesPorCurso[c.id] || { count: 0, minutos: 0 }
+  }));
+
+  resumenEl.classList.remove("hidden");
+  renderResumenCiclo(filas.map(f => f.r));
+
+  listEl.innerHTML = filas.map(f => renderCursoCardHTML(f.curso, f.r, f.sesiones)).join("");
+
+  $$('[data-action="notas"]', listEl).forEach(btn => {
+    btn.addEventListener("click", () => openNotasModal(btn.closest(".course-card").dataset.id));
+  });
+  $$('[data-action="edit-curso"]', listEl).forEach(btn => {
+    btn.addEventListener("click", () => openEditCursoModal(btn.closest(".course-card").dataset.id));
+  });
+}
+
+function renderResumenCiclo(resultados) {
+  const completos = resultados.filter(r => r.promedio !== null);
+  const aprobados = resultados.filter(r => r.estado === "aprobado" || r.estado === "asegurado").length;
+  const enRiesgo = resultados.filter(r => ["en-riesgo", "sin-opcion", "desaprobado"].includes(r.estado)).length;
+  const promedioCiclo = completos.length
+    ? completos.reduce((acc, r) => acc + r.promedio, 0) / completos.length
+    : null;
+
+  $("#cursos-resumen").innerHTML = `
+    <div class="overview-tile">
+      <span class="overview-value">${resultados.length}</span>
+      <span class="overview-label">Cursos</span>
+    </div>
+    <div class="overview-tile st-ok">
+      <span class="overview-value">${aprobados}</span>
+      <span class="overview-label">Aprobados</span>
+    </div>
+    <div class="overview-tile ${enRiesgo ? "st-warn" : ""}">
+      <span class="overview-value">${enRiesgo}</span>
+      <span class="overview-label">En riesgo</span>
+    </div>
+    <div class="overview-tile" title="Promedio simple de los cursos con las 3 notas completas">
+      <span class="overview-value">${formatNota(promedioCiclo)}</span>
+      <span class="overview-label">Prom. ciclo${completos.length ? ` (${completos.length})` : ""}</span>
+    </div>`;
+}
+
+function gradeCellHTML(label, valor) {
+  return `
+    <span class="grade-cell ${valor === null ? "is-empty" : ""}">
+      <span class="grade-cell-label">${label}</span>
+      <span class="grade-cell-value">${formatNota(valor)}</span>
+    </span>`;
+}
+
+function renderCursoCardHTML(c, r, ses) {
+  const info = ESTADO_NOTA_INFO[r.estado];
+  const color = escapeHtml(c.color || COLOR_CURSO_DEFECTO);
+  const horas = ses.minutos ? `${Number((ses.minutos / 60).toFixed(1))} h/sem` : "";
+  const sesionesTxt = ses.count
+    ? `${ses.count} ${ses.count === 1 ? "sesión" : "sesiones"}${horas ? " · " + horas : ""}`
+    : "Sin horario";
+  const ppLabel = r.practicasTotal ? `Prácticas ${r.practicasCalificadas}/${r.practicasTotal}` : "Prácticas";
+  const tienePromedio = r.promedio !== null;
+  const valorCentral = tienePromedio ? r.promedio : (r.estado === "sin-notas" ? null : r.acumulado);
+  const nombre = escapeHtml(c.nombre);
+
+  return `
+    <article class="course-card" data-id="${escapeHtml(c.id)}">
+      <span class="class-card-stripe" style="background:${color}"></span>
+      <button type="button" class="course-card-main" data-action="notas" aria-label="Ver y registrar notas de ${nombre}">
+        <span class="course-card-head">
+          <span class="class-card-title">${nombre}</span>
+          <span class="class-card-details">
+            ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
+            ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
+            <span class="class-detail-tag">${ICONS.layers} ${sesionesTxt}</span>
+          </span>
+        </span>
+        <span class="grade-strip">
+          ${gradeCellHTML("Parcial", r.parcial)}
+          ${gradeCellHTML(ppLabel, r.pp)}
+          ${gradeCellHTML("Final", r.final)}
+          <span class="grade-cell grade-cell-avg ${info.tone}">
+            <span class="grade-cell-label">${tienePromedio ? "Promedio" : "Acumulado"}</span>
+            <span class="grade-cell-value">${formatNota(valorCentral)}</span>
+          </span>
+        </span>
+        <span class="course-card-footer">
+          <span class="grade-status-pill ${info.tone}">${info.label}</span>
+          <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
+        </span>
+      </button>
+      <button type="button" class="icon-btn course-edit-btn" data-action="edit-curso" aria-label="Editar datos de ${nombre}" title="Editar curso">${ICONS.edit}</button>
+    </article>`;
+}
+
+/* =====================================================================
+   9.6 MODAL: NUEVO / EDITAR CURSO (CATÁLOGO)
+   ===================================================================== */
+function setCursoColor(color) {
+  $("#curso-color").value = color;
+  $$(".color-swatch", $("#curso-color-picker")).forEach(s => {
+    s.classList.toggle("selected", s.dataset.color === color);
+  });
+}
+
+async function openNewCursoModal(origin) {
+  state.cursoModalOrigin = origin || null;
+  $("#modal-curso-title").textContent = "Nuevo Curso";
+  $("#curso-id").value = "";
+  $("#curso-nombre").value = "";
+  $("#curso-profesor").value = "";
+  $("#curso-aula").value = "";
+  $("#curso-notas").value = "";
+  $("#curso-form-error").classList.add("hidden");
+  $("#btn-delete-curso").classList.add("hidden");
+  $("#curso-sesiones-info").classList.add("hidden");
+
+  // Proponer un color que aún no use otro curso
+  const usados = new Set((await db.cursos.toArray()).map(c => c.color));
+  const paleta = $$(".color-swatch", $("#curso-color-picker")).map(s => s.dataset.color);
+  setCursoColor(paleta.find(c => !usados.has(c)) || paleta[0]);
+
+  $("#modal-curso-backdrop").classList.remove("hidden");
+  $("#curso-nombre").focus();
+}
+
+async function openEditCursoModal(id) {
+  const c = await db.cursos.get(id);
+  if (!c) return;
+  state.cursoModalOrigin = null;
+
+  $("#modal-curso-title").textContent = "Editar Curso";
+  $("#curso-id").value = c.id;
+  $("#curso-nombre").value = c.nombre || "";
+  $("#curso-profesor").value = c.profesor || "";
+  $("#curso-aula").value = c.aula || "";
+  $("#curso-notas").value = c.notas || "";
+  setCursoColor(c.color || COLOR_CURSO_DEFECTO);
+  $("#curso-form-error").classList.add("hidden");
+  $("#btn-delete-curso").classList.remove("hidden");
+
+  const sesiones = await db.clases.where("curso_id").equals(id).count();
+  const infoEl = $("#curso-sesiones-info");
+  infoEl.textContent = sesiones
+    ? `Aparece en ${sesiones} ${sesiones === 1 ? "sesión" : "sesiones"} del horario. Los cambios se reflejan en todas.`
+    : "Este curso aún no tiene horario asignado.";
+  infoEl.classList.remove("hidden");
+
+  $("#modal-curso-backdrop").classList.remove("hidden");
+}
+
+function closeCursoModal() {
+  $("#modal-curso-backdrop").classList.add("hidden");
+  state.cursoModalOrigin = null;
+}
+
+async function guardarCurso(e) {
+  e.preventDefault();
+  const id = $("#curso-id").value;
+  const nombre = $("#curso-nombre").value.trim();
+  const errorEl = $("#curso-form-error");
+  errorEl.classList.add("hidden");
+
+  if (!nombre) {
+    errorEl.textContent = "El nombre del curso es obligatorio.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const existentes = await db.cursos.toArray();
+  const duplicado = existentes.find(c => c.id !== id && normalizarNombre(c.nombre) === normalizarNombre(nombre));
+  if (duplicado) {
+    errorEl.textContent = `Ya tienes registrado el curso "${duplicado.nombre}".`;
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const previo = id ? existentes.find(c => c.id === id) : null;
+  const curso = {
+    id: id || uuid(),
+    nombre,
+    profesor: $("#curso-profesor").value.trim(),
+    aula: $("#curso-aula").value.trim(),
+    color: $("#curso-color").value || COLOR_CURSO_DEFECTO,
+    notas: $("#curso-notas").value.trim(),
+    evaluacion: (previo && previo.evaluacion) || evaluacionVacia()
+  };
+
+  await db.cursos.put(curso);
+  const origin = state.cursoModalOrigin;
+  closeCursoModal();
+  showToast(previo ? "Curso actualizado." : "Curso registrado.");
+
+  if (origin === "clase") {
+    // Volver al formulario de clase con el curso recién creado ya elegido
+    await populateClassCursoSelect(curso.id);
+  } else if (origin && origin.abrirClase) {
+    await openNewClassModal(origin.dia, curso.id);
+  }
+  refrescarVistaActual();
+}
+
+async function eliminarCurso() {
+  const id = $("#curso-id").value;
+  if (!id) return;
+  const curso = await db.cursos.get(id);
+  if (!curso) return;
+
+  const [nClases, nTareas] = await Promise.all([
+    db.clases.where("curso_id").equals(id).count(),
+    db.tareas.where("curso_id").equals(id).count()
+  ]);
+
+  let msg = `Se eliminará "${curso.nombre}" con sus notas`;
+  msg += nClases ? ` y sus ${nClases} ${nClases === 1 ? "sesión" : "sesiones"} del horario.` : ".";
+  if (nTareas) msg += ` ${nTareas} ${nTareas === 1 ? "tarea pasará" : "tareas pasarán"} a General.`;
+
+  const ok = await confirmDialog("Eliminar Curso", msg);
+  if (!ok) return;
+
+  await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+    await db.clases.where("curso_id").equals(id).delete();
+    await db.tareas.where("curso_id").equals(id).modify({ curso_id: "" });
+    await db.cursos.delete(id);
+  });
+
+  closeCursoModal();
+  showToast("Curso eliminado.");
+  refrescarVistaActual();
+}
+
+/* =====================================================================
+   9.7 MODAL: REGISTRO DE NOTAS (PARCIAL, FINAL Y PRÁCTICAS)
+   ===================================================================== */
+function practicaRowHTML(p, idx) {
+  const titulo = p.titulo || `Práctica ${idx + 1}`;
+  const nota = p.nota === null || p.nota === undefined ? "" : p.nota;
+  return `
+    <div class="practica-row" data-id="${escapeHtml(p.id || uuid())}">
+      <input type="text" class="field practica-titulo" value="${escapeHtml(titulo)}" maxlength="40" aria-label="Nombre de la evaluación ${idx + 1}">
+      <input type="number" class="field grade-input practica-nota" value="${escapeHtml(nota)}" min="0" max="20" step="0.01" inputmode="decimal" placeholder="—" aria-label="Nota de la evaluación ${idx + 1}">
+      <button type="button" class="icon-btn practica-remove" aria-label="Quitar evaluación ${idx + 1}" title="Quitar">${ICONS.close}</button>
+    </div>`;
+}
+
+function renderPracticasRows(practicas) {
+  const list = $("#practicas-list");
+  list.innerHTML = practicas.length
+    ? practicas.map((p, i) => practicaRowHTML(p, i)).join("")
+    : `<p class="practicas-empty">Aún no agregas prácticas. Pueden ser prácticas calificadas, tareas, laboratorios o trabajos: todas se promedian.</p>`;
+}
+
+/** Lee y valida el formulario de notas. Las notas fuera de 0–20 se marcan y no se cuentan. */
+function leerEvaluacionDelFormulario() {
+  const errores = [];
+  const validar = (input, nombre) => {
+    input.classList.remove("invalid");
+    if (input.validity && input.validity.badInput) {
+      input.classList.add("invalid");
+      errores.push(`${nombre}: escribe un número válido.`);
+      return null;
+    }
+    const raw = input.value.trim();
+    if (raw === "") return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > NOTA_MAX) {
+      input.classList.add("invalid");
+      errores.push(`${nombre}: la nota debe estar entre 0 y ${NOTA_MAX}.`);
+      return null;
+    }
+    return Math.round(n * 100) / 100;
+  };
+
+  const parcial = validar($("#nota-parcial"), "Examen parcial");
+  const final = validar($("#nota-final"), "Examen final");
+  const practicas = $$(".practica-row", $("#practicas-list")).map((row, i) => {
+    const titulo = $(".practica-titulo", row).value.trim() || `Práctica ${i + 1}`;
+    return { id: row.dataset.id || uuid(), titulo, nota: validar($(".practica-nota", row), titulo) };
+  });
+
+  return { evaluacion: { parcial, final, practicas }, errores };
+}
+
+function actualizarResumenNotas() {
+  const { evaluacion } = leerEvaluacionDelFormulario();
+  const r = calcularRendimiento(evaluacion);
+  const info = ESTADO_NOTA_INFO[r.estado];
+  const tienePromedio = r.promedio !== null;
+  const valor = tienePromedio ? r.promedio : r.acumulado;
+  const etiqueta = tienePromedio ? "Promedio final" : "Acumulado";
+  const pct = Math.min(100, Math.max(0, (valor / NOTA_MAX) * 100));
+  const marca = (NOTA_APROBATORIA / NOTA_MAX) * 100;
+  const valorTxt = r.estado === "sin-notas" ? "—" : formatNota(valor);
+
+  const resumenEl = $("#notas-resumen");
+  resumenEl.className = `grade-summary ${info.tone}`;
+  resumenEl.innerHTML = `
+    <div class="grade-summary-top">
+      <div class="grade-summary-main">
+        <span class="grade-summary-label">${etiqueta}</span>
+        <span class="grade-summary-value">${valorTxt}<small>/ 20</small></span>
+      </div>
+      <span class="grade-status-pill ${info.tone}">${info.label}</span>
+    </div>
+    <div class="grade-progress" role="img" aria-label="${etiqueta}: ${valorTxt} de 20. Mínimo aprobatorio ${NOTA_APROBATORIA}.">
+      <div class="grade-progress-fill" style="width:${pct}%"></div>
+      <span class="grade-progress-mark" style="left:${marca}%"></span>
+    </div>
+    <div class="grade-progress-scale" aria-hidden="true">
+      <span>0</span>
+      <span class="grade-progress-scale-mark" style="left:${marca}%">${NOTA_APROBATORIA}</span>
+      <span>20</span>
+    </div>
+    <p class="grade-summary-msg">${escapeHtml(mensajeRendimiento(r))}</p>`;
+
+  const ppEl = $("#practicas-promedio");
+  ppEl.textContent = r.pp === null
+    ? "Promedio: —"
+    : `Promedio: ${formatNota(r.pp)}${r.ppProvisional ? ` (${r.practicasCalificadas} de ${r.practicasTotal})` : ""}`;
+}
+
+async function openNotasModal(id) {
+  const curso = await db.cursos.get(id);
+  if (!curso) return;
+  const ev = curso.evaluacion || evaluacionVacia();
+
+  $("#notas-curso-id").value = id;
+  $("#modal-notas-title").textContent = curso.nombre;
+  $("#notas-curso-sub").textContent = [curso.profesor, curso.aula].filter(Boolean).join(" · ") || "Registro de notas";
+  $("#notas-curso-dot").style.background = curso.color || COLOR_CURSO_DEFECTO;
+  $("#nota-parcial").value = ev.parcial === null || ev.parcial === undefined ? "" : ev.parcial;
+  $("#nota-final").value = ev.final === null || ev.final === undefined ? "" : ev.final;
+  renderPracticasRows(Array.isArray(ev.practicas) ? ev.practicas : []);
+  $("#notas-form-error").classList.add("hidden");
+  actualizarResumenNotas();
+  $$(".field.invalid", $("#form-notas")).forEach(f => f.classList.remove("invalid"));
+
+  $("#modal-notas-backdrop").classList.remove("hidden");
+}
+
+function closeNotasModal() {
+  $("#modal-notas-backdrop").classList.add("hidden");
+}
+
+function agregarPractica() {
+  const list = $("#practicas-list");
+  const empty = $(".practicas-empty", list);
+  if (empty) empty.remove();
+  const idx = $$(".practica-row", list).length;
+  list.insertAdjacentHTML("beforeend", practicaRowHTML({ id: uuid(), titulo: `Práctica ${idx + 1}`, nota: null }, idx));
+  $(".practica-nota", list.lastElementChild).focus();
+  actualizarResumenNotas();
+}
+
+async function guardarNotas(e) {
+  e.preventDefault();
+  const id = $("#notas-curso-id").value;
+  const errorEl = $("#notas-form-error");
+  const { evaluacion, errores } = leerEvaluacionDelFormulario();
+
+  if (errores.length) {
+    errorEl.textContent = errores[0] + (errores.length > 1 ? ` (y ${errores.length - 1} más)` : "");
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  errorEl.classList.add("hidden");
+
+  await db.cursos.update(id, { evaluacion });
+  closeNotasModal();
+  showToast("Notas guardadas.");
+  refrescarVistaActual();
+}
+
+/* =====================================================================
+   10. MODAL: AGREGAR / EDITAR CLASE (HORARIO)
+   Solo se elige el curso ya registrado + día + horas. El aula es opcional
+   y solo se guarda si esa sesión es en un aula distinta a la habitual.
+   ===================================================================== */
+async function populateClassCursoSelect(selectedId) {
+  const { list } = await cargarCursos();
+  const sel = $("#class-curso");
+  sel.innerHTML =
+    `<option value="" disabled ${selectedId ? "" : "selected"}>Elige un curso…</option>` +
+    list.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === selectedId ? "selected" : ""}>${escapeHtml(c.nombre)}</option>`).join("");
+  await actualizarPreviewCursoClase();
+}
+
+async function actualizarPreviewCursoClase() {
+  const id = $("#class-curso").value;
+  const el = $("#class-curso-preview");
+  const curso = id ? await db.cursos.get(id) : null;
+
+  if (!curso) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    $("#class-aula").placeholder = "Aula habitual del curso";
+    return;
+  }
+
+  const detalle = [curso.profesor, curso.aula].filter(Boolean).join(" · ") || "Sin profesor ni aula registrados";
+  el.innerHTML = `
+    <span class="curso-preview-dot" style="background:${escapeHtml(curso.color || COLOR_CURSO_DEFECTO)}"></span>
+    <span class="curso-preview-text">
+      <strong>${escapeHtml(curso.nombre)}</strong>
+      <span>${escapeHtml(detalle)}</span>
+    </span>`;
+  el.classList.remove("hidden");
+  $("#class-aula").placeholder = curso.aula ? `Habitual: ${curso.aula}` : "Ej: Aula 204, Lab B (opcional)";
+}
+
+async function openNewClassModal(preselectedDay, preselectedCursoId) {
+  const dia = preselectedDay || state.selectedDay || "LUNES";
+  const count = await db.cursos.count();
+  if (count === 0) {
+    showToast("Primero registra el curso; luego le asignas la hora.");
+    openNewCursoModal({ abrirClase: true, dia });
+    return;
+  }
+
+  $("#modal-class-title").textContent = "Añadir Clase al Horario";
   $("#class-id").value = "";
-  $("#class-materia").value = "";
-  $("#class-dia").value = preselectedDay || state.selectedDay || "LUNES";
+  $("#class-dia").value = dia;
   $("#class-hora-inicio").value = "08:00";
   $("#class-hora-fin").value = "10:00";
   $("#class-aula").value = "";
-  $("#class-profesor").value = "";
-  $("#class-color").value = "#AFC49A";
-  $("#class-notas").value = "";
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.add("hidden");
 
-  $$(".color-swatch", $("#class-color-picker")).forEach(s => {
-    s.classList.toggle("selected", s.dataset.color === "#AFC49A");
-  });
-
-  populateSubjectDatalist();
+  await populateClassCursoSelect(preselectedCursoId || "");
   $("#modal-class-backdrop").classList.remove("hidden");
-  $("#class-materia").focus();
+  $("#class-curso").focus();
 }
 
 async function openEditClassModal(id) {
   const c = await db.clases.get(id);
   if (!c) return;
 
-  $("#modal-class-title").textContent = "Editar Materia";
+  $("#modal-class-title").textContent = "Editar Clase";
   $("#class-id").value = c.id;
-  $("#class-materia").value = c.materia || "";
   $("#class-dia").value = c.dia_semana || "LUNES";
   $("#class-hora-inicio").value = c.hora_inicio || "08:00";
   $("#class-hora-fin").value = c.hora_fin || "10:00";
   $("#class-aula").value = c.aula || "";
-  $("#class-profesor").value = c.profesor || "";
-  $("#class-color").value = c.color || "#AFC49A";
-  $("#class-notas").value = c.notas || "";
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.remove("hidden");
 
-  $$(".color-swatch", $("#class-color-picker")).forEach(s => {
-    s.classList.toggle("selected", s.dataset.color === (c.color || "#AFC49A"));
-  });
-
-  populateSubjectDatalist();
+  await populateClassCursoSelect(c.curso_id);
   $("#modal-class-backdrop").classList.remove("hidden");
 }
 
@@ -725,15 +1734,14 @@ function closeClassModal() {
 /* =====================================================================
    11. MODAL: AGREGAR / EDITAR TAREA
    ===================================================================== */
-async function populateTaskSubjectSelect(currentVal) {
-  const classes = await db.clases.toArray();
-  const subjects = Array.from(new Set(classes.map(c => c.materia))).filter(Boolean).sort();
-  const sel = $("#task-materia");
-  sel.innerHTML = `<option value="General">General / Otra</option>` +
-    subjects.map(s => `<option value="${escapeHtml(s)}" ${s === currentVal ? "selected" : ""}>${escapeHtml(s)}</option>`).join("");
+async function populateTaskSubjectSelect(currentCursoId) {
+  const { list } = await cargarCursos();
+  const sel = $("#task-curso");
+  sel.innerHTML = `<option value="">General / Otra</option>` +
+    list.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === currentCursoId ? "selected" : ""}>${escapeHtml(c.nombre)}</option>`).join("");
 }
 
-function openNewTaskModal(defaultMateria) {
+function openNewTaskModal(defaultCursoId) {
   $("#modal-task-title").textContent = "Nueva Tarea";
   $("#task-id").value = "";
   $("#task-titulo").value = "";
@@ -752,7 +1760,7 @@ function openNewTaskModal(defaultMateria) {
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.add("hidden");
 
-  populateTaskSubjectSelect(defaultMateria || "");
+  populateTaskSubjectSelect(defaultCursoId || "");
   $("#modal-task-backdrop").classList.remove("hidden");
   $("#task-titulo").focus();
 }
@@ -772,7 +1780,7 @@ async function openEditTaskModal(id) {
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.remove("hidden");
 
-  await populateTaskSubjectSelect(t.materia);
+  await populateTaskSubjectSelect(t.curso_id || "");
   $("#modal-task-backdrop").classList.remove("hidden");
 }
 
@@ -810,33 +1818,48 @@ function renderAjustes() {
 }
 
 async function exportScheduleForFriends() {
-  const classes = await db.clases.toArray();
-  if (classes.length === 0) {
-    showToast("No hay materias en el horario para compartir.", true);
+  const [{ list: cursos, map: cursosMap }, classes] = await Promise.all([
+    cargarCursos(),
+    db.clases.toArray()
+  ]);
+
+  if (classes.length === 0 && cursos.length === 0) {
+    showToast("No hay cursos ni horario para compartir.", true);
     return;
   }
 
+  // Exporta cursos sin las notas personales + sesiones enriquecidas para máxima compatibilidad
   const exportPayload = {
-    tipo: "uniflow-horario-compartido",
-    version: 1,
+    tipo: "umbral-horario-compartido",
+    version: 2,
     fecha_creacion: new Date().toISOString(),
-    clases: classes.map(c => ({
-      materia: c.materia,
-      dia_semana: c.dia_semana,
-      hora_inicio: c.hora_inicio,
-      hora_fin: c.hora_fin,
-      aula: c.aula || "",
+    cursos: cursos.map(c => ({
+      nombre: c.nombre,
       profesor: c.profesor || "",
-      color: c.color || "#AFC49A",
+      aula: c.aula || "",
+      color: c.color || COLOR_CURSO_DEFECTO,
       notas: c.notas || ""
-    }))
+    })),
+    clases: classes.map(c => {
+      const cur = cursosMap[c.curso_id];
+      return {
+        materia: cur ? cur.nombre : "Curso",
+        dia_semana: c.dia_semana,
+        hora_inicio: c.hora_inicio,
+        hora_fin: c.hora_fin,
+        aula: c.aula || (cur && cur.aula) || "",
+        profesor: (cur && cur.profesor) || "",
+        color: (cur && cur.color) || COLOR_CURSO_DEFECTO,
+        notas: (cur && cur.notas) || ""
+      };
+    })
   };
 
   const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Horario_Semestre_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `Umbral_Horario_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast("Archivo de horario exportado.");
@@ -848,31 +1871,28 @@ async function importScheduleFromFriends(file) {
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (!data || !Array.isArray(data.clases)) {
+    if (!data || (!Array.isArray(data.clases) && !Array.isArray(data.cursos))) {
       throw new Error("El archivo no tiene el formato de horario compatible.");
     }
 
+    const totalClases = Array.isArray(data.clases) ? data.clases.length : 0;
     const confirm = await confirmDialog(
       "Importar Horario",
-      `Se incorporarán ${data.clases.length} clases al horario. ¿Deseas continuar?`
+      `Se incorporarán los cursos y ${totalClases} sesiones al horario. ¿Deseas continuar?`
     );
     if (!confirm) return;
 
-    for (const c of data.clases) {
-      await db.clases.put({
-        id: uuid(),
-        materia: c.materia,
-        dia_semana: c.dia_semana,
-        hora_inicio: c.hora_inicio,
-        hora_fin: c.hora_fin,
-        aula: c.aula || "",
-        profesor: c.profesor || "",
-        color: c.color || "#AFC49A",
-        notas: c.notas || ""
-      });
-    }
+    const existentes = await db.cursos.toArray();
+    const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
 
-    showToast(`Se importaron ${data.clases.length} clases.`);
+    await db.transaction("rw", db.cursos, db.clases, async () => {
+      if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
+      for (const c of r.clases) {
+        await db.clases.put({ ...c, id: uuid() });
+      }
+    });
+
+    showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${r.clases.length} clases).`);
     switchTab("view-horario");
   } catch (err) {
     console.error(err);
@@ -881,15 +1901,17 @@ async function importScheduleFromFriends(file) {
 }
 
 async function exportFullBackup() {
-  const [classes, tasks] = await Promise.all([
+  const [cursos, classes, tasks] = await Promise.all([
+    db.cursos.toArray(),
     db.clases.toArray(),
     db.tareas.toArray()
   ]);
 
   const payload = {
-    tipo: "uniflow-backup-total",
-    version: 1,
+    tipo: "umbral-backup-total",
+    version: 2,
     fecha_creacion: new Date().toISOString(),
+    cursos: cursos,
     clases: classes,
     tareas: tasks
   };
@@ -898,7 +1920,7 @@ async function exportFullBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `UniFlow_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `Umbral_Backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast("Copia de seguridad generada.");
@@ -910,22 +1932,26 @@ async function importFullBackup(file) {
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (!data.clases && !data.tareas) {
-      throw new Error("El archivo no corresponde a un respaldo válido de UniFlow.");
+    if (!data.cursos && !data.clases && !data.tareas) {
+      throw new Error("El archivo no corresponde a un respaldo válido de Umbral.");
     }
 
     const ok = await confirmDialog(
       "Restaurar Copia",
-      "Esto integrará las clases y tareas del respaldo a la base de datos actual. ¿Continuar?"
+      "Esto integrará los cursos, notas, clases y tareas del respaldo a la base de datos actual. ¿Continuar?"
     );
     if (!ok) return;
 
-    if (Array.isArray(data.clases)) {
-      for (const c of data.clases) await db.clases.put(c);
-    }
-    if (Array.isArray(data.tareas)) {
-      for (const t of data.tareas) await db.tareas.put(t);
-    }
+    await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+      if (Array.isArray(data.cursos) && data.cursos.length > 0) {
+        await db.cursos.bulkPut(data.cursos);
+      }
+      const existentes = await db.cursos.toArray();
+      const r = convertirFormatoPlano(data.clases || [], data.tareas || [], existentes, []);
+      if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
+      if (r.clases.length) await db.clases.bulkPut(r.clases);
+      if (r.tareas.length) await db.tareas.bulkPut(r.tareas);
+    });
 
     showToast("Copia de seguridad restaurada.");
     switchTab("view-hoy");
@@ -938,50 +1964,68 @@ async function importFullBackup(file) {
 async function loadDemoSemester() {
   const ok = await confirmDialog(
     "Cargar Semestre Modelo",
-    "Se incorporarán materias y evaluaciones representativas para probar el sistema. ¿Continuar?"
+    "Se incorporarán cursos con notas de ejemplo (escala 0–20), horario semanal y tareas para probar el sistema. ¿Continuar?"
   );
   if (!ok) return;
 
+  const cIA   = { id: uuid(), nombre: "Inteligencia Artificial y Sistemas Expertos", profesor: "Dr. Agurto", aula: "Aula 1", color: "#38BDF8", notas: "Repositorio del curso y guías de laboratorio", evaluacion: { parcial: 14, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 15 }, { id: uuid(), titulo: "Práctica 2", nota: 13 }, { id: uuid(), titulo: "Trabajo heurísticas", nota: 16 }] } };
+  const cTop  = { id: uuid(), nombre: "Tópicos Avanzados en Ingeniería de Software", profesor: "Ing. Chaparro", aula: "Laboratorio de Redes", color: "#818CF8", notas: "Arquitectura limpia y despliegue continuo", evaluacion: { parcial: 12, final: 15, practicas: [{ id: uuid(), titulo: "Lab CI/CD", nota: 14 }, { id: uuid(), titulo: "Entrega Arquitectura", nota: 16 }] } };
+  const cForm = { id: uuid(), nombre: "Formulación y Evaluación de Proyectos", profesor: "Dra. Vargas", aula: "Aula 204", color: "#4ADE80", notas: "Flujo de caja, VAN y TIR", evaluacion: { parcial: 9, final: null, practicas: [{ id: uuid(), titulo: "Control 1", nota: 10 }, { id: uuid(), titulo: "Avance Estudio Mercado", nota: 11 }] } };
+  const cAud  = { id: uuid(), nombre: "Auditoría y Seguridad en Informática", profesor: "Ing. Silva", aula: "Lab Sistemas", color: "#E879F9", notas: "Normativa ISO 27001 y pruebas OWASP", evaluacion: { parcial: 13, final: null, practicas: [{ id: uuid(), titulo: "Informe OWASP", nota: 14 }, { id: uuid(), titulo: "Práctica 2", nota: null }] } };
+  const cDist = { id: uuid(), nombre: "Sistemas Distribuidos", profesor: "Ing. Mendoza", aula: "Lab Redes", color: "#FB923C", notas: "Consenso Raft y tolerancia a fallos", evaluacion: { parcial: 8, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 9 }, { id: uuid(), titulo: "Laboratorio RPC", nota: 8 }] } };
+  const cPrac = { id: uuid(), nombre: "Prácticas Pre Profesionales II", profesor: "Ing. Castillo", aula: "Oficina de TI", color: "#FACC15", notas: "Supervisión e informes mensuales", evaluacion: { parcial: 17, final: 18, practicas: [{ id: uuid(), titulo: "Informe 1", nota: 17 }, { id: uuid(), titulo: "Informe 2", nota: 18 }] } };
+
+  const demoCursos = [cIA, cTop, cForm, cAud, cDist, cPrac];
+
   const demoClasses = [
-    { id: uuid(), materia: "Cálculo II", dia_semana: "LUNES", hora_inicio: "08:00", hora_fin: "10:00", aula: "Aula 204", profesor: "Dr. Mendoza", color: "#AFC49A" },
-    { id: uuid(), materia: "Física Aplicada", dia_semana: "LUNES", hora_inicio: "10:30", hora_fin: "12:30", aula: "Lab Central", profesor: "Dra. Soto", color: "#4F7256" },
-    { id: uuid(), materia: "Algoritmos y Estructuras", dia_semana: "MARTES", hora_inicio: "09:00", hora_fin: "12:00", aula: "Lab Sistemas 3", profesor: "Ing. Morales", color: "#294635" },
-    { id: uuid(), materia: "Cálculo II", dia_semana: "MIERCOLES", hora_inicio: "08:00", hora_fin: "10:00", aula: "Aula 204", profesor: "Dr. Mendoza", color: "#AFC49A" },
-    { id: uuid(), materia: "Base de Datos", dia_semana: "MIERCOLES", hora_inicio: "14:00", hora_fin: "17:00", aula: "Lab Sistemas 1", profesor: "Prof. Vidal", color: "#35687A" },
-    { id: uuid(), materia: "Algoritmos y Estructuras", dia_semana: "JUEVES", hora_inicio: "10:00", hora_fin: "12:00", aula: "Lab Sistemas 3", profesor: "Ing. Morales", color: "#294635" },
-    { id: uuid(), materia: "Física Aplicada", dia_semana: "VIERNES", hora_inicio: "08:30", hora_fin: "11:30", aula: "Aula 102", profesor: "Dra. Soto", color: "#4F7256" }
+    { id: uuid(), curso_id: cIA.id,   dia_semana: "LUNES",     hora_inicio: "16:30", hora_fin: "19:00", aula: "" },
+    { id: uuid(), curso_id: cTop.id,  dia_semana: "LUNES",     hora_inicio: "19:00", hora_fin: "21:30", aula: "" },
+    { id: uuid(), curso_id: cIA.id,   dia_semana: "MARTES",    hora_inicio: "14:00", hora_fin: "16:30", aula: "" },
+    { id: uuid(), curso_id: cForm.id, dia_semana: "MARTES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
+    { id: uuid(), curso_id: cAud.id,  dia_semana: "MIERCOLES", hora_inicio: "14:50", hora_fin: "16:30", aula: "" },
+    { id: uuid(), curso_id: cDist.id, dia_semana: "MIERCOLES", hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
+    { id: uuid(), curso_id: cDist.id, dia_semana: "JUEVES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
+    { id: uuid(), curso_id: cAud.id,  dia_semana: "VIERNES",   hora_inicio: "14:50", hora_fin: "16:30", aula: "" },
+    { id: uuid(), curso_id: cForm.id, dia_semana: "VIERNES",   hora_inicio: "17:20", hora_fin: "19:00", aula: "" },
+    { id: uuid(), curso_id: cPrac.id, dia_semana: "SABADO",    hora_inicio: "09:00", hora_fin: "12:20", aula: "" }
   ];
 
   const now = new Date();
-  const d1 = new Date(now.getTime() + 18 * 3600000).toISOString().slice(0, 16);
+  const d1 = new Date(now.getTime() + 24 * 3600000).toISOString().slice(0, 16);
   const d2 = new Date(now.getTime() + 48 * 3600000).toISOString().slice(0, 16);
   const d3 = new Date(now.getTime() + 96 * 3600000).toISOString().slice(0, 16);
   const d4 = new Date(now.getTime() + 140 * 3600000).toISOString().slice(0, 16);
 
   const demoTasks = [
-    { id: uuid(), titulo: "Guía 3: Integrales triples y coordenadas polares", materia: "Cálculo II", fecha_limite: d1, importancia: 3, completada: false, notas: "Ejercicios del 1 al 15 del temario oficial." },
-    { id: uuid(), titulo: "Primer Examen Parcial: Grafos y Árboles", materia: "Algoritmos y Estructuras", fecha_limite: d2, importancia: 5, completada: false, notas: "Evaluación presencial en laboratorio." },
-    { id: uuid(), titulo: "Informe de Laboratorio: Movimiento Armónico", materia: "Física Aplicada", fecha_limite: d3, importancia: 4, completada: false, notas: "Formato institucional con análisis de incertidumbre." },
-    { id: uuid(), titulo: "Diseño del Modelo Entidad-Relación", materia: "Base de Datos", fecha_limite: d4, importancia: 4, completada: false, notas: "Caso de estudio de plataforma de gestión." },
-    { id: uuid(), titulo: "Descarga de diapositivas del curso", materia: "Cálculo II", fecha_limite: "", importancia: 1, completada: true, notas: "" }
+    { id: uuid(), titulo: "Entrega de Proyecto: Agente de Búsqueda Heurística", curso_id: cIA.id, fecha_limite: d1, importancia: 5, completada: false, fecha_creacion: now.toISOString(), notas: "Implementación de algoritmo A* con heurística admisible." },
+    { id: uuid(), titulo: "Informe de Auditoría de Seguridad Web OWASP", curso_id: cAud.id, fecha_limite: d2, importancia: 4, completada: false, fecha_creacion: now.toISOString(), notas: "Escaneo de vulnerabilidades y matriz de riesgos." },
+    { id: uuid(), titulo: "Estudio de Mercado y Flujo de Caja", curso_id: cForm.id, fecha_limite: d3, importancia: 4, completada: false, fecha_creacion: now.toISOString(), notas: "Cálculo del VAN y TIR con escenarios de sensibilidad." },
+    { id: uuid(), titulo: "Implementación de Consenso Raft", curso_id: cDist.id, fecha_limite: d4, importancia: 3, completada: false, fecha_creacion: now.toISOString(), notas: "Módulo de elección de líder y replicación de log." },
+    { id: uuid(), titulo: "Bitácora semanal de actividades prácticas", curso_id: cPrac.id, fecha_limite: "", importancia: 2, completada: true, fecha_creacion: now.toISOString(), notas: "Firmada por el supervisor institucional." }
   ];
 
-  await db.clases.bulkPut(demoClasses);
-  await db.tareas.bulkPut(demoTasks);
+  await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+    await db.cursos.bulkPut(demoCursos);
+    await db.clases.bulkPut(demoClasses);
+    await db.tareas.bulkPut(demoTasks);
+  });
 
-  showToast("Datos de demostración incorporados.");
-  switchTab("view-hoy");
+  showToast("Semestre modelo cargado con cursos, notas y horario.");
+  switchTab("view-cursos");
 }
 
 async function clearAllData() {
   const ok = await confirmDialog(
     "Vaciar Base de Datos",
-    "¿Confirmas la eliminación total de materias y tareas registradas?"
+    "¿Confirmas la eliminación total de cursos, notas, horario y tareas registradas?"
   );
   if (!ok) return;
 
-  await db.clases.clear();
-  await db.tareas.clear();
+  await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+    await db.cursos.clear();
+    await db.clases.clear();
+    await db.tareas.clear();
+  });
   showToast("Base de datos reiniciada.");
   switchTab("view-hoy");
 }
@@ -1005,6 +2049,10 @@ function wireGlobalEvents() {
   $("#modal-quick-backdrop").addEventListener("click", (e) => {
     if (e.target.id === "modal-quick-backdrop") $("#modal-quick-backdrop").classList.add("hidden");
   });
+  $("#btn-quick-create-curso").addEventListener("click", () => {
+    $("#modal-quick-backdrop").classList.add("hidden");
+    openNewCursoModal();
+  });
   $("#btn-quick-create-task").addEventListener("click", () => {
     $("#modal-quick-backdrop").classList.add("hidden");
     openNewTaskModal();
@@ -1014,6 +2062,7 @@ function wireGlobalEvents() {
     openNewClassModal();
   });
 
+  $("#btn-add-curso").addEventListener("click", () => openNewCursoModal());
   $("#btn-add-task").addEventListener("click", () => openNewTaskModal());
   $("#btn-add-class").addEventListener("click", () => openNewClassModal());
   $("#btn-ver-todas-tareas").addEventListener("click", () => switchTab("view-tareas"));
@@ -1037,24 +2086,76 @@ function wireGlobalEvents() {
     });
   });
 
-  $("#select-filter-materia").addEventListener("change", (e) => {
-    state.tasksMateriaFilter = e.target.value;
-    renderTareas();
-  });
+  const btnSubjectDropdown = $("#btn-subject-dropdown-toggle");
+  const menuSubjectDropdown = $("#subject-dropdown-menu");
+  if (btnSubjectDropdown && menuSubjectDropdown) {
+    btnSubjectDropdown.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isClosed = menuSubjectDropdown.classList.contains("hidden");
+      if (isClosed) {
+        menuSubjectDropdown.classList.remove("hidden");
+        btnSubjectDropdown.classList.add("open");
+        btnSubjectDropdown.setAttribute("aria-expanded", "true");
+      } else {
+        menuSubjectDropdown.classList.add("hidden");
+        btnSubjectDropdown.classList.remove("open");
+        btnSubjectDropdown.setAttribute("aria-expanded", "false");
+      }
+    });
+
+    document.addEventListener("click", (e) => {
+      const wrapper = btnSubjectDropdown.closest(".subject-dropdown-wrapper");
+      if (wrapper && !wrapper.contains(e.target)) {
+        menuSubjectDropdown.classList.add("hidden");
+        btnSubjectDropdown.classList.remove("open");
+        btnSubjectDropdown.setAttribute("aria-expanded", "false");
+      }
+    });
+  }
 
   $("#input-search-tasks").addEventListener("input", (e) => {
     state.tasksSearchQuery = e.target.value;
     renderTareas();
   });
 
-  $$(".color-swatch", $("#class-color-picker")).forEach(s => {
-    s.addEventListener("click", () => {
-      $$(".color-swatch", $("#class-color-picker")).forEach(x => x.classList.remove("selected"));
-      s.classList.add("selected");
-      $("#class-color").value = s.dataset.color;
-    });
+  // Eventos del modal de Curso (catálogo)
+  $$(".color-swatch", $("#curso-color-picker")).forEach(s => {
+    s.addEventListener("click", () => setCursoColor(s.dataset.color));
   });
+  $("#modal-curso-close").addEventListener("click", closeCursoModal);
+  $("#btn-cancel-curso").addEventListener("click", closeCursoModal);
+  $("#modal-curso-backdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modal-curso-backdrop") closeCursoModal();
+  });
+  $("#form-curso").addEventListener("submit", guardarCurso);
+  $("#btn-delete-curso").addEventListener("click", eliminarCurso);
 
+  // Eventos del modal de Notas (0–20, parcial + final + prácticas)
+  $("#modal-notas-close").addEventListener("click", closeNotasModal);
+  $("#btn-cancel-notas").addEventListener("click", closeNotasModal);
+  $("#modal-notas-backdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modal-notas-backdrop") closeNotasModal();
+  });
+  $("#btn-add-practica").addEventListener("click", agregarPractica);
+  $("#nota-parcial").addEventListener("input", actualizarResumenNotas);
+  $("#nota-final").addEventListener("input", actualizarResumenNotas);
+  $("#practicas-list").addEventListener("input", actualizarResumenNotas);
+  $("#practicas-list").addEventListener("click", (e) => {
+    const rm = e.target.closest(".practica-remove");
+    if (!rm) return;
+    rm.closest(".practica-row").remove();
+    if ($$(".practica-row", $("#practicas-list")).length === 0) {
+      renderPracticasRows([]);
+    }
+    actualizarResumenNotas();
+  });
+  $("#form-notas").addEventListener("submit", guardarNotas);
+
+  // Eventos del modal de Clase (asignación al horario)
+  $("#class-curso").addEventListener("change", actualizarPreviewCursoClase);
+  $("#btn-new-curso-from-class").addEventListener("click", () => {
+    openNewCursoModal("clase");
+  });
   $("#modal-class-close").addEventListener("click", closeClassModal);
   $("#btn-cancel-class").addEventListener("click", closeClassModal);
   $("#modal-class-backdrop").addEventListener("click", (e) => {
@@ -1064,17 +2165,20 @@ function wireGlobalEvents() {
   $("#form-class").addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = $("#class-id").value || uuid();
-    const materia = $("#class-materia").value.trim();
+    const curso_id = $("#class-curso").value;
     const dia_semana = $("#class-dia").value;
     const hora_inicio = $("#class-hora-inicio").value;
     const hora_fin = $("#class-hora-fin").value;
     const aula = $("#class-aula").value.trim();
-    const profesor = $("#class-profesor").value.trim();
-    const color = $("#class-color").value || "#AFC49A";
-    const notas = $("#class-notas").value.trim();
     const errorEl = $("#class-form-error");
 
     errorEl.classList.add("hidden");
+
+    if (!curso_id) {
+      errorEl.textContent = "Selecciona un curso de la lista.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
 
     if (timeToMinutes(hora_fin) <= timeToMinutes(hora_inicio)) {
       errorEl.textContent = "La hora de fin debe ser posterior a la hora de inicio.";
@@ -1082,7 +2186,10 @@ function wireGlobalEvents() {
       return;
     }
 
-    const sameDayClasses = await db.clases.where("dia_semana").equals(dia_semana).toArray();
+    const [sameDayClasses, { map: cursosMap }] = await Promise.all([
+      db.clases.where("dia_semana").equals(dia_semana).toArray(),
+      cargarCursos()
+    ]);
     const startM = timeToMinutes(hora_inicio);
     const endM = timeToMinutes(hora_fin);
 
@@ -1090,28 +2197,27 @@ function wireGlobalEvents() {
       overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
 
     if (conflict) {
-      errorEl.textContent = `Conflicto de horario con "${conflict.materia}" (${conflict.hora_inicio}–${conflict.hora_fin}, ${DIAS_LABEL[conflict.dia_semana]}).`;
+      const nombreConflicto = (cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase";
+      errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${conflict.hora_inicio}–${conflict.hora_fin}, ${DIAS_LABEL[conflict.dia_semana]}).`;
       errorEl.classList.remove("hidden");
       return;
     }
 
-    await db.clases.put({ id, materia, dia_semana, hora_inicio, hora_fin, aula, profesor, color, notas });
+    await db.clases.put({ id, curso_id, dia_semana, hora_inicio, hora_fin, aula });
     closeClassModal();
-    showToast("Materia guardada.");
-    if (state.currentTab === "view-hoy") renderHoy();
-    else renderHorario();
+    showToast("Clase guardada en el horario.");
+    refrescarVistaActual();
   });
 
   $("#btn-delete-class").addEventListener("click", async () => {
     const id = $("#class-id").value;
     if (!id) return;
-    const ok = await confirmDialog("Eliminar Materia", "¿Deseas quitar esta materia de tu horario?");
+    const ok = await confirmDialog("Quitar del Horario", "¿Deseas quitar esta sesión del horario? El curso y sus notas se conservan.");
     if (!ok) return;
     await db.clases.delete(id);
     closeClassModal();
-    showToast("Materia eliminada.");
-    if (state.currentTab === "view-hoy") renderHoy();
-    else renderHorario();
+    showToast("Sesión eliminada del horario.");
+    refrescarVistaActual();
   });
 
   $$(".imp-star-btn", $("#task-importance-selector")).forEach(btn => {
@@ -1128,7 +2234,7 @@ function wireGlobalEvents() {
     e.preventDefault();
     const id = $("#task-id").value || uuid();
     const titulo = $("#task-titulo").value.trim();
-    const materia = $("#task-materia").value || "General";
+    const curso_id = $("#task-curso").value || "";
     const fecha_limite = $("#task-fecha").value;
     const importancia = parseInt($("#task-importancia").value) || 3;
     const notas = $("#task-descripcion").value.trim();
@@ -1145,7 +2251,7 @@ function wireGlobalEvents() {
 
     const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
 
-    await db.tareas.put({ id, titulo, materia, fecha_limite, importancia, completada, fecha_creacion, notas });
+    await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas });
     closeTaskModal();
     showToast("Tarea guardada.");
     if (state.currentTab === "view-hoy") renderHoy();
@@ -1183,14 +2289,51 @@ function wireGlobalEvents() {
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
+  const compactBtn = $("#btn-toggle-compact");
+  if (compactBtn) {
+    compactBtn.addEventListener("click", () => {
+      state.matrixCompact = !state.matrixCompact;
+      localStorage.setItem("umbral-matrix-compact", state.matrixCompact);
+      renderHorario();
+    });
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
+      closeCursoModal();
+      closeNotasModal();
       closeTaskModal();
       $("#modal-quick-backdrop").classList.add("hidden");
       $("#modal-confirm-backdrop").classList.add("hidden");
     }
   });
+}
+
+/* =====================================================================
+   MIGRACIÓN DE COMPATIBILIDAD DESDE UNIFLOW A UMBRAL
+   ===================================================================== */
+async function checkAndMigrateLegacyDB() {
+  try {
+    const count = await db.cursos.count();
+    if (count === 0 && window.indexedDB) {
+      const oldDb = new Dexie("UniFlowDB");
+      await oldDb.open().catch(() => {});
+      if (oldDb.isOpen()) {
+        const oldClases = await oldDb.table("clases").toArray().catch(() => []);
+        const oldTareas = await oldDb.table("tareas").toArray().catch(() => []);
+        if (oldClases.length > 0 || oldTareas.length > 0) {
+          const r = convertirFormatoPlano(oldClases, oldTareas, []);
+          if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
+          if (r.clases.length) await db.clases.bulkPut(r.clases);
+          if (r.tareas.length) await db.tareas.bulkPut(r.tareas);
+        }
+        oldDb.close();
+      }
+    }
+  } catch (err) {
+    console.warn("Migración legacy omitida:", err);
+  }
 }
 
 /* =====================================================================
@@ -1205,6 +2348,7 @@ async function init() {
 
   try {
     await db.open();
+    await checkAndMigrateLegacyDB();
   } catch (err) {
     console.error("Error abriendo IndexedDB:", err);
   }

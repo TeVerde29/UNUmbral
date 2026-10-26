@@ -1,5 +1,5 @@
 // Service Worker para funcionamiento 100% offline
-const CACHE_NAME = "uniflow-ricra-v1";
+const CACHE_NAME = "umbral-ricra-v2";
 const ASSETS = [
   "./",
   "./index.html",
