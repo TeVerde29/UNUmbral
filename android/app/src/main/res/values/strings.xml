@@ -4,4 +4,8 @@
     <string name="title_activity_main">UNUmbral</string>
     <string name="package_name">com.teverde.unumbral</string>
     <string name="custom_url_scheme">com.teverde.unumbral</string>
+    <string name="shortcut_nueva_tarea_short">Nueva tarea</string>
+    <string name="shortcut_nueva_tarea_long">Crear nueva tarea o entrega</string>
+    <string name="shortcut_hoy_short">Horario de hoy</string>
+    <string name="shortcut_hoy_long">Ver clases y pendientes de hoy</string>
 </resources>

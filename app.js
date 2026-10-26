@@ -625,13 +625,42 @@ function confirmDialog(title, message) {
 
 function actualizarBadgeTareas(pendingCount) {
   const navCountEl = $("#nav-count-tareas");
-  if (!navCountEl) return;
-  if (pendingCount > 0) {
-    navCountEl.textContent = pendingCount;
-    navCountEl.classList.remove("hidden");
-  } else {
-    navCountEl.classList.add("hidden");
+  if (navCountEl) {
+    if (pendingCount > 0) {
+      navCountEl.textContent = pendingCount;
+      navCountEl.classList.remove("hidden");
+    } else {
+      navCountEl.classList.add("hidden");
+    }
   }
+
+  // Actualizar aviso / badge nativo persistente en Android (Fase 8)
+  if (typeof esNativo === "function" && esNativo()) {
+    actualizarBadgeNativo(pendingCount).catch(() => {});
+  }
+}
+
+async function actualizarBadgeNativo(count) {
+  if (!window.Capacitor?.Plugins?.LocalNotifications) return;
+  const { LocalNotifications } = window.Capacitor.Plugins;
+  if (count <= 0) {
+    await LocalNotifications.cancel({ notifications: [{ id: 99999 }] }).catch(() => {});
+    return;
+  }
+  await LocalNotifications.schedule({
+    notifications: [{
+      id: 99999,
+      title: "UNUmbral",
+      body: `Tienes ${count} ${count === 1 ? "tarea pendiente" : "tareas pendientes"}`,
+      channelId: "clases",
+      ongoing: true,
+      autoCancel: false,
+      smallIcon: "ic_stat_icon",
+      iconColor: "#1e2327",
+      schedule: { at: new Date(Date.now() + 100) },
+      extra: { tipo: "badge_tareas", count }
+    }]
+  }).catch(() => {});
 }
 
 /* =====================================================================
@@ -4188,6 +4217,54 @@ async function checkAndMigrateLegacyDB() {
   }
 }
 
+function inicializarDeepLinks() {
+  const manejarUrl = (url) => {
+    if (!url) return;
+    const ruta = typeof parsearRutaDeepLink === "function" ? parsearRutaDeepLink(url) : null;
+    if (!ruta || ruta.accion === "ninguna") return;
+    ejecutarAccionDeepLink(ruta, {
+      "nueva-tarea": () => {
+        openNewTaskModal();
+      },
+      "hoy": () => {
+        switchTab("view-hoy");
+      },
+      "horario": () => {
+        switchTab("view-horario");
+      },
+      "cursos": () => {
+        switchTab("view-cursos");
+      },
+      "tareas": () => {
+        switchTab("view-tareas");
+      },
+      "ajustes": () => {
+        switchTab("view-ajustes");
+      }
+    });
+  };
+
+  // Capacitor App URL Open listener (Shortcuts nativos y deep links unumbral://)
+  if (window.Capacitor?.Plugins?.App) {
+    try {
+      window.Capacitor.Plugins.App.addListener("appUrlOpen", (data) => {
+        manejarUrl(data?.url);
+      });
+    } catch (err) {
+      console.warn("No se pudo registrar listener de appUrlOpen:", err);
+    }
+  }
+
+  // Hash web
+  window.addEventListener("hashchange", () => {
+    manejarUrl(window.location.hash);
+  });
+
+  if (window.location.hash) {
+    setTimeout(() => manejarUrl(window.location.hash), 150);
+  }
+}
+
 /* =====================================================================
    14. INICIALIZACIÓN
    ===================================================================== */
@@ -4211,6 +4288,7 @@ async function init() {
 
   wireGlobalEvents();
   switchTab("view-hoy");
+  inicializarDeepLinks();
 
   if (typeof inicializarSistemaNotificaciones === "function") {
     inicializarSistemaNotificaciones().catch(err => console.warn("Error inicializando notificaciones:", err));

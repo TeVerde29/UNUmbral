@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="nueva_tarea"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_nueva_tarea_short"
+        android:shortcutLongLabel="@string/shortcut_nueva_tarea_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.teverde.unumbral"
+            android:targetClass="com.teverde.unumbral.MainActivity"
+            android:data="unumbral://nueva-tarea" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="horario_hoy"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_hoy_short"
+        android:shortcutLongLabel="@string/shortcut_hoy_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.teverde.unumbral"
+            android:targetClass="com.teverde.unumbral.MainActivity"
+            android:data="unumbral://hoy" />
+    </shortcut>
+</shortcuts>
