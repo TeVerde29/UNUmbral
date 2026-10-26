@@ -11,7 +11,9 @@ const ASSETS = [
   "./icon-512.png",
   "./lib/dexie.min.js",
   "./lib/plataforma.js",
-  "./lib/ajustes.js"
+  "./lib/ajustes.js",
+  "./lib/planificador.js",
+  "./lib/notificaciones.js"
 ];
 
 self.addEventListener("install", (e) => {

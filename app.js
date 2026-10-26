@@ -1442,6 +1442,7 @@ function wireTaskCardEvents(containerEl) {
       const nextStatus = !task.completada;
       await db.tareas.update(id, { completada: nextStatus });
       showToast(nextStatus ? "Tarea marcada como completada." : "Tarea reabierta.");
+      if (typeof reprogramarTodo === "function") reprogramarTodo();
       if (state.currentTab === "view-hoy") renderHoy();
       else renderTareas();
     });
@@ -1698,6 +1699,7 @@ async function guardarCurso(e) {
   } else if (origin && origin.abrirClase) {
     await openNewClassModal(origin.dia, curso.id);
   }
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
 }
 
@@ -1727,6 +1729,7 @@ async function eliminarCurso() {
 
   closeCursoModal();
   showToast("Curso eliminado.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
 }
 
@@ -2136,6 +2139,7 @@ async function guardarAjustesUI() {
   }
 
   showToast("Ajustes guardados correctamente.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
 }
 
 async function exportScheduleForFriends() {
@@ -2418,6 +2422,7 @@ async function guardarClase(e) {
   await db.clases.put({ id, curso_id, dia_semana, hora_inicio, hora_fin, aula });
   closeClassModal();
   showToast("Clase guardada en el horario.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
 }
 
@@ -2429,6 +2434,7 @@ async function eliminarClase() {
   await db.clases.delete(id);
   closeClassModal();
   showToast("Sesión eliminada del horario.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
 }
 
@@ -2456,6 +2462,7 @@ async function guardarTarea(e) {
   await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas });
   closeTaskModal();
   showToast("Tarea guardada.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   if (state.currentTab === "view-hoy") renderHoy();
   else renderTareas();
 }
@@ -2468,6 +2475,7 @@ async function eliminarTarea() {
   await db.tareas.delete(id);
   closeTaskModal();
   showToast("Tarea eliminada.");
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
   if (state.currentTab === "view-hoy") renderHoy();
   else renderTareas();
 }
@@ -2740,6 +2748,10 @@ async function init() {
 
   wireGlobalEvents();
   switchTab("view-hoy");
+
+  if (typeof inicializarSistemaNotificaciones === "function") {
+    inicializarSistemaNotificaciones().catch(err => console.warn("Error inicializando notificaciones:", err));
+  }
 
   setInterval(() => {
     if (state.currentTab === "view-hoy") renderHoy();
