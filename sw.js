@@ -1,5 +1,5 @@
-// Service Worker para funcionamiento 100% offline
-const CACHE_NAME = "umbral-ricra-v4";
+// Service Worker para funcionamiento 100% offline con actualización en segundo plano
+const CACHE_NAME = "unumbral-ricra-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const ASSETS = [
   "./app.js",
   "./manifest.json",
   "./icon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
   "./lib/dexie.min.js"
 ];
 
@@ -29,9 +31,20 @@ self.addEventListener("activate", (e) => {
 });
 
 self.addEventListener("fetch", (e) => {
+  if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      return cached || fetch(e.request).catch(() => cached);
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(e.request).then((cached) => {
+        const networkFetch = fetch(e.request)
+          .then((response) => {
+            if (response && response.status === 200 && response.type === "basic") {
+              cache.put(e.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => cached);
+        return cached || networkFetch;
+      });
     })
   );
 });

@@ -2,15 +2,45 @@
 <html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';">
   <meta name="theme-color" content="#0D140F">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Horario universitario y organizador de tareas offline con estética Apple y Design Ricra">
-  <title>Umbral · Horario & Tareas Universitario</title>
+  <meta name="author" content="Té Verde">
+  <meta name="description" content="UNUmbral es tu organizador universitario 100% offline: horario semanal en formato de 12 horas, control de calificaciones y agenda de entregas críticas.">
+  <title>UNUmbral · Horario, Cursos y Notas Universitarias</title>
+  <link rel="canonical" href="https://teverde29.github.io/unumbral/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="UNUmbral · Horario, Cursos y Notas Universitarias">
+  <meta property="og:description" content="Organizador universitario 100% offline con horario semanal en 12 horas AM/PM, colores pasteles, calculadora de notas y entregas priorizadas.">
+  <meta property="og:url" content="https://teverde29.github.io/unumbral/">
+  <meta property="og:image" content="https://teverde29.github.io/unumbral/icon-512.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="UNUmbral · Horario, Cursos y Notas Universitarias">
+  <meta name="twitter:description" content="Organizador universitario 100% offline con horario semanal en 12 horas AM/PM, colores pasteles, calculadora de notas y entregas priorizadas.">
+  <meta name="twitter:image" content="https://teverde29.github.io/unumbral/icon-512.png">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="estilos.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "UNUmbral",
+    "url": "https://teverde29.github.io/unumbral/",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "All",
+    "datePublished": "2026-10-26",
+    "dateModified": "2026-10-26",
+    "author": {
+      "@type": "Person",
+      "name": "Té Verde",
+      "url": "https://github.com/TeVerde29"
+    }
+  }
+  </script>
 </head>
 <body>
 
@@ -26,14 +56,14 @@
         </svg>
       </div>
       <div>
-        <h1 class="brand-title">Umbral</h1>
+        <h1 class="brand-title">UNUmbral</h1>
         <span class="brand-subtitle" id="current-date-label">Cargando fecha…</span>
       </div>
     </div>
 
     <div class="header-actions">
       <button id="btn-theme-toggle" class="icon-btn" aria-label="Cambiar tema claro u oscuro" title="Cambiar tema">
-        <svg id="theme-icon-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg id="theme-icon-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="5"></circle>
           <line x1="12" y1="1" x2="12" y2="3"></line>
           <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -44,13 +74,13 @@
           <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
-        <svg id="theme-icon-moon" class="hidden" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg id="theme-icon-moon" class="hidden" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       </button>
 
-      <button id="btn-quick-add" class="btn-primary btn-sm" aria-label="Añadir nuevo registro">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <button id="btn-quick-add" class="btn-primary btn-sm">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
@@ -99,8 +129,8 @@
           <button class="seg-btn" id="btn-mode-matrix" data-mode="matrix">Parrilla Semanal</button>
         </div>
         <button id="btn-add-class" class="btn-secondary btn-sm">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Clase
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Clase</span>
         </button>
       </div>
 
@@ -115,7 +145,7 @@
         <button class="day-tab" data-day="DOMINGO"><span>Dom</span></button>
       </div>
 
-      <!-- Barra de navegación rápida y controles para la Parrilla Semanal -->
+      <!-- Barra de navegación rápida por día para la Parrilla Semanal -->
       <div id="matrix-toolbar" class="matrix-toolbar hidden">
         <div class="matrix-jump-scroll" id="matrix-jump-bar">
           <button class="matrix-jump-chip active" data-jump="all">Semana</button>
@@ -127,10 +157,6 @@
           <button class="matrix-jump-chip" data-jump="SABADO">Sáb</button>
           <button class="matrix-jump-chip" data-jump="DOMINGO">Dom</button>
         </div>
-        <button id="btn-toggle-compact" class="matrix-compact-btn" title="Alternar agrupación de horas libres">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
-          <span id="compact-toggle-text">Compacto</span>
-        </button>
       </div>
 
       <!-- Contenedor dinámico del horario -->
@@ -139,16 +165,15 @@
       </div>
     </section>
 
-    <!-- VISTA 2.5: MIS CURSOS & NOTAS (ESCALA 0–20, MÍNIMO 10.5) -->
+    <!-- VISTA 2.5: MIS CURSOS & NOTAS -->
     <section id="view-cursos" class="view-panel">
       <div class="section-header">
         <div>
           <h2 class="section-title">Mis Cursos y Notas</h2>
-          <p class="section-subtitle">Escala 0 a 20 · (Parcial + Final + Prom. Prácticas) ÷ 3 · Aprueba con 10.5</p>
         </div>
         <button id="btn-add-curso" class="btn-primary btn-sm">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Curso
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Curso</span>
         </button>
       </div>
 
@@ -165,12 +190,12 @@
     <section id="view-tareas" class="view-panel">
       <div class="tasks-toolbar">
         <div class="search-box">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          <input type="text" id="input-search-tasks" placeholder="Buscar por título o materia…" autocomplete="off">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="input-search-tasks" placeholder="Buscar por título o materia…" aria-label="Buscar tareas por título o materia" autocomplete="off" enterkeyhint="search">
         </div>
         <button id="btn-add-task" class="btn-primary btn-sm">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Tarea
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Tarea</span>
         </button>
       </div>
 
@@ -180,18 +205,18 @@
           <span>Pendientes</span>
         </button>
         <button class="chip" data-filter="urgentes">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           <span>Críticas (Nivel 4–5)</span>
         </button>
         <button class="chip" data-filter="proximas">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
           <span>Próximas</span>
         </button>
         <button class="chip" data-filter="todas">
           <span>Todas</span>
         </button>
         <button class="chip" data-filter="completadas">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           <span>Completadas</span>
         </button>
       </div>
@@ -219,13 +244,20 @@
             </button>
 
             <!-- Menú flotante / Popover de asignaturas -->
-            <div id="subject-dropdown-menu" class="subject-dropdown-menu hidden" role="listbox">
-              <div class="subject-dropdown-header">
+            <div id="subject-dropdown-menu" class="subject-dropdown-menu hidden" role="listbox" aria-label="Filtrar tareas por asignatura">
+              <div class="subject-dropdown-header" role="presentation">
                 <span>Filtrar Asignatura</span>
                 <span class="subject-dropdown-hint" id="subject-dropdown-total-hint">0 materias</span>
               </div>
-              <div class="subject-dropdown-list" id="subject-dropdown-options">
-                <!-- Opciones generadas dinámicamente con color, detalles y tareas -->
+              <div class="subject-dropdown-list" id="subject-dropdown-options" role="group" aria-label="Asignaturas disponibles">
+                <div class="subject-dropdown-item selected" role="option" aria-selected="true" data-subject="">
+                  <span class="subject-item-indicator" style="background:var(--tea-green)"></span>
+                  <div class="subject-item-info">
+                    <span class="subject-item-title">Todas las materias</span>
+                    <span class="subject-item-sub">Ver tareas de todas las asignaturas</span>
+                  </div>
+                  <span class="subject-item-count">0</span>
+                </div>
               </div>
             </div>
           </div>
@@ -264,13 +296,13 @@
         </div>
         <div class="settings-card-actions">
           <button id="btn-export-schedule" class="btn-primary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Exportar Horario (.json)
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Exportar Horario (.json)</span>
           </button>
 
-          <label for="input-import-schedule" class="btn-secondary file-upload-btn">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            Importar Horario
+          <label class="btn-secondary file-upload-btn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <span>Importar Horario</span>
             <input type="file" id="input-import-schedule" accept=".json" class="hidden">
           </label>
         </div>
@@ -280,19 +312,19 @@
       <div class="section-header" style="margin-top: 28px;">
         <div>
           <h2 class="section-title">Copia de Seguridad Personal</h2>
-          <p class="section-subtitle">Respalda la totalidad de tus materias, tareas e historial</p>
+          <p class="section-subtitle">Respalda la totalidad de tus materias, notas, tareas e historial</p>
         </div>
       </div>
 
       <div class="settings-card">
         <div class="settings-card-actions">
           <button id="btn-export-backup" class="btn-secondary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-            Crear Backup Completo
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+            <span>Crear Backup Completo</span>
           </button>
-          <label for="input-import-backup" class="btn-secondary file-upload-btn">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-            Restaurar Backup
+          <label class="btn-secondary file-upload-btn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span>Restaurar Backup</span>
             <input type="file" id="input-import-backup" accept=".json" class="hidden">
           </label>
         </div>
@@ -309,8 +341,8 @@
       <div class="settings-card">
         <div class="settings-card-actions">
           <button id="btn-load-demo" class="btn-secondary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            Cargar Semestre Modelo
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span>Cargar Semestre Modelo</span>
           </button>
           <button id="btn-clear-data" class="btn-danger-outline">
             Vaciar Base de Datos
@@ -319,30 +351,33 @@
       </div>
 
       <!-- Info PWA y Móvil -->
-      <div class="info-box">
-        <strong>Dispositivo Móvil & Acceso Offline:</strong>
-        <p>Abre esta página en Chrome o Brave en tu teléfono y selecciona <em>"Añadir a pantalla de inicio"</em> para instalar la aplicación en modo nativo.</p>
+      <div class="info-box" id="privacidad">
+        <strong>Dispositivo Móvil &amp; Privacidad 100% Local:</strong>
+        <p>Abre <a href="./" style="color:var(--accent);text-decoration:underline;">UNUmbral</a> en Chrome, Safari o Brave en tu teléfono y selecciona <em>"Añadir a pantalla de inicio"</em> para instalar la aplicación en modo nativo. Política de privacidad: todos tus datos académicos residen exclusivamente en tu dispositivo sin servidores externos.</p>
         <div class="db-status-line">
           <span class="db-indicator ok" id="db-indicator-dot"></span>
           <span id="db-indicator-text">Almacenamiento persistente activo en el dispositivo</span>
         </div>
+        <p style="margin-top:8px;font-size:12px;color:var(--text-tertiary);">
+          Desarrollado por <a href="https://github.com/TeVerde29" rel="author" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-26">26 de octubre de 2026</time> · <a href="#privacidad" style="color:var(--text-secondary);">Política de Privacidad</a>
+        </p>
       </div>
     </section>
 
   </main>
 
   <!-- BARRA DE NAVEGACIÓN INFERIOR (APPLE DOCKED BAR) -->
-  <nav class="bottom-nav">
-    <button class="nav-tab active" data-view="view-hoy" aria-label="Vista Hoy">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <nav class="bottom-nav" aria-label="Navegación principal">
+    <button class="nav-tab active" data-view="view-hoy">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
       <span>Hoy</span>
     </button>
 
-    <button class="nav-tab" data-view="view-horario" aria-label="Vista Horario">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="nav-tab" data-view="view-horario">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
         <line x1="16" y1="2" x2="16" y2="6"></line>
         <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -351,27 +386,27 @@
       <span>Horario</span>
     </button>
 
-    <button class="nav-tab" data-view="view-cursos" aria-label="Vista Cursos y Notas">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="nav-tab" data-view="view-cursos">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
       </svg>
       <span>Cursos</span>
     </button>
 
-    <button class="nav-tab" data-view="view-tareas" aria-label="Vista Tareas">
-      <div class="nav-tab-icon-wrap">
+    <button class="nav-tab" data-view="view-tareas">
+      <div class="nav-tab-icon-wrap" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 11l3 3L22 4"></path>
           <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
         </svg>
-        <span class="badge-count hidden" id="nav-count-tareas">0</span>
+        <span class="badge-count hidden" id="nav-count-tareas" aria-hidden="true">0</span>
       </div>
       <span>Tareas</span>
     </button>
 
-    <button class="nav-tab" data-view="view-ajustes" aria-label="Vista Compartir y Ajustes">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="nav-tab" data-view="view-ajustes">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="18" cy="5" r="3"></circle>
         <circle cx="6" cy="12" r="3"></circle>
         <circle cx="18" cy="19" r="3"></circle>
@@ -390,7 +425,7 @@
     <div class="modal-header">
       <h2 id="modal-class-title">Añadir Clase al Horario</h2>
       <button class="icon-btn modal-close-btn" id="modal-class-close" aria-label="Cerrar">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
     <form id="form-class" class="modal-body">
@@ -398,11 +433,11 @@
 
       <div class="form-group">
         <div class="form-label-row">
-          <label class="form-label" for="class-curso">Curso registrado *</label>
-          <button type="button" class="btn-text-action" id="btn-new-curso-from-class">+ Nuevo curso</button>
+          <label class="form-label" for="class-curso">Asignatura registrada *</label>
+          <button type="button" class="btn-text-action" id="btn-new-curso-from-class">+ Nueva asignatura</button>
         </div>
         <select id="class-curso" class="field" required>
-          <option value="" disabled selected>Elige un curso…</option>
+          <option value="" disabled selected>Elige una asignatura…</option>
         </select>
         <div id="class-curso-preview" class="curso-preview hidden"></div>
       </div>
@@ -428,20 +463,20 @@
             <label class="form-label" for="class-hora-inicio">Hora Inicio *</label>
             <span id="hint-hora-inicio" class="time-12h-badge">08:00 AM</span>
           </div>
-          <input type="time" id="class-hora-inicio" class="field" required value="08:00">
+          <input type="time" id="class-hora-inicio" class="field" required value="08:00" enterkeyhint="next">
         </div>
         <div class="form-group">
           <div class="form-label-row">
             <label class="form-label" for="class-hora-fin">Hora Fin *</label>
             <span id="hint-hora-fin" class="time-12h-badge">10:00 AM</span>
           </div>
-          <input type="time" id="class-hora-fin" class="field" required value="10:00">
+          <input type="time" id="class-hora-fin" class="field" required value="10:00" enterkeyhint="next">
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="class-aula">Aula de esta sesión (solo si cambia)</label>
-        <input type="text" id="class-aula" class="field" placeholder="Dejar vacío para usar el aula del curso">
+        <input type="text" id="class-aula" class="field" placeholder="Dejar vacío para usar el aula del curso" enterkeyhint="done">
       </div>
 
       <div id="class-form-error" class="form-error hidden"></div>
@@ -463,7 +498,7 @@
     <div class="modal-header">
       <h2 id="modal-curso-title">Nuevo Curso</h2>
       <button class="icon-btn modal-close-btn" id="modal-curso-close" aria-label="Cerrar">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
     <form id="form-curso" class="modal-body">
@@ -471,40 +506,40 @@
 
       <div class="form-group">
         <label class="form-label" for="curso-nombre">Nombre del Curso *</label>
-        <input type="text" id="curso-nombre" class="field" placeholder="Ej: Cálculo II, Sistemas Distribuidos, Física…" required>
+        <input type="text" id="curso-nombre" class="field" placeholder="Ej: Cálculo II, Sistemas Distribuidos, Física…" required enterkeyhint="next">
       </div>
 
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="curso-profesor">Profesor(a)</label>
-          <input type="text" id="curso-profesor" class="field" placeholder="Ej: Dr. Agurto">
+          <input type="text" id="curso-profesor" class="field" placeholder="Ej: Dr. Agurto" enterkeyhint="next">
         </div>
         <div class="form-group">
           <label class="form-label" for="curso-aula">Aula / Laboratorio habitual</label>
-          <input type="text" id="curso-aula" class="field" placeholder="Ej: Aula 204, Lab B">
+          <input type="text" id="curso-aula" class="field" placeholder="Ej: Aula 204, Lab B" enterkeyhint="next">
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Color Pastel del Curso</label>
+        <span class="form-label">Color Pastel del Curso</span>
         <div class="color-palette-picker" id="curso-color-picker">
-          <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" title="Celeste Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" title="Lavanda Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" title="Vainilla Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" title="Menta Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" title="Durazno Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" title="Índigo Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" title="Coral Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" title="Turquesa Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" title="Matcha Pastel (Ricra)"></button>
-          <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" title="Salvia Pastel (Ricra)"></button>
+          <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" aria-label="Celeste Pastel" title="Celeste Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" aria-label="Lavanda Pastel" title="Lavanda Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" aria-label="Vainilla Pastel" title="Vainilla Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" aria-label="Menta Pastel" title="Menta Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" aria-label="Durazno Pastel" title="Durazno Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" aria-label="Índigo Pastel" title="Índigo Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" aria-label="Coral Pastel" title="Coral Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" aria-label="Turquesa Pastel" title="Turquesa Pastel"></button>
+          <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" aria-label="Matcha Pastel" title="Matcha Pastel (Ricra)"></button>
+          <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" aria-label="Salvia Pastel" title="Salvia Pastel (Ricra)"></button>
         </div>
         <input type="hidden" id="curso-color" value="#BAE6FD">
       </div>
 
       <div class="form-group">
         <label class="form-label" for="curso-notas">Comentarios o Enlaces (Opcional)</label>
-        <input type="text" id="curso-notas" class="field" placeholder="Enlace a sílabo, aula virtual, Drive o apuntes…">
+        <input type="text" id="curso-notas" class="field" placeholder="Enlace a sílabo, aula virtual, Drive o apuntes…" enterkeyhint="done">
       </div>
 
       <p id="curso-sesiones-info" class="form-hint hidden"></p>
@@ -521,7 +556,7 @@
   </div>
 </div>
 
-<!-- DIÁLOGO MODAL: NOTAS DEL CURSO (ESCALA 0–20, PARCIAL + FINAL + PRÁCTICAS) -->
+<!-- DIÁLOGO MODAL: NOTAS DEL CURSO -->
 <div id="modal-notas-backdrop" class="modal-backdrop hidden">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-notas-title">
     <div class="modal-header">
@@ -529,14 +564,14 @@
         <span id="notas-curso-dot" class="curso-preview-dot"></span>
         <div>
           <h2 id="modal-notas-title">Notas del Curso</h2>
-          <span id="notas-curso-sub" class="notas-modal-sub">Escala 0 a 20</span>
+          <span id="notas-curso-sub" class="notas-modal-sub">Registro de notas</span>
         </div>
       </div>
       <button class="icon-btn modal-close-btn" id="modal-notas-close" aria-label="Cerrar">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
-    <form id="form-notas" class="modal-body" novalidate>
+    <form id="form-notas" class="modal-body">
       <input type="hidden" id="notas-curso-id">
 
       <!-- Tarjeta de promedio / simulador en vivo -->
@@ -546,11 +581,11 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="nota-parcial">Examen Parcial (0–20)</label>
-          <input type="number" id="nota-parcial" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar">
+          <input type="number" id="nota-parcial" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar" enterkeyhint="next">
         </div>
         <div class="form-group">
           <label class="form-label" for="nota-final">Examen Final (0–20)</label>
-          <input type="number" id="nota-final" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar">
+          <input type="number" id="nota-final" class="field grade-input" min="0" max="20" step="0.01" inputmode="decimal" placeholder="Sin calificar" enterkeyhint="done">
         </div>
       </div>
 
@@ -562,8 +597,8 @@
             <span id="practicas-promedio" class="practicas-avg-badge">Promedio: —</span>
           </div>
           <button type="button" class="btn-secondary btn-sm" id="btn-add-practica">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Añadir
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Añadir</span>
           </button>
         </div>
         <div id="practicas-list" class="practicas-list"></div>
@@ -587,15 +622,15 @@
     <div class="modal-header">
       <h2 id="modal-task-title">Nueva Tarea</h2>
       <button class="icon-btn modal-close-btn" id="modal-task-close" aria-label="Cerrar">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
     <form id="form-task" class="modal-body">
       <input type="hidden" id="task-id">
 
       <div class="form-group">
-        <label class="form-label">Título de la Tarea o Entrega *</label>
-        <input type="text" id="task-titulo" class="field" placeholder="Ej: Resolver Guía 3, Proyecto Final, Parcial…" required>
+        <label class="form-label" for="task-titulo">Título de la Tarea o Entrega *</label>
+        <input type="text" id="task-titulo" class="field" placeholder="Ej: Resolver Guía 3, Proyecto Final, Parcial…" required enterkeyhint="next">
       </div>
 
       <div class="form-row">
@@ -606,13 +641,13 @@
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Fecha y Hora Límite *</label>
-          <input type="datetime-local" id="task-fecha" class="field" required>
+          <label class="form-label" for="task-fecha">Fecha y Hora Límite *</label>
+          <input type="datetime-local" id="task-fecha" class="field" required enterkeyhint="next">
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Nivel de Importancia (1 a 5) *</label>
+        <span class="form-label">Nivel de Importancia (1 a 5) *</span>
         <div class="importance-selector" id="task-importance-selector">
           <button type="button" class="imp-star-btn" data-val="1" title="1 · Rutina / Baja">1</button>
           <button type="button" class="imp-star-btn" data-val="2" title="2 · Leve">2</button>
@@ -625,8 +660,8 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Instrucciones o Apuntes</label>
-        <textarea id="task-descripcion" class="field" rows="3" placeholder="Pautas de entrega, integrantes de equipo, enlaces…"></textarea>
+        <label class="form-label" for="task-descripcion">Instrucciones o Apuntes</label>
+        <textarea id="task-descripcion" class="field" rows="3" placeholder="Pautas de entrega, integrantes de equipo, enlaces…" enterkeyhint="done"></textarea>
       </div>
 
       <div class="form-group check-row">
@@ -658,7 +693,7 @@
         </div>
         <div>
           <strong>Registrar Nuevo Curso</strong>
-          <small>Nombre, profesor, aula, color y notas (0–20)</small>
+          <small>Nombre, profesor, aula, color y notas</small>
         </div>
       </button>
       <button type="button" class="action-sheet-option" id="btn-quick-create-class">
@@ -702,14 +737,6 @@
 <!-- LIBRERÍAS LOCALES OFFLINE -->
 <script src="lib/dexie.min.js"></script>
 <script src="app.js"></script>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
-    });
-  }
-</script>
 
 </body>
 </html>

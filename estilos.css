@@ -1,6 +1,6 @@
 /* =====================================================================
    DESIGN RICRA + APPLE HUMAN INTERFACE DESIGN (TEA GREEN)
-   Umbral — Horario Universitario & Organizador de Tareas Offline
+   UNUmbral — Horario Universitario, Cursos, Notas & Tareas Offline
    Estética Apple: Materiales translúcidos (vibrancy/blur), spring physics,
    tipografía óptica, listas agrupadas (inset groups) y cero emojis.
    ===================================================================== */
@@ -24,6 +24,13 @@
   --surface-subtle:  rgba(238, 242, 232, 0.7);
   --surface-active:  #E4EAD9;
   --chrome-bg:       rgba(247, 248, 241, 0.82);
+
+  /* Superficies Parrilla Horario */
+  --matrix-header-bg:   #E8ECE3;
+  --matrix-header-text: #1E2A21;
+  --matrix-corner-bg:   #DEE3D7;
+  --matrix-hour-bg:     #F4F6EE;
+  --matrix-hour-border: rgba(30, 42, 33, 0.14);
 
   /* Texto y jerarquía Apple */
   --text-primary:    #152018;
@@ -85,6 +92,12 @@
   --surface-subtle:  rgba(28, 43, 32, 0.65);
   --surface-active:  #24382A;
   --chrome-bg:       rgba(13, 20, 15, 0.82);
+
+  --matrix-header-bg:   #19271E;
+  --matrix-header-text: #F1F5EB;
+  --matrix-corner-bg:   #203126;
+  --matrix-hour-bg:     #141F16;
+  --matrix-hour-border: #2D3D31;
 
   --text-primary:    #F2F6ED;
   --text-secondary:  #AAB8A7;
@@ -910,7 +923,7 @@ button:active, .btn-primary:active, .btn-secondary:active {
 /* Tabla de Horario Universitario */
 .matrix-grid-table {
   width: 100%;
-  min-width: 820px;
+  min-width: 840px;
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
@@ -923,24 +936,17 @@ button:active, .btn-primary:active, .btn-secondary:active {
   position: sticky;
   top: 0;
   z-index: 20;
-  background: #E8ECE3;
-  color: #1E2A21;
+  background: var(--matrix-header-bg);
+  color: var(--matrix-header-text);
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 11.5px;
   letter-spacing: 0.04em;
   text-align: center;
   padding: 10px 4px;
-  border-right: 1px solid var(--border-subtle);
+  border-right: 1px solid var(--matrix-hour-border);
   border-bottom: 2px solid var(--border-focus);
   min-width: 120px;
-}
-
-[data-theme="dark"] .matrix-grid-table thead th {
-  background: #19271E;
-  color: #F1F5EB;
-  border-color: #2D3D31;
-  border-bottom-color: var(--accent);
 }
 
 /* Esquina superior izquierda (HORA) */
@@ -949,18 +955,12 @@ button:active, .btn-primary:active, .btn-secondary:active {
   top: 0;
   left: 0;
   z-index: 30;
-  width: 106px;
-  min-width: 106px;
-  max-width: 106px;
-  background: #DEE3D7;
-  color: #152018;
-  border-right: 2px solid var(--border-subtle);
-}
-
-[data-theme="dark"] .matrix-grid-table thead th.matrix-hour-header {
-  background: #203126;
-  color: #F1F5EB;
-  border-right-color: #2D3D31;
+  width: 122px;
+  min-width: 122px;
+  max-width: 122px;
+  background: var(--matrix-corner-bg);
+  color: var(--matrix-header-text);
+  border-right: 2px solid var(--matrix-hour-border);
 }
 
 /* Columna de Horas lateral */
@@ -968,27 +968,22 @@ button:active, .btn-primary:active, .btn-secondary:active {
   position: sticky;
   left: 0;
   z-index: 15;
-  background: #F4F6EE;
+  background: var(--matrix-hour-bg);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
+  letter-spacing: -0.02em;
   text-align: center;
-  padding: 6px 4px;
-  border-bottom: 1px solid var(--border-subtle);
-  border-right: 2px solid var(--border-subtle);
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--matrix-hour-border);
+  border-right: 2px solid var(--matrix-hour-border);
   white-space: nowrap;
-  width: 106px;
-  min-width: 106px;
-  max-width: 106px;
+  overflow: hidden;
+  width: 122px;
+  min-width: 122px;
+  max-width: 122px;
   vertical-align: middle !important;
-}
-
-[data-theme="dark"] .matrix-grid-table td.matrix-hour-col {
-  background: #141F16;
-  color: var(--text-secondary);
-  border-bottom-color: #253328;
-  border-right-color: #2E3E31;
 }
 
 /* Celdas generales */

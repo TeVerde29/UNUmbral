@@ -1,6 +1,6 @@
 /* =====================================================================
    DESIGN RICRA + APPLE HUMAN INTERFACE DESIGN (TEA GREEN)
-   Umbral — Horario Universitario & Tareas Offline
+   UNUmbral — Horario Universitario, Cursos, Notas & Tareas Offline
    100% Vanilla JS + Dexie.js (IndexedDB). Sin emojis, diseño profesional.
    ===================================================================== */
 "use strict";
@@ -69,7 +69,41 @@ const PASTEL_COLOR_MAP = {
 function normalizarColorPastel(hex) {
   if (!hex) return COLOR_CURSO_DEFECTO;
   const upper = String(hex).trim().toUpperCase();
-  return PASTEL_COLOR_MAP[upper] || upper;
+  if (PASTEL_COLOR_MAP[upper]) return PASTEL_COLOR_MAP[upper];
+  return /^#([0-9A-F]{3}|[0-9A-F]{6})$/.test(upper) ? upper : COLOR_CURSO_DEFECTO;
+}
+
+function sanitizarNota(v) {
+  const n = toNota(v);
+  if (n === null || n < 0 || n > NOTA_MAX) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function sanitizarCursoImportado(c) {
+  if (!c || typeof c !== "object") return null;
+  const nombre = String(c.nombre || "").trim();
+  if (!nombre) return null;
+  const ev = c.evaluacion && typeof c.evaluacion === "object" ? c.evaluacion : {};
+  const practicas = Array.isArray(ev.practicas)
+    ? ev.practicas.map((p, idx) => ({
+        id: String((p && p.id) || uuid()),
+        titulo: String((p && p.titulo) || `Práctica ${idx + 1}`).trim().slice(0, 40),
+        nota: sanitizarNota(p && p.nota)
+      }))
+    : [];
+  return {
+    id: String(c.id || uuid()),
+    nombre,
+    profesor: String(c.profesor || "").trim(),
+    aula: String(c.aula || "").trim(),
+    color: normalizarColorPastel(c.color),
+    notas: String(c.notas || "").trim(),
+    evaluacion: {
+      parcial: sanitizarNota(ev.parcial),
+      final: sanitizarNota(ev.final),
+      practicas
+    }
+  };
 }
 
 const ESTADO_NOTA_INFO = {
@@ -529,7 +563,10 @@ function showToast(msg, isError) {
   }, 2600);
 }
 
+let activeConfirmCancel = null;
+
 function confirmDialog(title, message) {
+  if (activeConfirmCancel) activeConfirmCancel();
   return new Promise((resolve) => {
     const backdrop = $("#modal-confirm-backdrop");
     $("#confirm-title").textContent = title || "¿Confirmar acción?";
@@ -540,14 +577,27 @@ function confirmDialog(title, message) {
     const onCancel = () => { cleanup(); resolve(false); };
 
     function cleanup() {
+      activeConfirmCancel = null;
       backdrop.classList.add("hidden");
       $("#btn-confirm-ok").removeEventListener("click", onOk);
       $("#btn-confirm-cancel").removeEventListener("click", onCancel);
     }
 
+    activeConfirmCancel = onCancel;
     $("#btn-confirm-ok").addEventListener("click", onOk);
     $("#btn-confirm-cancel").addEventListener("click", onCancel);
   });
+}
+
+function actualizarBadgeTareas(pendingCount) {
+  const navCountEl = $("#nav-count-tareas");
+  if (!navCountEl) return;
+  if (pendingCount > 0) {
+    navCountEl.textContent = pendingCount;
+    navCountEl.classList.remove("hidden");
+  } else {
+    navCountEl.classList.add("hidden");
+  }
 }
 
 /* =====================================================================
@@ -625,14 +675,7 @@ async function renderHoy() {
   // Radar de tareas urgentes
   const allTasks = await obtenerTareasEnriquecidas();
   const pendingTasks = allTasks.filter(t => !t.completada);
-
-  const navCountEl = $("#nav-count-tareas");
-  if (pendingTasks.length > 0) {
-    navCountEl.textContent = pendingTasks.length;
-    navCountEl.classList.remove("hidden");
-  } else {
-    navCountEl.classList.add("hidden");
-  }
+  actualizarBadgeTareas(pendingTasks.length);
 
   const nowMs = Date.now();
   const urgentTasks = pendingTasks.filter(t => {
@@ -827,14 +870,6 @@ async function renderHorario() {
     dayTabsEl.classList.add("hidden");
     if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
 
-    // Actualizar texto del botón de compactación
-    const compactBtn = $("#btn-toggle-compact");
-    const compactText = $("#compact-toggle-text");
-    if (compactBtn && compactText) {
-      compactBtn.classList.toggle("active", state.matrixCompact);
-      compactText.textContent = state.matrixCompact ? "Compacto" : "Completo";
-    }
-
     if (allClasses.length === 0) {
       if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
       container.innerHTML = `
@@ -876,7 +911,7 @@ function wireMatrixJumpBar(container) {
       } else {
         const th = $(`th[data-day="${target}"]`, scrollWrapper);
         if (th) {
-          const targetLeft = th.offsetLeft - 106;
+          const targetLeft = th.offsetLeft - 122;
           scrollWrapper.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
         }
       }
@@ -884,18 +919,9 @@ function wireMatrixJumpBar(container) {
   });
 }
 
-function renderMatrixTableHTML(classes) {
-  // 1. Días activos: por defecto Lunes a Sábado si hay clases en Sábado (igual que Image 5)
-  const hasSunday = classes.some(c => c.dia_semana === "DOMINGO");
-  const hasSaturday = classes.some(c => c.dia_semana === "SABADO");
-
-  let activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
-  if (hasSaturday || hasSunday) activeDays.push("SABADO");
-  if (hasSunday) activeDays.push("DOMINGO");
-
-  // 2. Límites horarios globales calculados sobre clases reales
-  let minMinutes = 480;  // 08:00
-  let maxMinutes = 1290; // 21:30
+function construirSlotsMatriz(classes) {
+  let minMinutes = 480;  // 08:00 AM
+  let maxMinutes = 1290; // 09:30 PM
 
   classes.forEach(c => {
     const s = timeToMinutes(c.hora_inicio);
@@ -904,107 +930,64 @@ function renderMatrixTableHTML(classes) {
     if (e > maxMinutes) maxMinutes = Math.ceil(e / 30) * 30;
   });
 
-  minMinutes = Math.max(360, minMinutes);  // no antes de 06:00
-  maxMinutes = Math.min(1440, maxMinutes); // no después de 24:00
+  minMinutes = Math.max(360, minMinutes);  // no antes de 06:00 AM
+  maxMinutes = Math.min(1440, maxMinutes); // no después de 12:00 AM
 
-  // 3. Crear lista de slots de 30 minutos (en formato de 12 horas AM/PM)
-  const rawSlots = [];
+  const slots = [];
   for (let m = minMinutes; m < maxMinutes; m += 30) {
     const nextM = m + 30;
-    const startStr = formatMinutes12(m);
-    const endStr = formatMinutes12(nextM);
-
-    const hasActivity = classes.some(c =>
-      activeDays.includes(c.dia_semana) &&
-      overlaps(m, nextM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin))
-    );
-
-    rawSlots.push({
+    slots.push({
       start: m,
       end: nextM,
-      label: `${startStr} – ${endStr}`,
-      hasActivity
+      label: `${formatMinutes12(m)} – ${formatMinutes12(nextM)}`
     });
   }
+  return slots;
+}
 
-  // 4. Compactar horas libres consecutivas (recesos) si matrixCompact está activo
-  let processedSlots = [];
-  if (state.matrixCompact) {
-    let emptyStreak = [];
-    for (let i = 0; i < rawSlots.length; i++) {
-      const slot = rawSlots[i];
-      if (!slot.hasActivity) {
-        emptyStreak.push(slot);
-      } else {
-        if (emptyStreak.length >= 3) {
-          const bStart = emptyStreak[0].start;
-          const bEnd = emptyStreak[emptyStreak.length - 1].end;
-          processedSlots.push({
-            isBreak: true,
-            start: bStart,
-            end: bEnd,
-            label: `${formatMinutes12(bStart)} – ${formatMinutes12(bEnd)}`
-          });
-        } else {
-          emptyStreak.forEach(s => processedSlots.push(s));
-        }
-        emptyStreak = [];
-        processedSlots.push(slot);
-      }
-    }
-    if (emptyStreak.length >= 3) {
-      const bStart = emptyStreak[0].start;
-      const bEnd = emptyStreak[emptyStreak.length - 1].end;
-      processedSlots.push({
-        isBreak: true,
-        start: bStart,
-        end: bEnd,
-        label: `${formatMinutes12(bStart)} – ${formatMinutes12(bEnd)}`
-      });
-    } else {
-      emptyStreak.forEach(s => processedSlots.push(s));
-    }
-  } else {
-    processedSlots = rawSlots;
-  }
+function renderMatrixCellHTML(c, span) {
+  const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+  const textColor = getContrastTextColor(color);
+  const borderColor = darkenColor(color, 0.24);
+  const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
 
-  // 5. Agrupar clases por día
+  return `
+    <td rowspan="${span}" class="matrix-class-cell">
+      <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${rangoHora12})">
+        <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
+        <div class="matrix-cell-card-time">${rangoHora12}</div>
+        ${c.aula ? `<div class="matrix-cell-card-aula">${escapeHtml(c.aula)}</div>` : ""}
+        ${c.profesor ? `<div class="matrix-cell-card-prof">${escapeHtml(c.profesor)}</div>` : ""}
+      </div>
+    </td>`;
+}
+
+function renderMatrixTableHTML(classes) {
+  const hasSunday = classes.some(c => c.dia_semana === "DOMINGO");
+  const hasSaturday = classes.some(c => c.dia_semana === "SABADO");
+
+  const activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
+  if (hasSaturday || hasSunday) activeDays.push("SABADO");
+  if (hasSunday) activeDays.push("DOMINGO");
+
+  const processedSlots = construirSlotsMatriz(classes);
   const classesByDay = {};
+  const activeSpanUntil = {};
   activeDays.forEach(d => {
     classesByDay[d] = classes.filter(c => c.dia_semana === d);
+    activeSpanUntil[d] = -1;
   });
 
-  // 6. Generar HTML con rowspan exacto por duración
-  const activeSpanUntil = {};
-  activeDays.forEach(d => { activeSpanUntil[d] = -1; });
-
-  let ths = activeDays.map(d => `<th data-day="${d}">${escapeHtml(d)}</th>`).join("");
+  const ths = activeDays.map(d => `<th data-day="${d}">${escapeHtml(d)}</th>`).join("");
   let rowsHtml = "";
 
   for (let r = 0; r < processedSlots.length; r++) {
     const slot = processedSlots[r];
-
-    if (slot.isBreak) {
-      rowsHtml += `
-        <tr class="matrix-break-row">
-          <td class="matrix-hour-col">${slot.label}</td>
-          <td colspan="${activeDays.length}" class="matrix-break-cell">
-            <span class="break-pill">
-              ${ICONS.clock} Receso universitario (${slot.label})
-            </span>
-          </td>
-        </tr>`;
-      continue;
-    }
-
     let cellsHtml = "";
 
     activeDays.forEach(d => {
-      if (activeSpanUntil[d] > slot.start) {
-        return; // Cubierto por celda previa con rowspan
-      }
+      if (activeSpanUntil[d] > slot.start) return;
 
-      // Buscar si alguna clase empieza en este intervalo
       const c = classesByDay[d].find(x =>
         timeToMinutes(x.hora_inicio) <= slot.start &&
         timeToMinutes(x.hora_fin) > slot.start
@@ -1014,30 +997,12 @@ function renderMatrixTableHTML(classes) {
         const classEnd = timeToMinutes(c.hora_fin);
         let span = 0;
         for (let nextR = r; nextR < processedSlots.length; nextR++) {
-          const nextSlot = processedSlots[nextR];
-          if (!nextSlot.isBreak && nextSlot.start < classEnd) {
-            span++;
-          } else {
-            break;
-          }
+          if (processedSlots[nextR].start < classEnd) span++;
+          else break;
         }
         span = Math.max(1, span);
         activeSpanUntil[d] = classEnd;
-
-        const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
-        const textColor = getContrastTextColor(color);
-        const borderColor = darkenColor(color, 0.24);
-        const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
-
-        cellsHtml += `
-          <td rowspan="${span}" class="matrix-class-cell">
-            <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${rangoHora12})">
-              <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
-              <div class="matrix-cell-card-time">${rangoHora12}</div>
-              ${c.aula ? `<div class="matrix-cell-card-aula">${escapeHtml(c.aula)}</div>` : ""}
-              ${c.profesor ? `<div class="matrix-cell-card-prof">${escapeHtml(c.profesor)}</div>` : ""}
-            </div>
-          </td>`;
+        cellsHtml += renderMatrixCellHTML(c, span);
       } else {
         cellsHtml += `<td class="matrix-empty-cell"></td>`;
       }
@@ -1070,6 +1035,18 @@ function renderMatrixTableHTML(classes) {
 /* =====================================================================
    INTERFAZ DEL SELECTOR Y FILTRO DE ASIGNATURAS (DESIGN RICRA)
    ===================================================================== */
+function seleccionarFiltroAsignatura(subjectKey) {
+  state.tasksMateriaFilter = subjectKey;
+  const menu = $("#subject-dropdown-menu");
+  const btn = $("#btn-subject-dropdown-toggle");
+  if (menu) menu.classList.add("hidden");
+  if (btn) {
+    btn.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+  }
+  renderTareas();
+}
+
 function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjectMap) {
   const currentSub = state.tasksMateriaFilter ? subjectMap[state.tasksMateriaFilter] : null;
 
@@ -1080,7 +1057,7 @@ function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjec
 
   if (dotEl && labelEl && countEl) {
     if (currentSub) {
-      dotEl.style.background = currentSub.color || "#38BDF8";
+      dotEl.style.background = normalizarColorPastel(currentSub.color);
       labelEl.textContent = currentSub.materia;
       countEl.textContent = `${currentSub.taskCount}`;
     } else {
@@ -1098,30 +1075,32 @@ function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjec
 
   const optionsContainer = $("#subject-dropdown-options");
   if (optionsContainer) {
+    const isAllSelected = !state.tasksMateriaFilter;
     let optionsHtml = `
-      <div class="subject-dropdown-item ${!state.tasksMateriaFilter ? "selected" : ""}" data-subject="">
+      <div class="subject-dropdown-item ${isAllSelected ? "selected" : ""}" role="option" aria-selected="${isAllSelected ? "true" : "false"}" data-subject="">
         <span class="subject-item-indicator" style="background:var(--tea-green)"></span>
         <div class="subject-item-info">
           <span class="subject-item-title">Todas las materias</span>
           <span class="subject-item-sub">Ver tareas de todas las asignaturas (${allTasks.length} registradas)</span>
         </div>
         <span class="subject-item-count">${totalPendingCount}</span>
-        ${!state.tasksMateriaFilter ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+        ${isAllSelected ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
       </div>`;
 
     subjectsList.forEach(sub => {
       const isSelected = state.tasksMateriaFilter === sub.key;
       const subtitle = [sub.aula, sub.profesor].filter(Boolean).join(" · ") || "Asignatura del horario";
+      const safeColor = normalizarColorPastel(sub.color);
 
       optionsHtml += `
-        <div class="subject-dropdown-item ${isSelected ? "selected" : ""}" data-subject="${escapeHtml(sub.key)}">
-          <span class="subject-item-indicator" style="background:${sub.color || "#38BDF8"}"></span>
+        <div class="subject-dropdown-item ${isSelected ? "selected" : ""}" role="option" aria-selected="${isSelected ? "true" : "false"}" data-subject="${escapeHtml(sub.key)}">
+          <span class="subject-item-indicator" style="background:${safeColor}"></span>
           <div class="subject-item-info">
             <span class="subject-item-title">${escapeHtml(sub.materia)}</span>
             <span class="subject-item-sub">${escapeHtml(subtitle)}</span>
           </div>
           <span class="subject-item-count">${sub.taskCount}</span>
-          ${isSelected ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+          ${isSelected ? `<svg class="subject-item-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
         </div>`;
     });
 
@@ -1130,15 +1109,7 @@ function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjec
     $$(".subject-dropdown-item", optionsContainer).forEach(item => {
       item.onclick = (e) => {
         e.stopPropagation();
-        state.tasksMateriaFilter = item.dataset.subject;
-        const menu = $("#subject-dropdown-menu");
-        const btn = $("#btn-subject-dropdown-toggle");
-        if (menu) menu.classList.add("hidden");
-        if (btn) {
-          btn.classList.remove("open");
-          btn.setAttribute("aria-expanded", "false");
-        }
-        renderTareas();
+        seleccionarFiltroAsignatura(item.dataset.subject);
       };
     });
   }
@@ -1158,9 +1129,10 @@ function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjec
 
       subjectsList.forEach(sub => {
         const isSelected = state.tasksMateriaFilter === sub.key;
+        const safeColor = normalizarColorPastel(sub.color);
         chipsHtml += `
           <button type="button" class="subject-quick-chip ${isSelected ? "active" : ""}" data-subject="${escapeHtml(sub.key)}">
-            <span class="subject-quick-chip-dot" style="background:${sub.color || "#38BDF8"}"></span>
+            <span class="subject-quick-chip-dot" style="background:${safeColor}"></span>
             <span>${escapeHtml(sub.materia)}</span>
             <span class="subject-quick-chip-count">${sub.taskCount}</span>
           </button>`;
@@ -1169,10 +1141,7 @@ function renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjec
       chipsContainer.innerHTML = chipsHtml;
 
       $$(".subject-quick-chip", chipsContainer).forEach(chip => {
-        chip.onclick = () => {
-          state.tasksMateriaFilter = chip.dataset.subject;
-          renderTareas();
-        };
+        chip.onclick = () => seleccionarFiltroAsignatura(chip.dataset.subject);
       });
     }
   }
@@ -1212,6 +1181,7 @@ async function renderTareas() {
 
   const subjectsList = Object.values(subjectMap).sort((a, b) => a.materia.localeCompare(b.materia, "es"));
   const totalPendingCount = allTasks.filter(t => !t.completada).length;
+  actualizarBadgeTareas(totalPendingCount);
 
   renderSubjectFilterUI(subjectsList, allTasks, totalPendingCount, subjectMap);
 
@@ -1916,7 +1886,7 @@ async function exportScheduleForFriends() {
 
   // Exporta cursos sin las notas personales + sesiones enriquecidas en formato 12h AM/PM y colores pasteles
   const exportPayload = {
-    tipo: "umbral-horario-compartido",
+    tipo: "unumbral-horario-compartido",
     version: 2,
     fecha_creacion: new Date().toISOString(),
     cursos: cursos.map(c => ({
@@ -1945,7 +1915,7 @@ async function exportScheduleForFriends() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Umbral_Horario_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `UNUmbral_Horario_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast("Archivo de horario exportado.");
@@ -1994,7 +1964,7 @@ async function exportFullBackup() {
   ]);
 
   const payload = {
-    tipo: "umbral-backup-total",
+    tipo: "unumbral-backup-total",
     version: 2,
     fecha_creacion: new Date().toISOString(),
     cursos: cursos,
@@ -2006,7 +1976,7 @@ async function exportFullBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Umbral_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `UNUmbral_Backup_${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast("Copia de seguridad generada.");
@@ -2018,8 +1988,8 @@ async function importFullBackup(file) {
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (!data.cursos && !data.clases && !data.tareas) {
-      throw new Error("El archivo no corresponde a un respaldo válido de Umbral.");
+    if (!data || (!data.cursos && !data.clases && !data.tareas)) {
+      throw new Error("El archivo no corresponde a un respaldo válido de UNUmbral.");
     }
 
     const ok = await confirmDialog(
@@ -2030,7 +2000,8 @@ async function importFullBackup(file) {
 
     await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
       if (Array.isArray(data.cursos) && data.cursos.length > 0) {
-        await db.cursos.bulkPut(data.cursos);
+        const cursosSanitizados = data.cursos.map(sanitizarCursoImportado).filter(Boolean);
+        if (cursosSanitizados.length) await db.cursos.bulkPut(cursosSanitizados);
       }
       const existentes = await db.cursos.toArray();
       const r = convertirFormatoPlano(data.clases || [], data.tareas || [], existentes, []);
@@ -2116,6 +2087,104 @@ async function clearAllData() {
   switchTab("view-hoy");
 }
 
+async function guardarClase(e) {
+  e.preventDefault();
+  const id = $("#class-id").value || uuid();
+  const curso_id = $("#class-curso").value;
+  const dia_semana = $("#class-dia").value;
+  const hora_inicio = $("#class-hora-inicio").value;
+  const hora_fin = $("#class-hora-fin").value;
+  const aula = $("#class-aula").value.trim();
+  const errorEl = $("#class-form-error");
+
+  errorEl.classList.add("hidden");
+
+  if (!curso_id) {
+    errorEl.textContent = "Selecciona un curso de la lista.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  if (timeToMinutes(hora_fin) <= timeToMinutes(hora_inicio)) {
+    errorEl.textContent = "La hora de fin debe ser posterior a la hora de inicio.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const [sameDayClasses, { map: cursosMap }] = await Promise.all([
+    db.clases.where("dia_semana").equals(dia_semana).toArray(),
+    cargarCursos()
+  ]);
+  const startM = timeToMinutes(hora_inicio);
+  const endM = timeToMinutes(hora_fin);
+
+  const conflict = sameDayClasses.find(c => c.id !== id &&
+    overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
+
+  if (conflict) {
+    const nombreConflicto = (cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase";
+    errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}, ${DIAS_LABEL[conflict.dia_semana]}).`;
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  await db.clases.put({ id, curso_id, dia_semana, hora_inicio, hora_fin, aula });
+  closeClassModal();
+  showToast("Clase guardada en el horario.");
+  refrescarVistaActual();
+}
+
+async function eliminarClase() {
+  const id = $("#class-id").value;
+  if (!id) return;
+  const ok = await confirmDialog("Quitar del Horario", "¿Deseas quitar esta sesión del horario? El curso y sus notas se conservan.");
+  if (!ok) return;
+  await db.clases.delete(id);
+  closeClassModal();
+  showToast("Sesión eliminada del horario.");
+  refrescarVistaActual();
+}
+
+async function guardarTarea(e) {
+  e.preventDefault();
+  const id = $("#task-id").value || uuid();
+  const titulo = $("#task-titulo").value.trim();
+  const curso_id = $("#task-curso").value || "";
+  const fecha_limite = $("#task-fecha").value;
+  const importancia = parseInt($("#task-importancia").value) || 3;
+  const notas = $("#task-descripcion").value.trim();
+  const completada = $("#task-completada").checked;
+  const errorEl = $("#task-form-error");
+
+  errorEl.classList.add("hidden");
+
+  if (!titulo) {
+    errorEl.textContent = "El título de la tarea es obligatorio.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
+
+  await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas });
+  closeTaskModal();
+  showToast("Tarea guardada.");
+  if (state.currentTab === "view-hoy") renderHoy();
+  else renderTareas();
+}
+
+async function eliminarTarea() {
+  const id = $("#task-id").value;
+  if (!id) return;
+  const ok = await confirmDialog("Eliminar Tarea", "¿Deseas eliminar esta tarea permanentemente?");
+  if (!ok) return;
+  await db.tareas.delete(id);
+  closeTaskModal();
+  showToast("Tarea eliminada.");
+  if (state.currentTab === "view-hoy") renderHoy();
+  else renderTareas();
+}
+
 /* =====================================================================
    13. EVENTOS Y FORMULARIOS
    ===================================================================== */
@@ -2178,15 +2247,9 @@ function wireGlobalEvents() {
     btnSubjectDropdown.addEventListener("click", (e) => {
       e.stopPropagation();
       const isClosed = menuSubjectDropdown.classList.contains("hidden");
-      if (isClosed) {
-        menuSubjectDropdown.classList.remove("hidden");
-        btnSubjectDropdown.classList.add("open");
-        btnSubjectDropdown.setAttribute("aria-expanded", "true");
-      } else {
-        menuSubjectDropdown.classList.add("hidden");
-        btnSubjectDropdown.classList.remove("open");
-        btnSubjectDropdown.setAttribute("aria-expanded", "false");
-      }
+      menuSubjectDropdown.classList.toggle("hidden", !isClosed);
+      btnSubjectDropdown.classList.toggle("open", isClosed);
+      btnSubjectDropdown.setAttribute("aria-expanded", isClosed ? "true" : "false");
     });
 
     document.addEventListener("click", (e) => {
@@ -2241,123 +2304,28 @@ function wireGlobalEvents() {
   $("#class-curso").addEventListener("change", actualizarPreviewCursoClase);
   $("#class-hora-inicio").addEventListener("input", actualizarHintsHoraClase);
   $("#class-hora-fin").addEventListener("input", actualizarHintsHoraClase);
-  $("#btn-new-curso-from-class").addEventListener("click", () => {
-    openNewCursoModal("clase");
-  });
+  $("#btn-new-curso-from-class").addEventListener("click", () => openNewCursoModal("clase"));
   $("#modal-class-close").addEventListener("click", closeClassModal);
   $("#btn-cancel-class").addEventListener("click", closeClassModal);
   $("#modal-class-backdrop").addEventListener("click", (e) => {
     if (e.target.id === "modal-class-backdrop") closeClassModal();
   });
+  $("#form-class").addEventListener("submit", guardarClase);
+  $("#btn-delete-class").addEventListener("click", eliminarClase);
 
-  $("#form-class").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const id = $("#class-id").value || uuid();
-    const curso_id = $("#class-curso").value;
-    const dia_semana = $("#class-dia").value;
-    const hora_inicio = $("#class-hora-inicio").value;
-    const hora_fin = $("#class-hora-fin").value;
-    const aula = $("#class-aula").value.trim();
-    const errorEl = $("#class-form-error");
-
-    errorEl.classList.add("hidden");
-
-    if (!curso_id) {
-      errorEl.textContent = "Selecciona un curso de la lista.";
-      errorEl.classList.remove("hidden");
-      return;
-    }
-
-    if (timeToMinutes(hora_fin) <= timeToMinutes(hora_inicio)) {
-      errorEl.textContent = "La hora de fin debe ser posterior a la hora de inicio.";
-      errorEl.classList.remove("hidden");
-      return;
-    }
-
-    const [sameDayClasses, { map: cursosMap }] = await Promise.all([
-      db.clases.where("dia_semana").equals(dia_semana).toArray(),
-      cargarCursos()
-    ]);
-    const startM = timeToMinutes(hora_inicio);
-    const endM = timeToMinutes(hora_fin);
-
-    const conflict = sameDayClasses.find(c => c.id !== id &&
-      overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
-
-    if (conflict) {
-      const nombreConflicto = (cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase";
-      errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}, ${DIAS_LABEL[conflict.dia_semana]}).`;
-      errorEl.classList.remove("hidden");
-      return;
-    }
-
-    await db.clases.put({ id, curso_id, dia_semana, hora_inicio, hora_fin, aula });
-    closeClassModal();
-    showToast("Clase guardada en el horario.");
-    refrescarVistaActual();
-  });
-
-  $("#btn-delete-class").addEventListener("click", async () => {
-    const id = $("#class-id").value;
-    if (!id) return;
-    const ok = await confirmDialog("Quitar del Horario", "¿Deseas quitar esta sesión del horario? El curso y sus notas se conservan.");
-    if (!ok) return;
-    await db.clases.delete(id);
-    closeClassModal();
-    showToast("Sesión eliminada del horario.");
-    refrescarVistaActual();
-  });
-
+  // Eventos del modal de Tarea
   $$(".imp-star-btn", $("#task-importance-selector")).forEach(btn => {
     btn.addEventListener("click", () => setImportanceStars(parseInt(btn.dataset.val)));
   });
-
   $("#modal-task-close").addEventListener("click", closeTaskModal);
   $("#btn-cancel-task").addEventListener("click", closeTaskModal);
   $("#modal-task-backdrop").addEventListener("click", (e) => {
     if (e.target.id === "modal-task-backdrop") closeTaskModal();
   });
+  $("#form-task").addEventListener("submit", guardarTarea);
+  $("#btn-delete-task").addEventListener("click", eliminarTarea);
 
-  $("#form-task").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const id = $("#task-id").value || uuid();
-    const titulo = $("#task-titulo").value.trim();
-    const curso_id = $("#task-curso").value || "";
-    const fecha_limite = $("#task-fecha").value;
-    const importancia = parseInt($("#task-importancia").value) || 3;
-    const notas = $("#task-descripcion").value.trim();
-    const completada = $("#task-completada").checked;
-    const errorEl = $("#task-form-error");
-
-    errorEl.classList.add("hidden");
-
-    if (!titulo) {
-      errorEl.textContent = "El título de la tarea es obligatorio.";
-      errorEl.classList.remove("hidden");
-      return;
-    }
-
-    const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
-
-    await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas });
-    closeTaskModal();
-    showToast("Tarea guardada.");
-    if (state.currentTab === "view-hoy") renderHoy();
-    else renderTareas();
-  });
-
-  $("#btn-delete-task").addEventListener("click", async () => {
-    const id = $("#task-id").value;
-    if (!id) return;
-    const ok = await confirmDialog("Eliminar Tarea", "¿Deseas eliminar esta tarea permanentemente?");
-    if (!ok) return;
-    await db.tareas.delete(id);
-    closeTaskModal();
-    showToast("Tarea eliminada.");
-    if (state.currentTab === "view-hoy") renderHoy();
-    else renderTareas();
-  });
-
+  // Eventos de Ajustes y Backups
   $("#btn-export-schedule").addEventListener("click", exportScheduleForFriends);
   $("#input-import-schedule").addEventListener("change", (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -2377,15 +2345,6 @@ function wireGlobalEvents() {
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
-  const compactBtn = $("#btn-toggle-compact");
-  if (compactBtn) {
-    compactBtn.addEventListener("click", () => {
-      state.matrixCompact = !state.matrixCompact;
-      localStorage.setItem("umbral-matrix-compact", state.matrixCompact);
-      renderHorario();
-    });
-  }
-
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
@@ -2393,13 +2352,13 @@ function wireGlobalEvents() {
       closeNotasModal();
       closeTaskModal();
       $("#modal-quick-backdrop").classList.add("hidden");
-      $("#modal-confirm-backdrop").classList.add("hidden");
+      if (activeConfirmCancel) activeConfirmCancel();
     }
   });
 }
 
 /* =====================================================================
-   MIGRACIÓN DE COMPATIBILIDAD DESDE UNIFLOW A UMBRAL
+   MIGRACIÓN DE COMPATIBILIDAD DESDE UNIFLOW A UNUMBRAL
    ===================================================================== */
 async function checkAndMigrateLegacyDB() {
   try {
@@ -2432,6 +2391,10 @@ async function init() {
 
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist().catch(() => {});
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
 
   try {

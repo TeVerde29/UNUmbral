@@ -1,13 +1,25 @@
 {
-  "name": "Umbral · Horario y Tareas",
-  "short_name": "Umbral",
-  "description": "Horario universitario y organizador de tareas offline",
-  "start_url": "./index.html",
+  "name": "UNUmbral · Horario y Notas",
+  "short_name": "UNUmbral",
+  "description": "Horario universitario, calculadora de notas vigesimal (0 a 20) y organizador de tareas académicas 100% offline.",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#111A13",
-  "theme_color": "#294635",
+  "background_color": "#0D140F",
+  "theme_color": "#0D140F",
   "orientation": "portrait-primary",
   "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "icon.svg",
       "sizes": "any",
