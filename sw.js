@@ -1,5 +1,5 @@
 // Service Worker para funcionamiento 100% offline con actualización en segundo plano
-const CACHE_NAME = "unumbral-ricra-v10";
+const CACHE_NAME = "unumbral-ricra-v11";
 const ASSETS = [
   "./",
   "./index.html",
@@ -17,7 +17,9 @@ const ASSETS = [
   "./lib/asistencia.js",
   "./lib/prioridad.js",
   "./lib/rendimiento.js",
-  "./lib/huecos.js"
+  "./lib/huecos.js",
+  "./lib/qrcode.min.js",
+  "./lib/qr.js"
 ];
 
 self.addEventListener("install", (e) => {

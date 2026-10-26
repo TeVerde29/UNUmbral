@@ -3188,6 +3188,284 @@ async function importScheduleFromFriends(file) {
   }
 }
 
+/* =====================================================================
+   12.5 COMPARTIR E IMPORTAR HORARIO POR QR OFFLINE (FASE 7)
+   ===================================================================== */
+let qrPartesActuales = [];
+let qrParteIndiceActual = 0;
+let partesQrAcumuladas = [];
+let qrScannerStream = null;
+
+async function openModalQrSchedule() {
+  const [cursos, clases] = await Promise.all([db.cursos.toArray(), db.clases.toArray()]);
+  if (cursos.length === 0 && clases.length === 0) {
+    showToast("No tienes cursos ni clases para compartir por QR.", true);
+    return;
+  }
+
+  const horarioCompartido = {
+    tipo: "unumbral-horario-compartido",
+    version: 2,
+    exportado_el: new Date().toISOString(),
+    cursos: cursos.map(c => ({
+      id: c.id,
+      nombre: c.nombre,
+      color: c.color,
+      aula: c.aula,
+      profesor: c.profesor,
+      creditos: c.creditos || 3
+    })),
+    clases: clases.map(k => ({
+      curso_id: k.curso_id,
+      dia_semana: k.dia_semana,
+      hora_inicio: k.hora_inicio,
+      hora_fin: k.hora_fin,
+      aula: k.aula
+    }))
+  };
+
+  try {
+    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido);
+  } catch (err) {
+    showToast("Error generando código QR: " + err.message, true);
+    return;
+  }
+
+  qrParteIndiceActual = 0;
+  renderQrEnDisplay(qrPartesActuales[0]);
+
+  const multiControls = $("#qr-multipart-controls");
+  const indicator = $("#qr-part-indicator");
+  if (qrPartesActuales.length > 1) {
+    if (multiControls) multiControls.classList.remove("hidden");
+    if (indicator) indicator.textContent = `Parte 1 de ${qrPartesActuales.length}`;
+  } else {
+    if (multiControls) multiControls.classList.add("hidden");
+  }
+
+  $("#modal-qr-schedule-backdrop").classList.remove("hidden");
+}
+
+function closeModalQrSchedule() {
+  $("#modal-qr-schedule-backdrop").classList.add("hidden");
+}
+
+function renderQrEnDisplay(textoQr) {
+  const container = $("#qr-display-container");
+  if (!container) return;
+
+  if (typeof qrcode === "function") {
+    try {
+      const qr = qrcode(0, "M");
+      qr.addData(textoQr);
+      qr.make();
+      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+      return;
+    } catch {
+      try {
+        const qr = qrcode(0, "L");
+        qr.addData(textoQr);
+        qr.make();
+        container.innerHTML = qr.createSvgTag({ scalable: true, margin: 2 });
+        return;
+      } catch (err) {
+        console.error("Error generando QR:", err);
+      }
+    }
+  }
+
+  container.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); text-align:center;">Librería QR no disponible.</p>`;
+}
+
+function mostrarSiguienteParteQr() {
+  if (qrPartesActuales.length <= 1) return;
+  qrParteIndiceActual = (qrParteIndiceActual + 1) % qrPartesActuales.length;
+  renderQrEnDisplay(qrPartesActuales[qrParteIndiceActual]);
+  const indicator = $("#qr-part-indicator");
+  if (indicator) indicator.textContent = `Parte ${qrParteIndiceActual + 1} de ${qrPartesActuales.length}`;
+}
+
+function mostrarAnteriorParteQr() {
+  if (qrPartesActuales.length <= 1) return;
+  qrParteIndiceActual = (qrParteIndiceActual - 1 + qrPartesActuales.length) % qrPartesActuales.length;
+  renderQrEnDisplay(qrPartesActuales[qrParteIndiceActual]);
+  const indicator = $("#qr-part-indicator");
+  if (indicator) indicator.textContent = `Parte ${qrParteIndiceActual + 1} de ${qrPartesActuales.length}`;
+}
+
+function descargarQrPng() {
+  if (!qrPartesActuales || qrPartesActuales.length === 0) return;
+  const canvas = $("#qr-export-canvas");
+  if (!canvas || typeof qrcode !== "function") return;
+
+  try {
+    const qr = qrcode(0, "M");
+    qr.addData(qrPartesActuales[qrParteIndiceActual]);
+    qr.make();
+    const count = qr.getModuleCount();
+    const cellSize = 8;
+    const margin = 16;
+    canvas.width = count * cellSize + margin * 2;
+    canvas.height = count * cellSize + margin * 2;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#000000";
+    for (let r = 0; r < count; r++) {
+      for (let c = 0; c < count; c++) {
+        if (qr.isDark(r, c)) {
+          ctx.fillRect(margin + c * cellSize, margin + r * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+    const link = document.createElement("a");
+    link.download = `UNUmbral_Horario_QR${qrPartesActuales.length > 1 ? `_p${qrParteIndiceActual + 1}` : ""}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  } catch (err) {
+    showToast("Error descargando imagen QR: " + err.message, true);
+  }
+}
+
+async function openModalQrScanner() {
+  partesQrAcumuladas = [];
+  const statusEl = $("#qr-scanner-status");
+  if (statusEl) statusEl.textContent = "Apunta la cámara al código QR de UNUmbral o sube una foto.";
+  const txtManual = $("#textarea-qr-manual");
+  if (txtManual) txtManual.value = "";
+
+  const camWrap = $("#qr-camera-wrap");
+  const video = $("#qr-scanner-video");
+
+  if ("BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia && video && camWrap) {
+    try {
+      qrScannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      video.srcObject = qrScannerStream;
+      camWrap.classList.remove("hidden");
+      iniciarDeteccionCamara(video);
+    } catch {
+      camWrap.classList.add("hidden");
+    }
+  } else if (camWrap) {
+    camWrap.classList.add("hidden");
+  }
+
+  $("#modal-qr-scanner-backdrop").classList.remove("hidden");
+}
+
+function closeModalQrScanner() {
+  if (qrScannerStream) {
+    qrScannerStream.getTracks().forEach(t => t.stop());
+    qrScannerStream = null;
+  }
+  const video = $("#qr-scanner-video");
+  if (video) video.srcObject = null;
+  $("#modal-qr-scanner-backdrop").classList.add("hidden");
+}
+
+async function iniciarDeteccionCamara(video) {
+  if (!("BarcodeDetector" in window)) return;
+  const detector = new BarcodeDetector({ formats: ["qr_code"] });
+  const interval = setInterval(async () => {
+    if (!qrScannerStream || $("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
+      clearInterval(interval);
+      return;
+    }
+    try {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const barcodes = await detector.detect(video);
+        if (barcodes.length > 0 && barcodes[0].rawValue) {
+          clearInterval(interval);
+          procesarTextoQrEscaneado(barcodes[0].rawValue);
+        }
+      }
+    } catch {
+      // Ignorar cuadros borrosos
+    }
+  }, 300);
+}
+
+async function procesarArchivoImagenQr(file) {
+  if (!file) return;
+  const statusEl = $("#qr-scanner-status");
+  if (statusEl) statusEl.textContent = "Analizando imagen de código QR...";
+
+  if ("BarcodeDetector" in window) {
+    try {
+      const detector = new BarcodeDetector({ formats: ["qr_code"] });
+      const bmp = await createImageBitmap(file);
+      const barcodes = await detector.detect(bmp);
+      if (barcodes.length > 0 && barcodes[0].rawValue) {
+        procesarTextoQrEscaneado(barcodes[0].rawValue);
+        return;
+      }
+    } catch (err) {
+      console.warn("Fallo BarcodeDetector en imagen:", err);
+    }
+  }
+
+  showToast("No se detectó un código QR legible en la imagen. Usa la opción de texto o asegúrate de que esté bien iluminada.", true);
+  if (statusEl) statusEl.textContent = "No se detectó código QR en la imagen.";
+}
+
+async function procesarTextoQrEscaneado(rawText) {
+  if (!rawText) return;
+  const text = rawText.trim();
+
+  let res;
+  try {
+    res = (typeof descomprimirHorarioDeQr === "function" ? descomprimirHorarioDeQr : window.descomprimirHorarioDeQr)(text);
+  } catch (err) {
+    showToast("QR no compatible: " + err.message, true);
+    return;
+  }
+
+  if (res.esMultiparte) {
+    partesQrAcumuladas.push(res);
+    const ensamble = (typeof ensamblarQrMultiparte === "function" ? ensamblarQrMultiparte : window.ensamblarQrMultiparte)(partesQrAcumuladas);
+    if (!ensamble.completo) {
+      const msg = `Parte ${res.parte} de ${res.total} leída con éxito. Faltan partes: ${ensamble.faltantes.join(", ")}.`;
+      showToast(msg);
+      const statusEl = $("#qr-scanner-status");
+      if (statusEl) statusEl.textContent = msg;
+      return;
+    }
+    res = { esMultiparte: false, horario: ensamble.horario };
+  }
+
+  const horario = res.horario;
+  closeModalQrScanner();
+
+  const totalCursos = Array.isArray(horario.cursos) ? horario.cursos.length : 0;
+  const totalClases = Array.isArray(horario.clases) ? horario.clases.length : 0;
+
+  const ok = await confirmDialog(
+    "Importar Horario por QR",
+    `¿Deseas importar el horario escaneado con ${totalCursos} cursos y ${totalClases} clases?`
+  );
+  if (!ok) return;
+
+  await ejecutarImportacionHorario(horario);
+}
+
+async function ejecutarImportacionHorario(data) {
+  const existentes = await db.cursos.toArray();
+  const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
+
+  await db.transaction("rw", db.cursos, db.clases, async () => {
+    if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
+    for (const c of r.clases) {
+      await db.clases.put({ ...c, id: uuid() });
+    }
+  });
+
+  showToast(`Horario importado (${r.cursosNuevos.length} cursos nuevos, ${r.clases.length} clases).`);
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+  switchTab("view-horario");
+}
+
 async function exportFullBackup() {
   const [cursos, classes, tasks, eventos, asistencia, excepciones, ajustes] = await Promise.all([
     db.cursos.toArray(),
@@ -3821,6 +4099,51 @@ function wireGlobalEvents() {
     inputSimMeta.addEventListener("input", () => actualizarSimulador());
   }
 
+  // Compartir e Importar por QR (Fase 7)
+  const btnCompartirQr = $("#btn-compartir-qr");
+  if (btnCompartirQr) btnCompartirQr.addEventListener("click", openModalQrSchedule);
+  const btnCloseQrModal = $("#btn-close-qr-modal");
+  if (btnCloseQrModal) btnCloseQrModal.addEventListener("click", closeModalQrSchedule);
+  const modalQrBackdrop = $("#modal-qr-schedule-backdrop");
+  if (modalQrBackdrop) {
+    modalQrBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-qr-schedule-backdrop") closeModalQrSchedule();
+    });
+  }
+  const btnPrevQr = $("#btn-prev-qr-part");
+  if (btnPrevQr) btnPrevQr.addEventListener("click", mostrarAnteriorParteQr);
+  const btnNextQr = $("#btn-next-qr-part");
+  if (btnNextQr) btnNextQr.addEventListener("click", mostrarSiguienteParteQr);
+  const btnDescargarQr = $("#btn-descargar-qr-png");
+  if (btnDescargarQr) btnDescargarQr.addEventListener("click", descargarQrPng);
+
+  const btnEscanearQr = $("#btn-escanear-qr");
+  if (btnEscanearQr) btnEscanearQr.addEventListener("click", openModalQrScanner);
+  const btnCloseScanner = $("#btn-close-qr-scanner");
+  if (btnCloseScanner) btnCloseScanner.addEventListener("click", closeModalQrScanner);
+  const modalScannerBackdrop = $("#modal-qr-scanner-backdrop");
+  if (modalScannerBackdrop) {
+    modalScannerBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-qr-scanner-backdrop") closeModalQrScanner();
+    });
+  }
+  const inputQrFile = $("#input-qr-image-file");
+  if (inputQrFile) {
+    inputQrFile.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        procesarArchivoImagenQr(e.target.files[0]);
+        e.target.value = "";
+      }
+    });
+  }
+  const btnProcManual = $("#btn-procesar-qr-manual");
+  if (btnProcManual) {
+    btnProcManual.addEventListener("click", () => {
+      const txt = $("#textarea-qr-manual");
+      if (txt && txt.value) procesarTextoQrEscaneado(txt.value);
+    });
+  }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeClassModal();
@@ -3831,6 +4154,8 @@ function wireGlobalEvents() {
       closeModalExcepcion();
       closeModalEvento();
       closeSimuladorModal();
+      closeModalQrSchedule();
+      closeModalQrScanner();
       $("#modal-quick-backdrop").classList.add("hidden");
       if (activeConfirmCancel) activeConfirmCancel();
     }

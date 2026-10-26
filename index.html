@@ -397,6 +397,16 @@
             <span>Importar Horario</span>
             <input type="file" id="input-import-schedule" accept=".json" class="hidden">
           </label>
+
+          <button id="btn-compartir-qr" class="btn-primary" type="button" style="background:var(--forest-shadow); width:100%; margin-top:4px;">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Compartir por Código QR (Offline)</span>
+          </button>
+
+          <button id="btn-escanear-qr" class="btn-secondary" type="button" style="width:100%; margin-top:4px;">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            <span>Escanear / Leer Código QR</span>
+          </button>
         </div>
       </div>
 
@@ -1202,6 +1212,91 @@
   </div>
 </div>
 
+<!-- MODAL DE COMPARTIR HORARIO POR QR (FASE 7) -->
+<div id="modal-qr-schedule-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" style="max-height: 90vh; overflow-y: auto; text-align: center;">
+    <div class="modal-header">
+      <div>
+        <h3 id="qr-modal-title">Compartir Horario por QR</h3>
+        <p class="modal-subtitle">Tu compañero puede escanear este código desde su pantalla</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-qr-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
+      <!-- Contenedor del código QR -->
+      <div id="qr-display-container" style="background:#ffffff; padding:16px; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.1); width:280px; height:280px; display:flex; justify-content:center; align-items:center;">
+        <!-- SVG del QR generado dinámicamente -->
+      </div>
+
+      <!-- Controles de multiparte (si aplica) -->
+      <div id="qr-multipart-controls" class="hidden" style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px;">
+        <button type="button" class="btn-secondary btn-sm" id="btn-prev-qr-part">◀ Ant</button>
+        <span id="qr-part-indicator" style="font-weight:700; font-size:12px; min-width:80px; text-align:center;">Parte 1 de 1</span>
+        <button type="button" class="btn-secondary btn-sm" id="btn-next-qr-part">Sig ▶</button>
+      </div>
+
+      <p style="font-size:11.5px; color:var(--text-secondary); max-width:320px; margin:4px 0 10px;">
+        Este código contiene tus cursos y horarios. No incluye notas, asistencias ni tareas personales.
+      </p>
+
+      <div style="display:flex; gap:8px; width:100%; justify-content:center;">
+        <button type="button" id="btn-descargar-qr-png" class="btn-secondary btn-sm">
+          💾 Guardar imagen QR
+        </button>
+      </div>
+      <canvas id="qr-export-canvas" class="hidden"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE ESCANEAR / IMPORTAR HORARIO POR QR (FASE 7) -->
+<div id="modal-qr-scanner-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="qr-scanner-title" style="max-height: 90vh; overflow-y: auto;">
+    <div class="modal-header">
+      <div>
+        <h3 id="qr-scanner-title">Escanear Horario por QR</h3>
+        <p class="modal-subtitle">Importa el horario de un compañero usando tu cámara o archivo</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-qr-scanner" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+      <!-- Visor de cámara en vivo si BarcodeDetector está disponible -->
+      <div id="qr-camera-wrap" class="hidden" style="position:relative; width:100%; border-radius:var(--radius-md); overflow:hidden; background:#000;">
+        <video id="qr-scanner-video" autoplay playsinline style="width:100%; height:220px; object-fit:cover;"></video>
+        <div style="position:absolute; inset:20px; border:2px dashed rgba(255,255,255,0.7); border-radius:12px; pointer-events:none;"></div>
+      </div>
+
+      <!-- Estado / progreso del escaneo -->
+      <div id="qr-scanner-status" style="font-size:12px; color:var(--text-secondary); text-align:center; padding:6px;">
+        Apunta la cámara al código QR de UNUmbral.
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <!-- Subir imagen de QR -->
+        <label class="btn-secondary" style="display:flex; justify-content:center; align-items:center; gap:6px; cursor:pointer;">
+          <span>📁 Cargar foto del código QR</span>
+          <input type="file" id="input-qr-image-file" accept="image/*" class="hidden">
+        </label>
+
+        <!-- Entrada manual de texto QR -->
+        <details style="margin-top:4px;">
+          <summary style="font-size:12px; color:var(--text-secondary); cursor:pointer; padding:4px 0;">O pegar código de texto UNU1:</summary>
+          <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
+            <textarea id="textarea-qr-manual" class="field" rows="3" placeholder="Pega aquí el código que empieza con UNU1:"></textarea>
+            <button type="button" id="btn-procesar-qr-manual" class="btn-primary btn-sm">Procesar código</button>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- DIÁLOGO DE CONFIRMACIÓN -->
 <div id="modal-confirm-backdrop" class="modal-backdrop hidden">
   <div class="confirm-box">
@@ -1227,6 +1322,8 @@
 <script src="lib/prioridad.js"></script>
 <script src="lib/rendimiento.js"></script>
 <script src="lib/huecos.js"></script>
+<script src="lib/qrcode.min.js"></script>
+<script src="lib/qr.js"></script>
 <script src="app.js"></script>
 
 </body>
