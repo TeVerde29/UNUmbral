@@ -907,196 +907,325 @@ button:active, .btn-primary:active, .btn-secondary:active {
 }
 
 /* Contenedor desplazable de la tabla */
-.matrix-scroll-wrapper {
+/* =====================================================================
+   PARRILLA CONTINUA ESTILO GOOGLE CALENDAR (DESIGN RICRA)
+   ===================================================================== */
+.matrix-scroll-wrapper,
+.gcal-wrapper {
   position: relative;
   overflow-x: auto;
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 190px);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--surface-solid);
   box-shadow: var(--shadow-sm);
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
-}
-
-/* Tabla de Horario Universitario */
-.matrix-grid-table {
-  width: 100%;
-  min-width: 840px;
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-  font-size: 11px;
   user-select: none;
 }
 
-/* Encabezados de columna (Días) */
-.matrix-grid-table thead th {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--matrix-header-bg);
-  color: var(--matrix-header-text);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
-  text-align: center;
-  padding: 10px 4px;
-  border-right: 1px solid var(--matrix-hour-border);
-  border-bottom: 2px solid var(--border-focus);
-  min-width: 120px;
+.gcal-content {
+  display: flex;
+  flex-direction: column;
+  min-width: calc(72px + var(--gcal-days, 5) * 140px);
+  width: 100%;
 }
 
-/* Esquina superior izquierda (HORA) */
-.matrix-grid-table thead th.matrix-hour-header {
+/* Fila de Encabezados (Sticky Top) */
+.gcal-header-row {
   position: sticky;
   top: 0;
-  left: 0;
   z-index: 30;
-  width: 122px;
-  min-width: 122px;
-  max-width: 122px;
+  display: flex;
+  width: 100%;
+  background: var(--matrix-header-bg);
+  border-bottom: 2px solid var(--border-focus);
+}
+
+/* Celda Esquina Superior Izquierda (Sticky Top & Left) */
+.gcal-corner-cell {
+  position: sticky;
+  left: 0;
+  z-index: 35;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--matrix-corner-bg);
   color: var(--matrix-header-text);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   border-right: 2px solid var(--matrix-hour-border);
+  box-sizing: border-box;
+  padding: 8px 4px;
 }
 
-/* Columna de Horas lateral */
-.matrix-grid-table td.matrix-hour-col {
+.gcal-days-header-strip {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.gcal-header-day {
+  flex: 1;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 6px;
+  background: var(--matrix-header-bg);
+  color: var(--matrix-header-text);
+  border-right: 1px solid var(--matrix-hour-border);
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.gcal-header-day:last-child {
+  border-right: none;
+}
+
+.gcal-header-day.is-today {
+  background: var(--accent-subtle);
+  border-bottom: 2px solid var(--accent);
+}
+
+.gcal-day-title {
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.gcal-day-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gcal-today-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  padding: 1px 5px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.02em;
+}
+
+.gcal-day-count {
+  font-size: 9.5px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* Cuerpo de la línea de tiempo continua */
+.gcal-body-row {
+  display: flex;
+  width: 100%;
+  position: relative;
+}
+
+/* Columna de Horas lateral (Sticky Left) */
+.gcal-time-column {
   position: sticky;
   left: 0;
-  z-index: 15;
+  z-index: 20;
+  width: 72px;
+  min-width: 72px;
+  max-width: 72px;
   background: var(--matrix-hour-bg);
-  color: var(--text-secondary);
+  border-right: 2px solid var(--matrix-hour-border);
+  box-sizing: border-box;
+}
+
+.gcal-time-tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: right;
+  padding-right: 8px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.gcal-time-tick:first-child {
+  transform: translateY(2px);
+}
+
+.gcal-time-tick:last-child {
+  transform: translateY(-100%);
+}
+
+.gcal-time-tick-label {
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
+  color: var(--text-secondary);
   letter-spacing: -0.02em;
-  text-align: center;
-  padding: 6px 6px;
-  border-bottom: 1px solid var(--matrix-hour-border);
-  border-right: 2px solid var(--matrix-hour-border);
   white-space: nowrap;
-  overflow: hidden;
-  width: 122px;
-  min-width: 122px;
-  max-width: 122px;
-  vertical-align: middle !important;
 }
 
-/* Celdas generales */
-.matrix-grid-table td {
-  height: 38px;
-  vertical-align: middle;
-  border-right: 1px solid var(--border-hairline);
-  border-bottom: 1px solid var(--border-hairline);
-  padding: 0;
+/* Lienzo de Días */
+.gcal-days-canvas {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+/* Columna de Día continua con líneas horizontales horarias */
+.gcal-day-column {
+  flex: 1;
+  min-width: 140px;
+  position: relative;
   box-sizing: border-box;
+  border-right: 1px solid var(--border-hairline);
+  background-size: 100% 60px;
+  background-image:
+    linear-gradient(to bottom, var(--matrix-hour-border) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(175, 196, 154, 0.14) 1px, transparent 1px);
+  background-position: 0 0, 0 30px;
 }
 
-.matrix-grid-table td.matrix-empty-cell {
-  background: transparent;
-  transition: background 0.12s ease;
+[data-theme="dark"] .gcal-day-column {
+  background-image:
+    linear-gradient(to bottom, var(--matrix-hour-border) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
 }
 
-.matrix-grid-table td.matrix-empty-cell:hover {
-  background: rgba(175, 196, 154, 0.12);
+.gcal-day-column:last-child {
+  border-right: none;
 }
 
-/* Celda con clase asignada (rowspan) */
-.matrix-grid-table td.matrix-class-cell {
-  padding: 3px !important;
-  vertical-align: middle !important;
+.gcal-day-column.is-today {
+  background-color: rgba(175, 196, 154, 0.05);
+}
+
+[data-theme="dark"] .gcal-day-column.is-today {
+  background-color: rgba(175, 196, 154, 0.03);
+}
+
+/* Indicador de Hora Actual ("Ahora") */
+.gcal-current-time-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  z-index: 15;
+  pointer-events: none;
+}
+
+.gcal-current-time-dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--surface-solid);
+}
+
+/* Tarjeta de Clase en la Línea de Tiempo (Posición Absoluta al Minuto) */
+.gcal-event-card {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
-}
-
-/* Tarjeta de Asignatura tipo Horario Universitario */
-.matrix-cell-card {
-  width: 100%;
-  height: 100%;
-  min-height: calc(100% - 2px);
-  border-radius: var(--radius-xs);
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-  padding: 7px 6px;
-  box-sizing: border-box;
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
   cursor: pointer;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  border: 1.5px solid rgba(0, 0, 0, 0.18);
-  transition: transform 0.14s ease, filter 0.14s ease, box-shadow 0.14s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-left-width: 4px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  z-index: 5;
 }
 
-.matrix-cell-card:hover {
-  transform: scale(0.985);
-  filter: brightness(1.03);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+.gcal-event-card:hover {
+  transform: translateY(-1px);
+  z-index: 12;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  filter: brightness(1.02);
 }
 
-[data-theme="dark"] .matrix-cell-card {
+[data-theme="dark"] .gcal-event-card {
   border-color: rgba(255, 255, 255, 0.22);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
-.matrix-cell-card-title {
+[data-theme="dark"] .gcal-event-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.gcal-event-card .matrix-cell-card-title {
   width: 100%;
   font-family: var(--font-display);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.22;
-  text-transform: uppercase;
   letter-spacing: -0.01em;
-  word-break: normal;
-  overflow-wrap: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.matrix-cell-card-time {
-  width: 100%;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  opacity: 0.9;
-  margin-top: 4px;
-  letter-spacing: -0.03em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.matrix-cell-card-aula {
-  width: 100%;
-  font-size: 9.5px;
-  font-weight: 700;
-  line-height: 1.2;
-  opacity: 0.86;
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.matrix-cell-card-prof {
-  width: 100%;
-  font-size: 9px;
-  font-weight: 500;
-  line-height: 1.22;
-  opacity: 0.78;
-  margin-top: 2px;
-  word-break: normal;
-  overflow-wrap: break-word;
+  text-transform: uppercase;
+  margin-bottom: 2px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.gcal-event-card .matrix-cell-card-time {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  opacity: 0.92;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gcal-event-card .matrix-cell-card-aula {
+  width: 100%;
+  font-size: 9.5px;
+  font-weight: 600;
+  opacity: 0.86;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 1px;
+}
+
+.gcal-event-card .matrix-cell-card-prof {
+  width: 100%;
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 1px;
 }
 
 /* Fila de Receso Universitario (Horas libres agrupadas) */

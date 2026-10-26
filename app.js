@@ -392,7 +392,7 @@ const state = {
   tasksMateriaFilter: "",
   tasksSearchQuery: "",
   matrixCompact: localStorage.getItem("umbral-matrix-compact") !== "false",
-  theme: localStorage.getItem("umbral-theme") || localStorage.getItem("uniflow-theme") || "dark",
+  theme: localStorage.getItem("umbral-theme") || localStorage.getItem("uniflow-theme") || "light",
   // Si el modal de curso se abrió desde el formulario de clase, al guardar se vuelve a él
   cursoModalOrigin: null // null | "clase" | { abrirClase: true, dia: "LUNES" }
 };
@@ -895,9 +895,257 @@ async function renderHorario() {
   }
 }
 
+/* =====================================================================
+   LÍNEA DE TIEMPO CONTINUA TIPO GOOGLE CALENDAR (DESIGN RICRA)
+   ===================================================================== */
+
+/**
+ * Calcula los límites de horas (inicio y fin) de forma adaptativa según los
+ * horarios reales de las clases ingresadas por el estudiante.
+ */
+function calcularLimitesTimeline(classes) {
+  let minMinutes = 480;  // 08:00 AM por defecto
+  let maxMinutes = 1320; // 10:00 PM por defecto
+
+  if (classes && classes.length > 0) {
+    const classStarts = classes.map(c => timeToMinutes(c.hora_inicio));
+    const classEnds = classes.map(c => timeToMinutes(c.hora_fin));
+    const earliest = Math.min(...classStarts);
+    const latest = Math.max(...classEnds);
+
+    let startH = Math.floor(earliest / 60);
+    let endH = Math.ceil(latest / 60);
+
+    // Permite adaptarse a horas reales: no antes de las 06:00 AM, no después de las 24:00
+    startH = Math.max(6, Math.min(22, startH));
+    endH = Math.min(24, Math.max(startH + 2, endH));
+
+    minMinutes = startH * 60;
+    maxMinutes = endH * 60;
+  }
+
+  const startHour = Math.floor(minMinutes / 60);
+  const endHour = Math.ceil(maxMinutes / 60);
+  return { startHour, endHour, totalHours: Math.max(1, endHour - startHour) };
+}
+
+/**
+ * Posiciona los bloques de clase en una columna continua calculando su 'top'
+ * y 'height' proporcionales al minuto exacto, y distribuyendo en columnas
+ * paralelas las clases que tengan solapamiento temporal (algoritmo tipo Google Calendar).
+ */
+function computeDayEventPositions(dayClasses, startHour, pxPerMin) {
+  if (!dayClasses || dayClasses.length === 0) return [];
+
+  const events = dayClasses.map(c => {
+    const start = timeToMinutes(c.hora_inicio);
+    const end = Math.max(start + 15, timeToMinutes(c.hora_fin));
+    return { classObj: c, start, end };
+  }).sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+  const clusters = [];
+  let currentCluster = [];
+  let clusterEnd = -1;
+
+  for (const ev of events) {
+    if (currentCluster.length === 0) {
+      currentCluster.push(ev);
+      clusterEnd = ev.end;
+    } else if (ev.start < clusterEnd) {
+      currentCluster.push(ev);
+      clusterEnd = Math.max(clusterEnd, ev.end);
+    } else {
+      clusters.push(currentCluster);
+      currentCluster = [ev];
+      clusterEnd = ev.end;
+    }
+  }
+  if (currentCluster.length > 0) {
+    clusters.push(currentCluster);
+  }
+
+  const positioned = [];
+  const startTimelineMin = startHour * 60;
+
+  for (const cluster of clusters) {
+    const columns = [];
+    const eventCols = [];
+
+    for (const ev of cluster) {
+      let placed = false;
+      for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+        if (columns[colIdx] <= ev.start) {
+          columns[colIdx] = ev.end;
+          eventCols.push({ ev, colIdx });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        columns.push(ev.end);
+        eventCols.push({ ev, colIdx: columns.length - 1 });
+      }
+    }
+
+    const totalCols = columns.length;
+    for (const { ev, colIdx } of eventCols) {
+      const top = Math.max(0, (ev.start - startTimelineMin) * pxPerMin);
+      const height = Math.max(26, (ev.end - ev.start) * pxPerMin - 2);
+
+      let leftStyle = "3px";
+      let widthStyle = "calc(100% - 6px)";
+
+      if (totalCols > 1) {
+        const colWidthPct = 100 / totalCols;
+        leftStyle = `calc(2px + ${colIdx * colWidthPct}%)`;
+        widthStyle = `calc(${colWidthPct}% - 4px)`;
+      }
+
+      positioned.push({
+        c: ev.classObj,
+        top,
+        height,
+        leftStyle,
+        widthStyle
+      });
+    }
+  }
+
+  return positioned;
+}
+
+function renderMatrixTableHTML(classes) {
+  const hasSunday = classes.some(c => c.dia_semana === "DOMINGO");
+  const hasSaturday = classes.some(c => c.dia_semana === "SABADO");
+
+  const activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
+  if (hasSaturday || hasSunday) activeDays.push("SABADO");
+  if (hasSunday) activeDays.push("DOMINGO");
+
+  const bounds = calcularLimitesTimeline(classes);
+  const { startHour, endHour, totalHours } = bounds;
+  const PX_PER_HOUR = 60;
+  const PX_PER_MIN = 1.0;
+  const totalHeight = totalHours * PX_PER_HOUR;
+
+  const classesByDay = {};
+  activeDays.forEach(d => {
+    classesByDay[d] = classes.filter(c => c.dia_semana === d);
+  });
+
+  const todayKey = getTodayDayKey();
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const isTimeInRange = currentMinutes >= startHour * 60 && currentMinutes <= endHour * 60;
+
+  const hoursList = [];
+  for (let h = startHour; h <= endHour; h++) {
+    hoursList.push(h);
+  }
+
+  // Encabezados de días
+  const headerDaysHtml = activeDays.map(d => {
+    const isToday = d === todayKey;
+    const count = classesByDay[d].length;
+    const countLabel = count === 1 ? "1 clase" : `${count} clases`;
+    return `
+      <div class="gcal-header-day ${isToday ? "is-today" : ""}" data-day="${d}">
+        <div class="gcal-day-title">${escapeHtml(d)}</div>
+        <div class="gcal-day-meta">
+          ${isToday ? `<span class="gcal-today-badge">Hoy</span>` : ""}
+          <span class="gcal-day-count">${countLabel}</span>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Ticks de la columna de tiempo (horas en punto en 12h)
+  const timeTicksHtml = hoursList.map(h => {
+    const topPx = (h - startHour) * PX_PER_HOUR;
+    const label = formatMinutes12(h * 60);
+    return `
+      <div class="gcal-time-tick" style="top:${topPx}px;">
+        <span class="gcal-time-tick-label">${label}</span>
+      </div>`;
+  }).join("");
+
+  // Columnas de días continuas
+  const dayColumnsHtml = activeDays.map(d => {
+    const isToday = d === todayKey;
+    const dayClasses = classesByDay[d];
+    const positionedCards = computeDayEventPositions(dayClasses, startHour, PX_PER_MIN);
+
+    let cardsHtml = "";
+    positionedCards.forEach(({ c, top, height, leftStyle, widthStyle }) => {
+      const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+      const textColor = getContrastTextColor(color);
+      const borderColor = darkenColor(color, 0.28);
+      const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
+
+      cardsHtml += `
+        <div class="matrix-cell-card gcal-event-card"
+             data-id="${c.id}"
+             style="top:${top}px; height:${height}px; left:${leftStyle}; width:${widthStyle}; background:${color}; color:${textColor}; border-color:${borderColor}; border-left-color:${borderColor};"
+             title="${escapeHtml(c.materia)} (${rangoHora12})${c.aula ? ' · ' + escapeHtml(c.aula) : ''}${c.profesor ? ' · ' + escapeHtml(c.profesor) : ''}">
+          <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
+          <div class="matrix-cell-card-time">${rangoHora12}</div>
+          ${c.aula ? `<div class="matrix-cell-card-aula" title="Aula: ${escapeHtml(c.aula)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${escapeHtml(c.aula)}</div>` : ""}
+          ${c.profesor ? `<div class="matrix-cell-card-prof" title="Profesor: ${escapeHtml(c.profesor)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtml(c.profesor)}</div>` : ""}
+        </div>`;
+    });
+
+    // Línea indicadora de hora actual si el día es hoy
+    let currentTimeLineHtml = "";
+    if (isToday && isTimeInRange) {
+      const curTop = Math.round((currentMinutes - startHour * 60) * PX_PER_MIN);
+      currentTimeLineHtml = `
+        <div class="gcal-current-time-line" style="top:${curTop}px;" title="Hora actual: ${formatMinutes12(currentMinutes)}">
+          <span class="gcal-current-time-dot"></span>
+        </div>`;
+    }
+
+    return `
+      <div class="gcal-day-column ${isToday ? "is-today" : ""}" data-day="${d}" style="height:${totalHeight}px;">
+        ${currentTimeLineHtml}
+        ${cardsHtml}
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="matrix-scroll-wrapper gcal-wrapper" id="gcal-scroll-wrapper">
+      <div class="gcal-content" style="--gcal-days:${activeDays.length};">
+        <!-- Fila de Encabezados (Sticky Top) -->
+        <div class="gcal-header-row">
+          <div class="gcal-corner-cell">HORA</div>
+          <div class="gcal-days-header-strip">
+            ${headerDaysHtml}
+          </div>
+        </div>
+
+        <!-- Cuerpo Continuo Tipo Google Calendar -->
+        <div class="gcal-body-row">
+          <div class="gcal-time-column" style="height:${totalHeight}px;">
+            ${timeTicksHtml}
+          </div>
+          <div class="gcal-days-canvas">
+            ${dayColumnsHtml}
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="form-hint" style="margin-top:10px;text-align:center">Toca cualquier clase para ver o editar sus detalles. Desliza horizontalmente para navegar entre días.</p>`;
+}
+
 function wireMatrixJumpBar(container) {
   const scrollWrapper = $(".matrix-scroll-wrapper", container);
   if (!scrollWrapper) return;
+
+  // Actualizar visibilidad de chips de fin de semana según los días visibles en el DOM
+  const hasSab = Boolean($('.gcal-day-column[data-day="SABADO"]', scrollWrapper));
+  const hasDom = Boolean($('.gcal-day-column[data-day="DOMINGO"]', scrollWrapper));
+  const chipSab = $('[data-jump="SABADO"]', $("#matrix-toolbar"));
+  const chipDom = $('[data-jump="DOMINGO"]', $("#matrix-toolbar"));
+  if (chipSab) chipSab.style.display = hasSab ? "" : "none";
+  if (chipDom) chipDom.style.display = hasDom ? "" : "none";
 
   const jumpChips = $$(".matrix-jump-chip", $("#matrix-toolbar"));
   jumpChips.forEach(chip => {
@@ -909,127 +1157,18 @@ function wireMatrixJumpBar(container) {
       if (target === "all") {
         scrollWrapper.scrollTo({ left: 0, behavior: "smooth" });
       } else {
-        const th = $(`th[data-day="${target}"]`, scrollWrapper);
-        if (th) {
-          const targetLeft = th.offsetLeft - 122;
-          scrollWrapper.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+        const targetCol = $(`.gcal-day-column[data-day="${target}"]`, scrollWrapper);
+        if (targetCol) {
+          const wrapperRect = scrollWrapper.getBoundingClientRect();
+          const colRect = targetCol.getBoundingClientRect();
+          const timeCol = $(".gcal-time-column", scrollWrapper);
+          const timeWidth = timeCol ? timeCol.offsetWidth : 72;
+          const scrollDelta = colRect.left - wrapperRect.left - timeWidth;
+          scrollWrapper.scrollBy({ left: scrollDelta, behavior: "smooth" });
         }
       }
     };
   });
-}
-
-function construirSlotsMatriz(classes) {
-  let minMinutes = 480;  // 08:00 AM
-  let maxMinutes = 1290; // 09:30 PM
-
-  classes.forEach(c => {
-    const s = timeToMinutes(c.hora_inicio);
-    const e = timeToMinutes(c.hora_fin);
-    if (s < minMinutes) minMinutes = Math.floor(s / 30) * 30;
-    if (e > maxMinutes) maxMinutes = Math.ceil(e / 30) * 30;
-  });
-
-  minMinutes = Math.max(360, minMinutes);  // no antes de 06:00 AM
-  maxMinutes = Math.min(1440, maxMinutes); // no después de 12:00 AM
-
-  const slots = [];
-  for (let m = minMinutes; m < maxMinutes; m += 30) {
-    const nextM = m + 30;
-    slots.push({
-      start: m,
-      end: nextM,
-      label: `${formatMinutes12(m)} – ${formatMinutes12(nextM)}`
-    });
-  }
-  return slots;
-}
-
-function renderMatrixCellHTML(c, span) {
-  const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
-  const textColor = getContrastTextColor(color);
-  const borderColor = darkenColor(color, 0.24);
-  const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
-
-  return `
-    <td rowspan="${span}" class="matrix-class-cell">
-      <div class="matrix-cell-card" data-id="${c.id}" style="background:${color}; color:${textColor}; border-color:${borderColor};" title="${escapeHtml(c.materia)} (${rangoHora12})">
-        <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
-        <div class="matrix-cell-card-time">${rangoHora12}</div>
-        ${c.aula ? `<div class="matrix-cell-card-aula">${escapeHtml(c.aula)}</div>` : ""}
-        ${c.profesor ? `<div class="matrix-cell-card-prof">${escapeHtml(c.profesor)}</div>` : ""}
-      </div>
-    </td>`;
-}
-
-function renderMatrixTableHTML(classes) {
-  const hasSunday = classes.some(c => c.dia_semana === "DOMINGO");
-  const hasSaturday = classes.some(c => c.dia_semana === "SABADO");
-
-  const activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
-  if (hasSaturday || hasSunday) activeDays.push("SABADO");
-  if (hasSunday) activeDays.push("DOMINGO");
-
-  const processedSlots = construirSlotsMatriz(classes);
-  const classesByDay = {};
-  const activeSpanUntil = {};
-  activeDays.forEach(d => {
-    classesByDay[d] = classes.filter(c => c.dia_semana === d);
-    activeSpanUntil[d] = -1;
-  });
-
-  const ths = activeDays.map(d => `<th data-day="${d}">${escapeHtml(d)}</th>`).join("");
-  let rowsHtml = "";
-
-  for (let r = 0; r < processedSlots.length; r++) {
-    const slot = processedSlots[r];
-    let cellsHtml = "";
-
-    activeDays.forEach(d => {
-      if (activeSpanUntil[d] > slot.start) return;
-
-      const c = classesByDay[d].find(x =>
-        timeToMinutes(x.hora_inicio) <= slot.start &&
-        timeToMinutes(x.hora_fin) > slot.start
-      );
-
-      if (c) {
-        const classEnd = timeToMinutes(c.hora_fin);
-        let span = 0;
-        for (let nextR = r; nextR < processedSlots.length; nextR++) {
-          if (processedSlots[nextR].start < classEnd) span++;
-          else break;
-        }
-        span = Math.max(1, span);
-        activeSpanUntil[d] = classEnd;
-        cellsHtml += renderMatrixCellHTML(c, span);
-      } else {
-        cellsHtml += `<td class="matrix-empty-cell"></td>`;
-      }
-    });
-
-    rowsHtml += `
-      <tr>
-        <td class="matrix-hour-col">${slot.label}</td>
-        ${cellsHtml}
-      </tr>`;
-  }
-
-  return `
-    <div class="matrix-scroll-wrapper">
-      <table class="matrix-grid-table">
-        <thead>
-          <tr>
-            <th class="matrix-hour-header">HORA</th>
-            ${ths}
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-        </tbody>
-      </table>
-    </div>
-    <p class="form-hint" style="margin-top:10px;text-align:center">Toca cualquier bloque para editar la clase. Desliza horizontalmente para navegar entre días.</p>`;
 }
 
 /* =====================================================================

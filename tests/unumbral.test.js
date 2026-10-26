@@ -114,3 +114,57 @@ test("sanitizarCursoImportado clamps out-of-range grades and sanitizes colors", 
   assert.equal(clean.evaluacion.practicas[0].nota, 18);
   assert.equal(clean.evaluacion.practicas[1].nota, null);
 });
+
+test("index.html defaults to light theme and correct theme-color", () => {
+  const { html } = loadAppContext();
+  assert.match(html, /<html\s+lang="es"\s+data-theme="light">/);
+  assert.match(html, /<meta\s+name="theme-color"\s+content="#F4F6EE">/);
+});
+
+test("calcularLimitesTimeline adapts bounds to real class hours", () => {
+  const { sandbox } = loadAppContext();
+  const classes = [
+    { hora_inicio: "08:00 AM", hora_fin: "10:30 AM" },
+    { hora_inicio: "02:50 PM", hora_fin: "04:30 PM" },
+    { hora_inicio: "05:20 PM", hora_fin: "07:00 PM" },
+    { hora_inicio: "07:30 PM", hora_fin: "09:10 PM" }
+  ];
+  const bounds = sandbox.calcularLimitesTimeline(classes);
+  assert.equal(bounds.startHour, 8);
+  assert.equal(bounds.endHour, 22);
+  assert.equal(bounds.totalHours, 14);
+
+  const afternoonClasses = [
+    { hora_inicio: "14:00", hora_fin: "18:00" },
+    { hora_inicio: "18:30", hora_fin: "20:00" }
+  ];
+  const boundsAfternoon = sandbox.calcularLimitesTimeline(afternoonClasses);
+  assert.equal(boundsAfternoon.startHour, 14);
+  assert.equal(boundsAfternoon.endHour, 20);
+});
+
+test("computeDayEventPositions places irregular hours and handles parallel overlaps", () => {
+  const { sandbox } = loadAppContext();
+  const dayClasses = [
+    { id: "c1", materia: "Matemática", hora_inicio: "02:50 PM", hora_fin: "04:30 PM" }
+  ];
+  const startHour = 8;
+  const positions = sandbox.computeDayEventPositions(dayClasses, startHour, 1.0);
+  assert.equal(positions.length, 1);
+  assert.equal(positions[0].top, 410); // 14:50 (890 min) - 08:00 (480 min) = 410px
+  assert.equal(positions[0].height, 98); // 100 min duration - 2px gap = 98px
+  assert.equal(positions[0].leftStyle, "3px");
+  assert.equal(positions[0].widthStyle, "calc(100% - 6px)");
+
+  // Solapamiento: 2 clases a la misma hora
+  const overlappingClasses = [
+    { id: "o1", materia: "Teoría", hora_inicio: "10:00 AM", hora_fin: "12:00 PM" },
+    { id: "o2", materia: "Laboratorio", hora_inicio: "11:00 AM", hora_fin: "01:00 PM" }
+  ];
+  const overlapPositions = sandbox.computeDayEventPositions(overlappingClasses, startHour, 1.0);
+  assert.equal(overlapPositions.length, 2);
+  assert.equal(overlapPositions[0].widthStyle, "calc(50% - 4px)");
+  assert.equal(overlapPositions[1].widthStyle, "calc(50% - 4px)");
+  assert.equal(overlapPositions[0].leftStyle, "calc(2px + 0%)");
+  assert.equal(overlapPositions[1].leftStyle, "calc(2px + 50%)");
+});
