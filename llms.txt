@@ -1,7 +1,7 @@
 # UNUmbral
 
-> Aplicación web progresiva (PWA) 100% offline para estudiantes universitarios: horario semanal con bloques reales en formato de 12 horas AM/PM, catálogo de cursos en colores pasteles, calculadora de notas en escala vigesimal (0 a 20, aprueba con 10.5) y gestor de tareas priorizadas (1 a 5).
+> Aplicación web progresiva (PWA) y APK Android 100% offline para estudiantes universitarios: horario semanal adaptativo en formato 12 horas AM/PM, catálogo de cursos en colores pasteles, cálculo de notas vigesimales (0 a 20, aprueba con 10.5), gráficos SVG de rendimiento, simulador de metas, control de asistencia y ciclo académico, detección de huecos libres con sugerencias de tareas, alertas locales programadas y compartición de horarios por código QR offline.
 
 ## Recursos Principales
 - [Aplicación Web (PWA)](https://teverde29.github.io/unumbral/): Interfaz principal de UNUmbral.
-- [Repositorio y Documentación](https://github.com/TeVerde29/unumbral): Código fuente e instrucciones técnicas.
+- [Repositorio y Documentación](https://github.com/TeVerde29/unumbral): Código fuente, especificación de arquitectura y suite de 43 pruebas unitarias.

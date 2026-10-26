@@ -45,13 +45,16 @@ El diseño visual aplica el sistema **Design Ricra** ("Tea Green") en combinaci�
 
 ## Características Principales
 
-- **Catálogo de Cursos desacoplado del Horario:** Registra cada curso una sola vez (nombre, profesor, aula habitual, color pastel y enlaces). Al agregar una clase al horario, solo eliges el curso del desplegable, el día y la hora.
-- **Calculadora y Simulador de Notas (Escala 0 a 20):** Calcula el promedio final mediante `(Examen Parcial + Examen Final + Promedio de Prácticas) ÷ 3` con nota mínima aprobatoria de `10.5`, indicando en tiempo real cuánto necesitas en las evaluaciones restantes para aprobar.
+- **Catálogo de Cursos desacoplado del Horario:** Registra cada curso una sola vez (nombre, créditos, profesor, aula habitual, color pastel y enlaces). Al agregar una clase al horario, solo eliges el curso del desplegable, el día y la hora.
+- **Calculadora, Gráficos SVG y Simulador de Metas (Escala 0 a 20):** Calcula el promedio final mediante `(Examen Parcial + Examen Final + Promedio de Prácticas) ÷ 3` con nota mínima aprobatoria de `10.5`, promedio ponderado por créditos, gráficas nativas SVG comparativas y simulador de nota meta requerida.
 - **Formato de 12 horas (`AM / PM`) y Paleta Pastel:** Todas las vistas, tarjetas y la parrilla semanal muestran horarios en formato `08:00 AM – 01:00 PM` sobre una paleta de 10 colores pasteles legibles en tema claro y oscuro.
-- **Dashboard en tiempo real ("Hoy"):** Identifica automáticamente si hay una materia en curso (mostrando aula, profesor, minutos restantes y barra de progreso) o calcula la cuenta regresiva hacia la siguiente clase.
-- **Parrilla semanal académica con duración real (`rowspan`):** Cada curso ocupa un bloque continuo proporcional a su duración en intervalos de 30 minutos, con cabecera y columna de horas fijas (`sticky`) y navegación rápida por día.
-- **Detección estricta de cruces horarios:** Impide guardar sesiones que se solapen en el mismo día, informando el curso y rango horario en conflicto.
-- **Radar de tareas y escala de criticidad (1 a 5):** Clasificación de entregas desde Nivel 1 (Rutina) hasta Nivel 5 (Crítica / Examen), con filtros por estado, asignatura y búsqueda instantánea.
+- **Dashboard en tiempo real ("Hoy"):** Identifica materias en curso, cuenta regresiva, estado de asistencia rápida (`Asistí`, `Falté`, `Justif.`, `Cancelar sesión`) y detección de feriados.
+- **Huecos Libres y Sugerencia de Tareas:** Detecta automáticamente los bloques libres entre clases (≥ 30 min) y sugiere tareas pendientes que caben en ese tiempo con botón para completarlas directamente.
+- **Notificaciones Locales Programadas (Android Offline):** Alertas de clase (30 y 10 min antes), tareas por niveles de criticidad (1 a 5, con alarmas insistentes para exámenes), resumen matutino diario y respeto de horas de silencio, todo funcionando con la app cerrada y sin conexión.
+- **Calendario Mensual y Prioridad ("Esta semana"):** Vista mensual con marcas visuales de entregas por fecha y filtro agrupado por urgencia + importancia.
+- **Control de Asistencia y Ciclo:** Proyección exacta de sesiones del semestre, deducción de feriados y cancelaciones, y alertas automáticas al cruzar el 10 %, 20 % y 30 % de inasistencias.
+- **Compartir Horario por Código QR Offline:** Comparte e importa horarios directamente de pantalla a cámara sin requerir internet, bluetooth ni NFC (con soporte multiparte).
+- **Accesos Rápidos Nativos (Android Shortcuts):** Mantén presionado el icono de la app en Android para crear rápidamente una nueva tarea o saltar al horario de hoy.
 - **Exportación de horario vs. Backup completo:** Comparte el horario con compañeros (`UNUmbral_Horario_YYYY-MM-DD.json`) sin incluir tus notas ni tareas personales, o genera un respaldo integral (`UNUmbral_Backup_YYYY-MM-DD.json`) para restaurar todos tus datos en otro dispositivo.
 
 ---
@@ -72,8 +75,8 @@ El diseño visual aplica el sistema **Design Ricra** ("Tea Green") en combinaci�
 
 ```text
 unumbral/
-├── app.js               # Lógica del cliente, motor de notas 0–20, vistas, modales y Dexie
-├── estilos.css          # Tokens Design Ricra (Tea Green), temas claro/oscuro y parrilla semanal
+├── app.js               # Lógica del cliente, vistas, modales, deep links y Dexie
+├── estilos.css          # Tokens Design Ricra (Tea Green), temas claro/oscuro y componentes
 ├── icon.svg             # Isotipo vectorial para favicon y PWA
 ├── icon-192.png         # Icono PWA 192×192
 ├── icon-512.png         # Icono PWA 512×512
@@ -82,31 +85,49 @@ unumbral/
 ├── manifest.json        # Manifiesto PWA para instalación standalone
 ├── robots.txt           # Reglas de rastreo y enlace a sitemap
 ├── sitemap.xml          # Mapa XML del sitio
-├── sw.js                # Service Worker offline (unumbral-ricra-v5)
+├── sw.js                # Service Worker offline (unumbral-ricra-v12)
+├── android/             # Proyecto nativo Capacitor para compilar el APK de Android
 ├── lib/
-│   └── dexie.min.js     # Motor IndexedDB Dexie.js v4.4.4 empaquetado localmente
-└── tests/
-    └── unumbral.test.js # Suite de pruebas unitarias (node --test)
+│   ├── dexie.min.js     # Motor IndexedDB Dexie.js v4.4.4
+│   ├── plataforma.js    # Detección de entorno (Web vs Android Capacitor)
+│   ├── ajustes.js       # Sanitización y valores por defecto de configuración
+│   ├── planificador.js  # Motor puro de cálculo y programación de notificaciones
+│   ├── notificaciones.js# Integración con Capacitor LocalNotifications
+│   ├── asistencia.js    # Proyección de sesiones, feriados y umbrales de faltas
+│   ├── prioridad.js     # Matriz mensual y clasificación de urgencia e importancia
+│   ├── rendimiento.js   # Promedio ponderado, simulador y gráficos SVG
+│   ├── huecos.js        # Detección de bloques libres entre clases y sugerencias
+│   ├── qrcode.min.js    # Generador offline de códigos QR
+│   ├── qr.js            # Compresión y ensamble multiparte de horarios para QR
+│   └── deeplink.js      # Enrutamiento de accesos directos y deep links
+└── tests/               # Suite de 43 pruebas unitarias puras (node --test)
 ```
 
 ---
 
 ## Modelo de Datos
 
-La base de datos IndexedDB (`UmbralDB` versión 3) separa los cursos del horario y las tareas:
+La base de datos IndexedDB (`UmbralDB` versión 4) almacena toda la información del estudiante:
 
 ```javascript
-db.version(3).stores({
+db.version(4).stores({
   cursos: "id, nombre",
   clases: "id, curso_id, dia_semana",
   tareas: "id, curso_id, fecha_limite, importancia, completada, fecha_creacion",
+  eventos: "id, curso_id, fecha, tipo",
+  asistencia: "id, curso_id, fecha, estado",
+  excepciones: "id, tipo, fecha, curso_id, clase_id",
   ajustes: "clave"
 });
 ```
 
-- **`cursos`**: `{ id, nombre, profesor, aula, color, notas, evaluacion: { parcial, final, practicas: [{ id, titulo, nota }] } }`
-- **`clases`**: `{ id, curso_id, dia_semana, hora_inicio, hora_fin, aula }` (donde `aula` solo se define si esa sesión cambia respecto al aula habitual del curso).
-- **`tareas`**: `{ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas }`
+- **`cursos`**: `{ id, nombre, creditos, profesor, aula, color, notas, evaluacion: { parcial, final, practicas: [{ id, titulo, nota }] } }`
+- **`clases`**: `{ id, curso_id, dia_semana, hora_inicio, hora_fin, aula }`
+- **`tareas`**: `{ id, titulo, curso_id, fecha_limite, importancia, estimado_min, completada, fecha_creacion, notas }`
+- **`eventos`**: `{ id, titulo, tipo, curso_id, fecha, hora, aula, notas }` (exámenes, entregas especiales)
+- **`asistencia`**: `{ id, curso_id, clase_id, fecha, estado }` (`asistio`, `falto`, `justificada`)
+- **`excepciones`**: `{ id, tipo, fecha, curso_id, clase_id, motivo }` (`feriado`, `cancelada`)
+- **`ajustes`**: `{ clave, valor }` (fechas del ciclo, límites de faltas, horas de silencio, etc.)
 
 ---
 
@@ -196,11 +217,23 @@ UNUmbral cuenta con soporte nativo para Android mediante **Capacitor**, lo que p
 
 ## Pruebas Automatizadas
 
-Ejecuta la suite de pruebas unitarias con Node.js (sin dependencias externas):
+UNUmbral cuenta con una suite completa de 43 pruebas unitarias puras (sin DOM, sin Dexie, sin mocks externos) que verifican la lógica de negocio:
 
 ```bash
-node --test tests/unumbral.test.js
+npm test
+# o directamente con Node:
+node --test tests/*.test.js
 ```
+
+La suite cubre:
+- **`tests/unumbral.test.js`**: Cálculo vigesimal 0–20, límites del timeline adaptativo, colocación y solapamiento de eventos, consistencia de IDs DOM entre JS y HTML.
+- **`tests/asistencia.test.js`**: Proyección del ciclo académico, cálculo de faltas y disparadores en 10 %, 20 % y 30 %.
+- **`tests/prioridad.test.js`**: Fórmula de urgencia + importancia, matriz mensual y agrupación semanal.
+- **`tests/planificador.js`**: Ventana móvil de 14 días, canales de notificación, tareas nivel 5 insistentes y respeto de horas de silencio.
+- **`tests/rendimiento.test.js`**: Promedio ponderado por créditos, simulador de notas y generadores de gráficos SVG.
+- **`tests/huecos.test.js`**: Detección de huecos libres y algoritmo de sugerencia de tareas por duración y prioridad.
+- **`tests/qr.test.js`**: Codificación Base64URL, compresión v2, roundtrip exacto y ensamble multiparte.
+- **`tests/deeplink.test.js`**: Parseo y enrutamiento de accesos directos de Android y URLs de esquema `unumbral://`.
 
 ---
 
