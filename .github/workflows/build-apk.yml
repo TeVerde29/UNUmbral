@@ -37,9 +37,11 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Aceptar licencias de Android SDK
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Dar permisos de ejecución a gradlew
         run: chmod +x android/gradlew
