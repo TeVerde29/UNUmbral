@@ -117,6 +117,20 @@
         <!-- Renderizado dinámico -->
       </div>
 
+      <!-- Huecos Libres de Hoy y Sugerencias de Tareas (Fase 6) -->
+      <div id="section-huecos-libres" class="hidden" style="margin-top: 20px;">
+        <div class="section-header">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <h2 class="section-title">Huecos Libres de Hoy</h2>
+            <span class="section-badge" id="badge-huecos-hoy">0 huecos</span>
+          </div>
+          <span style="font-size:11px;color:var(--text-secondary);">Aprovecha tus tiempos libres</span>
+        </div>
+        <div id="today-huecos-list" class="cards-list" style="gap:10px;">
+          <!-- Renderizado dinámico de huecos y sugerencias -->
+        </div>
+      </div>
+
       <!-- Radar de Tareas Pendientes Urgentes -->
       <div class="section-header" style="margin-top: 24px;">
         <div>
@@ -891,6 +905,23 @@
       </div>
 
       <div class="form-group">
+
+        <label class="form-label" for="task-estimado">Tiempo Estimado (opcional para sugerencias en huecos)</label>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <input type="number" id="task-estimado" class="field" min="5" max="480" step="5" placeholder="45" style="width:100px;">
+          <span style="font-size:12px; color:var(--text-secondary);">minutos</span>
+        </div>
+        <div class="filter-chips-scroll" id="task-estimado-chips" style="gap:4px;">
+          <button type="button" class="filter-chip" data-min="15">15 min</button>
+          <button type="button" class="filter-chip" data-min="30">30 min</button>
+          <button type="button" class="filter-chip" data-min="45">45 min</button>
+          <button type="button" class="filter-chip" data-min="60">1 h</button>
+          <button type="button" class="filter-chip" data-min="90">1.5 h</button>
+          <button type="button" class="filter-chip" data-min="120">2 h</button>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="task-descripcion">Instrucciones o Apuntes</label>
         <textarea id="task-descripcion" class="field" rows="3" placeholder="Pautas de entrega, integrantes de equipo, enlaces…" enterkeyhint="done"></textarea>
       </div>
@@ -1195,6 +1226,7 @@
 <script src="lib/asistencia.js"></script>
 <script src="lib/prioridad.js"></script>
 <script src="lib/rendimiento.js"></script>
+<script src="lib/huecos.js"></script>
 <script src="app.js"></script>
 
 </body>

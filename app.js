@@ -740,6 +740,78 @@ async function renderHoy() {
   const pendingTasks = allTasks.filter(t => !t.completada);
   actualizarBadgeTareas(pendingTasks.length);
 
+  // Detección de huecos libres de hoy y sugerencias de tareas (Fase 6)
+  const secHuecos = $("#section-huecos-libres");
+  const listHuecos = $("#today-huecos-list");
+  const badgeHuecos = $("#badge-huecos-hoy");
+
+  if (secHuecos && listHuecos && typeof huecosDelDia === "function") {
+    const huecos = huecosDelDia(classesToday, {
+      fecha: fechaHoyStr,
+      excepciones,
+      minMinutos: 30
+    });
+
+    if (huecos.length > 0) {
+      if (badgeHuecos) {
+        badgeHuecos.textContent = `${huecos.length} ${huecos.length === 1 ? "hueco" : "huecos"}`;
+      }
+
+      listHuecos.innerHTML = huecos.map(h => {
+        const tareasSug = typeof sugerirTareas === "function" ? sugerirTareas(h, pendingTasks) : [];
+        const rangoTexto = `${formatTime12(h.inicio)} – ${formatTime12(h.fin)}`;
+        const durTexto = typeof formatearDuracion === "function" ? formatearDuracion(h.duracionMinutos) : `${h.duracionMinutos} min`;
+
+        const sugerenciasHtml = tareasSug.length > 0
+          ? `<div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+              ${tareasSug.map(t => `
+                <div style="background:var(--surface-hover); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                  <div style="min-width:0; flex:1;">
+                    <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.titulo)}</div>
+                    <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                      ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:600;">${escapeHtml(t.materia)}</span> · ` : ""}
+                      <span>⏱️ ${t._estimadoMinutos || 45} min</span>
+                      <span>· ⭐ Nivel ${t.importancia || 1}</span>
+                    </div>
+                  </div>
+                  <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 8px; flex-shrink:0;">
+                    ✓ Lista
+                  </button>
+                </div>
+              `).join("")}
+            </div>`
+          : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">Sin tareas pendientes que quepan en este tiempo. ¡Aprovecha para descansar!</p>`;
+
+        return `
+          <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${rangoTexto}</span>
+                <span style="margin-left:6px; font-size:11px; background:rgba(35,120,70,0.12); color:var(--deep-leaf); padding:2px 7px; border-radius:var(--radius-pill); font-weight:700;">${durTexto} libres</span>
+              </div>
+            </div>
+            ${sugerenciasHtml}
+          </div>`;
+      }).join("");
+
+      $$('[data-action="completar-tarea-hueco"]', listHuecos).forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const tid = btn.dataset.taskId;
+          if (!tid) return;
+          await db.tareas.update(tid, { completada: true });
+          showToast("¡Tarea completada!");
+          if (typeof reprogramarTodo === "function") reprogramarTodo();
+          renderHoy();
+        });
+      });
+
+      secHuecos.classList.remove("hidden");
+    } else {
+      secHuecos.classList.add("hidden");
+    }
+  }
+
   const nowMs = Date.now();
   const urgentTasks = pendingTasks.filter(t => {
     if (t.importancia >= 4) return true;
@@ -2605,6 +2677,9 @@ function openNewTaskModal(defaultCursoId) {
   setImportanceStars(3);
 
   $("#task-descripcion").value = "";
+  const taskEstEl = $("#task-estimado");
+  if (taskEstEl) taskEstEl.value = "";
+  $$("#task-estimado-chips .filter-chip").forEach(c => c.classList.remove("active"));
   $("#task-completada").checked = false;
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.add("hidden");
@@ -2625,6 +2700,11 @@ async function openEditTaskModal(id) {
   $("#task-importancia").value = t.importancia || 3;
   setImportanceStars(t.importancia || 3);
   $("#task-descripcion").value = t.notas || "";
+  const taskEstEl = $("#task-estimado");
+  if (taskEstEl) taskEstEl.value = t.estimado_min || "";
+  $$("#task-estimado-chips .filter-chip").forEach(c => {
+    c.classList.toggle("active", Number(c.dataset.min) === Number(t.estimado_min));
+  });
   $("#task-completada").checked = !!t.completada;
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.remove("hidden");
@@ -3328,6 +3408,9 @@ async function guardarTarea(e) {
   const curso_id = $("#task-curso").value || "";
   const fecha_limite = $("#task-fecha").value;
   const importancia = parseInt($("#task-importancia").value) || 3;
+  const taskEstEl = $("#task-estimado");
+  const estVal = taskEstEl ? parseInt(taskEstEl.value, 10) : NaN;
+  const estimado_min = !isNaN(estVal) && estVal > 0 ? Math.min(480, estVal) : null;
   const notas = $("#task-descripcion").value.trim();
   const completada = $("#task-completada").checked;
   const errorEl = $("#task-form-error");
@@ -3342,7 +3425,7 @@ async function guardarTarea(e) {
 
   const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
 
-  await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, completada, fecha_creacion, notas });
+  await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, estimado_min, completada, fecha_creacion, notas });
   closeTaskModal();
   showToast("Tarea guardada.");
   if (typeof reprogramarTodo === "function") reprogramarTodo();
@@ -3598,6 +3681,14 @@ function wireGlobalEvents() {
   // Eventos del modal de Tarea
   $$(".imp-star-btn", $("#task-importance-selector")).forEach(btn => {
     btn.addEventListener("click", () => setImportanceStars(parseInt(btn.dataset.val)));
+  });
+  $$("#task-estimado-chips .filter-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const input = $("#task-estimado");
+      if (input) input.value = chip.dataset.min;
+      $$("#task-estimado-chips .filter-chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+    });
   });
   $("#modal-task-close").addEventListener("click", closeTaskModal);
   $("#btn-cancel-task").addEventListener("click", closeTaskModal);
