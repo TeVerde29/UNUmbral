@@ -9,6 +9,7 @@
    1. CONSTANTES, ENUMS Y DÍAS
    ===================================================================== */
 const DIAS = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+const DIAS_SEMANA = DIAS;
 
 const DIAS_LABEL = {
   LUNES: "Lunes", MARTES: "Martes", MIERCOLES: "Miércoles",
@@ -109,6 +110,10 @@ function sanitizarCursoImportado(c) {
   const creditos = typeof c.creditos === "number" && c.creditos > 0 ? Math.min(10, Math.max(1, Math.round(c.creditos))) : 3;
   return {
     id: String(c.id || uuid()),
+    ciclo_curso: String(c.ciclo_curso || "").trim(),
+    tipo_condicion: c.tipo_condicion === "electivo" ? "electivo" : "obligatorio",
+    codigo_asignatura: String(c.codigo_asignatura || "").trim(),
+    grupo_seccion: String(c.grupo_seccion || "").trim(),
     nombre,
     profesor: String(c.profesor || "").trim(),
     aula: String(c.aula || "").trim(),
@@ -213,6 +218,51 @@ db.version(4).stores({
     }
   } catch (err) {
     console.warn("Aviso en upgrade v4:", err);
+  }
+});
+
+/* Versión 5: Ciclo académico (17 semanas, semana 8 exámenes parciales) y actividades no académicas en horario */
+db.version(5).stores({
+  ciclos:      "id, nombre, fecha_inicio, fecha_fin, estado",
+  cursos:      "id, nombre, ciclo_id",
+  clases:      "id, curso_id, dia_semana, ciclo_id, tipo",
+  tareas:      "id, curso_id, fecha_limite, importancia, completada, fecha_creacion, ciclo_id",
+  eventos:     "id, curso_id, fecha, tipo, ciclo_id",
+  asistencia:  "id, curso_id, clase_id, fecha, estado, &[clase_id+fecha]",
+  excepciones: "id, fecha, tipo, clase_id",
+  ajustes:     "clave"
+}).upgrade(async (tx) => {
+  try {
+    const numCiclos = await tx.table("ciclos").count();
+    if (numCiclos === 0) {
+      const ajustes = await tx.table("ajustes").toArray();
+      const map = {};
+      for (const a of ajustes) map[a.clave] = a.valor;
+      let inicio = map.ciclo_inicio;
+      if (!inicio) {
+        inicio = "2026-03-16";
+      }
+      const fin = typeof calcularFinCiclo17Semanas === "function"
+        ? calcularFinCiclo17Semanas(inicio)
+        : (map.ciclo_fin || "2026-07-12");
+      const cicloInicial = {
+        id: "ciclo-inicial",
+        nombre: "Ciclo 2026-I",
+        fecha_inicio: inicio,
+        fecha_fin: fin,
+        estado: "activo",
+        fecha_creacion: new Date().toISOString()
+      };
+      await tx.table("ciclos").add(cicloInicial);
+      await tx.table("cursos").toCollection().modify(c => {
+        if (!c.ciclo_id) c.ciclo_id = cicloInicial.id;
+      });
+      await tx.table("clases").toCollection().modify(cl => {
+        if (!cl.ciclo_id) cl.ciclo_id = cicloInicial.id;
+      });
+    }
+  } catch (e) {
+    console.warn("Aviso en upgrade v5:", e);
   }
 });
 
@@ -350,11 +400,32 @@ async function cargarCursos() {
   return { list, map };
 }
 
-/** Une una sesión del horario con los datos de su curso para poder renderizarla. */
+const CATEGORIAS_ACTIVIDAD = {
+  practicas: "Prácticas Pre-Profesionales",
+  trabajo: "Trabajo / Empleo",
+  estudio: "Estudio / Asesoría",
+  taller: "Taller / Salud / Deporte",
+  otro: "Actividad General"
+};
+
+/** Une una sesión del horario con los datos de su curso o actividad para poder renderizarla. */
 function enriquecerClase(clase, cursosMap) {
+  if (clase.tipo === "actividad") {
+    return {
+      ...clase,
+      esActividad: true,
+      creditos: 0,
+      materia: clase.titulo || "Actividad",
+      color: normalizarColorPastel(clase.color || "#BAE6FD"),
+      profesor: "",
+      aula: clase.categoria ? (CATEGORIAS_ACTIVIDAD[clase.categoria] || clase.categoria) : (clase.aula || "Actividad")
+    };
+  }
   const curso = cursosMap[clase.curso_id];
   return {
     ...clase,
+    esActividad: false,
+    creditos: (curso && typeof curso.creditos === "number") ? curso.creditos : 3,
     materia: curso ? curso.nombre : "Curso eliminado",
     color: normalizarColorPastel((curso && curso.color) || "#DDE8C8"),
     profesor: (curso && curso.profesor) || "",
@@ -847,7 +918,13 @@ async function renderHoy() {
       }
 
       listHuecos.innerHTML = huecos.map(h => {
-        const tareasSug = typeof sugerirTareas === "function" ? sugerirTareas(h, pendingTasks) : [];
+        let tareasSug = typeof sugerirTareas === "function" ? sugerirTareas(h, pendingTasks) : [];
+        if (tareasSug.length === 0 && pendingTasks.length > 0) {
+          // Siempre sugerir tareas universitarias pendientes si hay un hueco libre
+          tareasSug = [...pendingTasks]
+            .sort((a, b) => (b.importancia || 1) - (a.importancia || 1))
+            .slice(0, 3);
+        }
         const rangoTexto = `${formatTime12(h.inicio)} – ${formatTime12(h.fin)}`;
         const durTexto = typeof formatearDuracion === "function" ? formatearDuracion(h.duracionMinutos) : `${h.duracionMinutos} min`;
 
@@ -859,8 +936,8 @@ async function renderHoy() {
                     <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.titulo)}</div>
                     <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
                       ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:600;">${escapeHtml(t.materia)}</span> · ` : ""}
-                      <span>${ICONS.clock} ${t._estimadoMinutos || 45} min</span>
-                      <span>· Nivel ${t.importancia || 1}</span>
+                      <span>${ICONS.star} Nivel ${t.importancia || 1}</span>
+                      ${t.fecha_limite ? `<span>· Vence: ${escapeHtml(t.fecha_limite.replace('T', ' '))}</span>` : ""}
                     </div>
                   </div>
                   <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 8px; flex-shrink:0;">
@@ -869,7 +946,7 @@ async function renderHoy() {
                 </div>
               `).join("")}
             </div>`
-          : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">Sin tareas pendientes que quepan en este tiempo. ¡Aprovecha para descansar!</p>`;
+          : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">No tienes tareas universitarias pendientes. ¡Aprovecha para descansar!</p>`;
 
         return `
           <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px;">
@@ -932,6 +1009,18 @@ async function renderHoy() {
   }
 }
 
+function formatearTiempoRestanteHMS(diffSeconds) {
+  if (diffSeconds <= 0) return "0 s";
+  const h = Math.floor(diffSeconds / 3600);
+  const m = Math.floor((diffSeconds % 3600) / 60);
+  const sec = diffSeconds % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h} h`);
+  if (m > 0 || h > 0) parts.push(`${m} min`);
+  parts.push(`${sec} s`);
+  return parts.join(" ");
+}
+
 function renderLiveStatusCard(classesToday) {
   const container = $("#live-status-card");
   const now = new Date();
@@ -958,29 +1047,63 @@ function renderLiveStatusCard(classesToday) {
     return currentMin >= s && currentMin < e;
   });
 
+  if (state.liveCountdownInterval) {
+    clearInterval(state.liveCountdownInterval);
+    state.liveCountdownInterval = null;
+  }
+
   if (currentClass) {
-    const s = timeToMinutes(currentClass.hora_inicio);
-    const e = timeToMinutes(currentClass.hora_fin);
-    const total = e - s;
-    const elapsed = currentMin - s;
-    const remaining = e - currentMin;
-    const pct = Math.min(100, Math.round((elapsed / total) * 100));
+    const sSec = timeToMinutes(currentClass.hora_inicio) * 60;
+    const eSec = timeToMinutes(currentClass.hora_fin) * 60;
+    const curNow = new Date();
+    const curSec = curNow.getHours() * 3600 + curNow.getMinutes() * 60 + curNow.getSeconds();
+    const totalSec = Math.max(1, eSec - sSec);
+    const elapsedSec = Math.max(0, curSec - sSec);
+    const diffSec = Math.max(0, eSec - curSec);
+    const pct = Math.min(100, Math.round((elapsedSec / totalSec) * 100));
 
     container.className = "live-card in-class";
     container.innerHTML = `
       <div class="live-card-eyebrow">
         <span class="live-dot pulse"></span>
-        <span style="color:var(--status-success)">En Curso · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}</span>
+        <span class="live-badge-in-class">EN CURSO · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}</span>
       </div>
       <div class="live-card-title">${escapeHtml(currentClass.materia)}</div>
       <div class="live-card-meta">
         <span class="live-meta-item">${ICONS.location} ${escapeHtml(currentClass.aula || "Sin aula")}</span>
         <span class="live-meta-item">${ICONS.person} ${escapeHtml(currentClass.profesor || "Profesor(a)")}</span>
-        <span class="live-meta-item" style="color:var(--deep-leaf);font-weight:600">${ICONS.clock} Restan ${remaining} min</span>
+        <span class="live-meta-item live-timer-in-class" id="live-remaining-timer">${ICONS.clock} Restan ${formatearTiempoRestanteHMS(diffSec)}</span>
       </div>
       <div class="live-progress-bar">
         <div class="live-progress-fill" style="width: ${pct}%"></div>
       </div>`;
+
+    state.liveCountdownInterval = setInterval(() => {
+      if (state.currentTab !== "view-hoy") {
+        clearInterval(state.liveCountdownInterval);
+        state.liveCountdownInterval = null;
+        return;
+      }
+      const tickNow = new Date();
+      const tickSec = tickNow.getHours() * 3600 + tickNow.getMinutes() * 60 + tickNow.getSeconds();
+      if (tickSec >= eSec) {
+        clearInterval(state.liveCountdownInterval);
+        state.liveCountdownInterval = null;
+        renderHoy();
+        return;
+      }
+      const tickRemSec = Math.max(0, eSec - tickSec);
+      const tickElapsedSec = Math.max(0, tickSec - sSec);
+      const tickPct = Math.min(100, Math.round((tickElapsedSec / totalSec) * 100));
+      const timerEl = document.getElementById("live-remaining-timer");
+      if (timerEl) {
+        timerEl.innerHTML = `${ICONS.clock} Restan ${formatearTiempoRestanteHMS(tickRemSec)}`;
+      }
+      const fillEl = document.querySelector(".live-card.in-class .live-progress-fill");
+      if (fillEl) {
+        fillEl.style.width = `${tickPct}%`;
+      }
+    }, 1000);
     return;
   }
 
@@ -1035,7 +1158,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
       const asistPrev = asistencias.find(a => a.curso_id === cursoId && a.fecha === fechaHoyStr);
 
       if (asistPrev && asistPrev.estado === nuevoEstado) {
-        await db.asistencia.where({ curso_id: cursoId, fecha: fechaHoyStr }).delete();
+        await db.asistencia.delete(asistPrev.id || `${cursoId}_${fechaHoyStr}`);
         showToast("Registro de asistencia retirado.");
       } else {
         if (nuevoEstado === "falta") {
@@ -1045,13 +1168,16 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
           const mapAjustes = {};
           for (const a of ajustes) mapAjustes[a.clave] = a.valor;
           const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+          const cicloActivo = await obtenerCicloActivo();
+          const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-01-01";
+          const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-12-31";
 
           const resPrev = (typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia)({
             cursoId,
             clasesDelCurso,
             asistencias: asistCurso,
-            cicloInicio: cfg.ciclo_inicio || "2026-01-01",
-            cicloFin: cfg.ciclo_fin || "2026-12-31",
+            cicloInicio: fechaIni,
+            cicloFin: fechaFin,
             excepciones,
             limiteFaltasPct: cfg.limite_faltas_pct || 30
           });
@@ -1093,6 +1219,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
 
       if (typeof reprogramarTodo === "function") reprogramarTodo();
       renderHoy();
+      if ($("#view-cursos") && $("#view-cursos").classList.contains("active")) renderCursos();
     });
   });
 
@@ -1141,6 +1268,7 @@ function renderClassCardHTML(c, opts = {}) {
   const isHoy = Boolean(opts.isHoy);
   const motivoCancelada = opts.motivoCancelada;
   const est = opts.estadoAsistencia;
+  const esAct = Boolean(c.esActividad);
 
   return `
     <div class="class-card ${cancelada ? "is-cancelled" : ""}" data-id="${c.id}" data-curso-id="${c.curso_id || ""}">
@@ -1149,13 +1277,15 @@ function renderClassCardHTML(c, opts = {}) {
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
           <div class="class-card-title">${escapeHtml(c.materia)}</div>
           ${cancelada ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:var(--radius-pill);background:rgba(210,50,50,0.15);color:var(--status-danger);font-weight:600;">${escapeHtml(motivoCancelada || "Cancelada")}</span>` : ""}
+          ${esAct ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:var(--radius-pill);background:var(--surface-subtle);color:var(--text-secondary);font-weight:600;">Actividad</span>` : ""}
         </div>
         <div class="class-card-details">
           <span class="class-time-tag">${ICONS.clock} ${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
           ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
           ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
+          ${!esAct && c.creditos ? `<span class="class-detail-tag">${c.creditos} Créditos</span>` : ""}
         </div>
-        ${isHoy ? (
+        ${isHoy && !esAct ? (
           !cancelada ? `
             <div class="class-card-attendance" onclick="event.stopPropagation();">
               <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
@@ -1187,13 +1317,313 @@ function renderClassCardHTML(c, opts = {}) {
 /* =====================================================================
    8. VISTA: HORARIO SEMANAL
    ===================================================================== */
+
+/* =====================================================================
+   6.5 GESTIÓN DE CICLO ACADÉMICO (17 SEMANAS)
+   ===================================================================== */
+async function obtenerCicloActivo() {
+  try {
+    const activo = await db.ciclos.where("estado").equals("activo").first();
+    if (activo && activo.id !== "ciclo-inicial") return activo;
+    if (activo && activo.id === "ciclo-inicial") {
+      const tieneCursos = await db.cursos.count();
+      if (tieneCursos > 0) return activo;
+    }
+    const fallback = await db.ciclos.toCollection().first();
+    if (fallback && fallback.id !== "ciclo-inicial") return fallback;
+    return null;
+  } catch (err) {
+    console.warn("Aviso al obtener ciclo activo:", err);
+    return null;
+  }
+}
+
+function openNewCicloModal(opts) {
+  state.cicloModalCallback = (opts && opts.onSaved) || null;
+  $("#modal-ciclo-title").textContent = "Nuevo Ciclo Académico (17 Semanas)";
+  $("#ciclo-id").value = "";
+  $("#ciclo-nombre").value = "";
+
+  // Proponer el lunes más próximo
+  const d = new Date();
+  const day = d.getDay(); // 0 Dom, 1 Lun, ...
+  const diffToMonday = day === 0 ? 1 : (day === 1 ? 0 : 8 - day);
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + (day <= 3 && day > 0 ? (1 - day) : diffToMonday));
+  const mondayStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(monday);
+
+  $("#ciclo-fecha-inicio").value = mondayStr;
+  $("#ciclo-form-error").classList.add("hidden");
+  actualizarPreviewCiclo();
+
+  $("#modal-ciclo-backdrop").classList.remove("hidden");
+  $("#ciclo-nombre").focus();
+}
+
+function openEditCicloModal(ciclo) {
+  state.cicloModalCallback = null;
+  $("#modal-ciclo-title").textContent = "Editar Ciclo Académico";
+  $("#ciclo-id").value = ciclo.id;
+  $("#ciclo-nombre").value = ciclo.nombre || "";
+  $("#ciclo-fecha-inicio").value = ciclo.fecha_inicio || "";
+  $("#ciclo-form-error").classList.add("hidden");
+  actualizarPreviewCiclo();
+
+  $("#modal-ciclo-backdrop").classList.remove("hidden");
+}
+
+function closeModalCiclo() {
+  $("#modal-ciclo-backdrop").classList.add("hidden");
+  state.cicloModalCallback = null;
+}
+
+function actualizarPreviewCiclo() {
+  const inicioVal = $("#ciclo-fecha-inicio").value;
+  const finPreviewEl = $("#ciclo-preview-fin");
+  const s8PreviewEl = $("#ciclo-preview-sem8");
+  const s17PreviewEl = $("#ciclo-preview-sem17");
+  const avisoEl = $("#ciclo-dia-aviso");
+  if (!inicioVal) {
+    if (finPreviewEl) finPreviewEl.textContent = "Elige fecha de inicio";
+    if (s8PreviewEl) s8PreviewEl.textContent = "-";
+    if (s17PreviewEl) s17PreviewEl.textContent = "-";
+    return;
+  }
+
+  const [y, m, d] = inicioVal.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const esLunes = dt.getDay() === 1;
+
+  if (avisoEl) {
+    if (!esLunes) {
+      avisoEl.textContent = "Atención: La fecha seleccionada no es lunes. El ciclo académico debe iniciar un día lunes.";
+      avisoEl.style.color = "var(--status-danger)";
+    } else {
+      avisoEl.textContent = "Válido: Inicia en día lunes (17 semanas continuas).";
+      avisoEl.style.color = "var(--deep-leaf)";
+    }
+  }
+
+  const finCalc = typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(inicioVal) : "";
+  const semanas = typeof proyectarSemanasCiclo === "function" ? proyectarSemanasCiclo(inicioVal) : [];
+  const s8 = semanas.find(s => s.numero === 8);
+  const s17 = semanas.find(s => s.numero === 17);
+
+  if (finPreviewEl) finPreviewEl.textContent = `${finCalc} (17 semanas)`;
+  if (s8PreviewEl) s8PreviewEl.textContent = s8 ? `${s8.inicio} al ${s8.fin}` : "-";
+  if (s17PreviewEl) s17PreviewEl.textContent = s17 ? `${s17.inicio} al ${s17.fin}` : "-";
+}
+
+async function guardarCiclo(e) {
+  e.preventDefault();
+  const id = $("#ciclo-id").value || uuid();
+  const nombre = $("#ciclo-nombre").value.trim();
+  const inicioVal = $("#ciclo-fecha-inicio").value;
+  const errorEl = $("#ciclo-form-error");
+  errorEl.classList.add("hidden");
+
+  if (!nombre) {
+    errorEl.textContent = "Ingresa el nombre del ciclo (ej. 2026-I).";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  if (!inicioVal) {
+    errorEl.textContent = "Selecciona la fecha de inicio del ciclo.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const [y, m, d] = inicioVal.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (dt.getDay() !== 1) {
+    errorEl.textContent = "El ciclo académico debe iniciar obligatoriamente un día lunes.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  const fecha_fin = typeof calcularFinCiclo17Semanas === "function"
+    ? calcularFinCiclo17Semanas(inicioVal)
+    : "";
+
+  if (!$("#ciclo-id").value) {
+    await db.ciclos.where("estado").equals("activo").modify({ estado: "archivado" });
+  }
+
+  const registro = {
+    id,
+    nombre,
+    fecha_inicio: inicioVal,
+    fecha_fin,
+    estado: "activo",
+    fecha_creacion: new Date().toISOString()
+  };
+
+  await db.ciclos.put(registro);
+
+  // Sincronizar ajustes globales
+  await db.ajustes.put({ clave: "ciclo_inicio", valor: inicioVal });
+  await db.ajustes.put({ clave: "ciclo_fin", valor: fecha_fin });
+
+  closeModalCiclo();
+  showToast(`Ciclo "${nombre}" guardado.`);
+
+  if (typeof state.cicloModalCallback === "function") {
+    const cb = state.cicloModalCallback;
+    state.cicloModalCallback = null;
+    cb();
+  }
+
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+  refrescarVistaActual();
+}
+
+async function confirmarArchivarCiclo(ciclo) {
+  const ok = await confirmDialog(
+    "Finalizar Ciclo Académico",
+    `¿Deseas dar por concluido y archivar el ciclo "${ciclo.nombre}"?\n\nAl archivar, se limpiará el horario de clases de la semana para dar paso al nuevo ciclo, conservando todo el historial de calificaciones, asignaturas y registros de asistencia.`
+  );
+  if (!ok) return;
+
+  await db.ciclos.update(ciclo.id, { estado: "archivado", fecha_archivado: new Date().toISOString() });
+  await db.clases.clear();
+
+  showToast(`Ciclo "${ciclo.nombre}" archivado. Horario semanal reiniciado.`);
+  if (typeof reprogramarTodo === "function") reprogramarTodo();
+  renderHorario();
+}
+
+async function renderCicloRoadmap() {
+  const headerEl = $("#cycle-active-header");
+  const listEl = $("#cycle-weeks-list");
+  if (!headerEl || !listEl) return;
+
+  const ciclo = await obtenerCicloActivo();
+  if (!ciclo) {
+    headerEl.innerHTML = `
+      <div class="empty-card" style="margin: 0;">
+        <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
+        <strong>No hay un Ciclo Académico activo</strong>
+        <p>Configura tu ciclo académico de 17 semanas para proyectar exámenes, asistencias y clases.</p>
+        <button type="button" class="btn-primary btn-sm" id="btn-crear-primer-ciclo" style="margin-top: 10px;">Configurar Ciclo Académico</button>
+      </div>`;
+    listEl.innerHTML = "";
+    const btn = $("#btn-crear-primer-ciclo", headerEl);
+    if (btn) btn.addEventListener("click", () => openNewCicloModal());
+    return;
+  }
+
+  const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  const semanas = typeof proyectarSemanasCiclo === "function"
+    ? proyectarSemanasCiclo(ciclo.fecha_inicio, hoyStr)
+    : [];
+
+  const semanaActual = semanas.find(s => s.esActual);
+  const haConcluido = hoyStr > ciclo.fecha_fin;
+  let progressPct = 0;
+  if (haConcluido) {
+    progressPct = 100;
+  } else if (semanaActual) {
+    progressPct = Math.round((semanaActual.numero / 17) * 100);
+  }
+
+  headerEl.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(ciclo.nombre)}</h3>
+          <span class="cycle-badge-active" style="padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; background: var(--accent-sage-soft); color: var(--deep-leaf);">Activo</span>
+          ${haConcluido ? `<span style="background: rgba(210,50,50,0.15); color: var(--status-danger); padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">17 Semanas Concluidas</span>` : ""}
+        </div>
+        <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary);">
+          ${ciclo.fecha_inicio} al ${ciclo.fecha_fin} · 17 Semanas académicas
+          ${semanaActual ? `· <strong>Semana ${semanaActual.numero} en curso</strong>` : (haConcluido ? "· Semestre completado" : "· Ciclo por iniciar")}
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button type="button" class="btn-secondary btn-sm" id="btn-editar-ciclo-activo">Editar Ciclo</button>
+        <button type="button" class="btn-secondary btn-sm" id="btn-archivar-ciclo-activo" style="color: var(--status-danger); border-color: rgba(210,50,50,0.3);">Archivar / Finalizar</button>
+      </div>
+    </div>
+    <div style="margin-top: 12px; background: var(--border-subtle); height: 6px; border-radius: 3px; overflow: hidden;">
+      <div style="width: ${progressPct}%; background: var(--accent-teal); height: 100%; transition: width 0.3s ease;"></div>
+    </div>`;
+
+  const btnEdit = $("#btn-editar-ciclo-activo", headerEl);
+  if (btnEdit) btnEdit.addEventListener("click", () => openEditCicloModal(ciclo));
+
+  const btnArch = $("#btn-archivar-ciclo-activo", headerEl);
+  if (btnArch) btnArch.addEventListener("click", () => confirmarArchivarCiclo(ciclo));
+
+  const [eventos, tareas] = await Promise.all([
+    db.eventos.toArray().catch(() => []),
+    db.tareas.toArray().catch(() => [])
+  ]);
+
+  listEl.innerHTML = semanas.map(s => {
+    const isExamenParcial = s.numero === 8;
+    const isExamenFinal = s.numero === 17;
+    const isCurrent = s.esActual;
+
+    const evSemana = eventos.filter(ev => ev.fecha >= s.inicio && ev.fecha <= s.fin);
+    const tarSemana = tareas.filter(t => t.fecha_limite && t.fecha_limite.slice(0, 10) >= s.inicio && t.fecha_limite.slice(0, 10) <= s.fin);
+
+    let cardClasses = ["cycle-week-card"];
+    if (isCurrent) cardClasses.push("is-current");
+    if (isExamenParcial) cardClasses.push("is-exam");
+    if (isExamenFinal) cardClasses.push("is-final");
+
+    return `
+      <div class="${cardClasses.join(" ")}" data-week="${s.numero}">
+        <div class="cycle-week-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="cycle-week-num">Semana ${s.numero}</span>
+            ${isCurrent ? `<span class="cycle-tag-badge is-current-badge">Actual</span>` : ""}
+            ${isExamenParcial ? `<span class="cycle-tag-badge is-exam-badge">Exámenes Parciales</span>` : ""}
+            ${isExamenFinal ? `<span class="cycle-tag-badge is-final-badge">Exámenes Finales</span>` : ""}
+          </div>
+          <span class="cycle-week-dates">${s.inicio} — ${s.fin}</span>
+        </div>
+        <div class="cycle-week-content">
+          ${isExamenParcial ? `<div class="cycle-week-highlight">Semana 8: Evaluaciones Parciales Universitarias. Dedicada a exámenes según rol institucional.</div>` : ""}
+          ${isExamenFinal ? `<div class="cycle-week-highlight">Semana 17: Evaluaciones Finales y Cierre de Actas Académicas.</div>` : ""}
+          ${evSemana.length > 0 || tarSemana.length > 0 ? `
+            <div class="cycle-week-items">
+              ${evSemana.map(ev => `<span class="cycle-item-chip">${ICONS.calendar} ${escapeHtml(ev.titulo || ev.tipo)}</span>`).join("")}
+              ${tarSemana.map(t => `<span class="cycle-item-chip">${ICONS.check} ${escapeHtml(t.titulo)}</span>`).join("")}
+            </div>
+          ` : `
+            <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${isExamenParcial ? "Evaluación parcial central" : (isExamenFinal ? "Cierre y entrega de promedios" : "Sesiones lectivas regulares")}</div>
+          `}
+        </div>
+      </div>`;
+  }).join("");
+}
+
 async function renderHorario() {
   const container = $("#schedule-container");
+  const cycleContainer = $("#cycle-container");
   const dayTabsEl = $("#day-tabs-container");
   const matrixToolbarEl = $("#matrix-toolbar");
 
   $("#btn-mode-agenda").classList.toggle("active", state.scheduleMode === "agenda");
   $("#btn-mode-matrix").classList.toggle("active", state.scheduleMode === "matrix");
+  const btnCycle = $("#btn-mode-cycle");
+  if (btnCycle) btnCycle.classList.toggle("active", state.scheduleMode === "cycle");
+
+  if (state.scheduleMode === "cycle") {
+    dayTabsEl.classList.add("hidden");
+    if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
+    container.classList.add("hidden");
+    if (cycleContainer) {
+      cycleContainer.classList.remove("hidden");
+      await renderCicloRoadmap();
+    }
+    return;
+  }
+
+  if (cycleContainer) cycleContainer.classList.add("hidden");
+  container.classList.remove("hidden");
 
   const allClasses = await obtenerClasesEnriquecidas();
   const cursosCount = await db.cursos.count();
@@ -1450,15 +1880,20 @@ function renderMatrixTableHTML(classes) {
       const borderColor = darkenColor(color, 0.28);
       const rangoHora12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
 
+      const duracionMin = Math.max(0, timeToMinutes(c.hora_fin) - timeToMinutes(c.hora_inicio));
+      const esCorta = duracionMin <= 35 || height <= 38;
+
       cardsHtml += `
-        <div class="matrix-cell-card gcal-event-card"
+        <div class="matrix-cell-card gcal-event-card ${esCorta ? 'is-short-block' : ''}"
              data-id="${c.id}"
-             style="top:${top}px; height:${height}px; left:${leftStyle}; width:${widthStyle}; background:${color}; color:${textColor}; border-color:${borderColor}; border-left-color:${borderColor};"
+             style="top:${top}px; height:${height}px; left:${leftStyle}; width:${widthStyle}; background:${color}; color:${textColor}; border-color:${borderColor}; border-left-color:${borderColor};${esCorta ? 'padding: 2px 6px; display: flex; align-items: center; overflow: hidden;' : ''}"
              title="${escapeHtml(c.materia)} (${rangoHora12})${c.aula ? ' · ' + escapeHtml(c.aula) : ''}${c.profesor ? ' · ' + escapeHtml(c.profesor) : ''}">
-          <div class="matrix-cell-card-title">${escapeHtml(c.materia)}</div>
-          <div class="matrix-cell-card-time">${rangoHora12}</div>
-          ${c.aula ? `<div class="matrix-cell-card-aula" title="Aula: ${escapeHtml(c.aula)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${escapeHtml(c.aula)}</div>` : ""}
-          ${c.profesor ? `<div class="matrix-cell-card-prof" title="Profesor: ${escapeHtml(c.profesor)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtml(c.profesor)}</div>` : ""}
+          <div class="matrix-cell-card-title" style="${esCorta ? 'font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;' : ''}">${escapeHtml(c.materia)}</div>
+          ${esCorta ? "" : `
+            <div class="matrix-cell-card-time">${rangoHora12}</div>
+            ${c.aula ? `<div class="matrix-cell-card-aula" title="Aula: ${escapeHtml(c.aula)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ${escapeHtml(c.aula)}</div>` : ""}
+            ${c.profesor ? `<div class="matrix-cell-card-prof" title="Profesor: ${escapeHtml(c.profesor)}"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg> ${escapeHtml(c.profesor)}</div>` : ""}
+          `}
         </div>`;
     });
 
@@ -2059,20 +2494,49 @@ function refrescarVistaActual() {
 }
 
 async function renderCursos() {
-  const [{ list: cursos }, clases] = await Promise.all([cargarCursos(), db.clases.toArray()]);
+  const [{ list: cursos }, clases, asistencias, excepciones, cicloActivo, ajustes] = await Promise.all([
+    cargarCursos(),
+    db.clases.toArray(),
+    db.asistencia.toArray(),
+    db.excepciones.toArray(),
+    obtenerCicloActivo(),
+    db.ajustes.toArray()
+  ]);
   const resumenEl = $("#cursos-resumen");
   const listEl = $("#cursos-list");
+
+  const mapAjustes = {};
+  for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+  const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+  const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-03-16";
+  const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-07-12";
+  const limiteFaltasPct = cfg.limite_faltas_pct || 30;
 
   if (cursos.length === 0) {
     resumenEl.innerHTML = "";
     resumenEl.classList.add("hidden");
+    let cicloBannerHTML = "";
+    if (!cicloActivo) {
+      cicloBannerHTML = `
+        <div class="empty-card" style="border:1.5px dashed var(--accent-teal); background:rgba(82,183,136,0.08); margin-bottom:14px; text-align:center;">
+          <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
+          <strong style="font-size:14px; color:var(--text-primary);">Ciclo Académico Requerido</strong>
+          <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 10px;">Para registrar asignaturas y organizar tu horario universitario, primero debes definir tu Ciclo Académico (17 semanas).</p>
+          <button class="btn-primary btn-sm" id="btn-crear-ciclo-banner">Configurar Ciclo Académico</button>
+        </div>`;
+    }
     listEl.innerHTML = `
+      ${cicloBannerHTML}
       <div class="empty-card">
         <div class="empty-card-icon-wrap">${ICONS.book}</div>
         <strong>Aún no registras cursos</strong>
         <p>Registra cada curso una sola vez con su profesor, aula y color. Luego armas el horario eligiendo el curso y la hora, y aquí llevas tus notas.</p>
         <button class="btn-primary btn-sm" id="btn-add-curso-empty" style="margin-top:10px;">Registrar Curso</button>
       </div>`;
+    const btnCicloBanner = $("#btn-crear-ciclo-banner", listEl);
+    if (btnCicloBanner) {
+      btnCicloBanner.addEventListener("click", () => openNewCicloModal({ onSaved: () => renderCursos() }));
+    }
     $("#btn-add-curso-empty", listEl).addEventListener("click", () => openNewCursoModal());
     return;
   }
@@ -2084,16 +2548,33 @@ async function renderCursos() {
     s.minutos += Math.max(0, timeToMinutes(c.hora_fin) - timeToMinutes(c.hora_inicio));
   });
 
-  const filas = cursos.map(c => ({
-    curso: c,
-    r: calcularRendimiento(c.evaluacion),
-    sesiones: sesionesPorCurso[c.id] || { count: 0, minutos: 0 }
-  }));
+  const fnResumen = typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia;
+  const filas = cursos.map(c => {
+    const clasesCurso = clases.filter(cl => cl.curso_id === c.id);
+    let asistRes = null;
+    if (fnResumen) {
+      asistRes = fnResumen({
+        cursoId: c.id,
+        clasesDelCurso: clasesCurso,
+        asistencias,
+        cicloInicio: fechaIni,
+        cicloFin: fechaFin,
+        excepciones,
+        limiteFaltasPct
+      });
+    }
+    return {
+      curso: c,
+      r: calcularRendimiento(c.evaluacion),
+      sesiones: sesionesPorCurso[c.id] || { count: 0, minutos: 0 },
+      asist: asistRes
+    };
+  });
 
   resumenEl.classList.remove("hidden");
   renderResumenCiclo(filas.map(f => f.r), cursos);
 
-  listEl.innerHTML = filas.map(f => renderCursoCardHTML(f.curso, f.r, f.sesiones)).join("");
+  listEl.innerHTML = filas.map(f => renderCursoCardHTML(f.curso, f.r, f.sesiones, f.asist)).join("");
 
   $$('[data-action="notas"]', listEl).forEach(btn => {
     btn.addEventListener("click", () => openNotasModal(btn.closest(".course-card").dataset.id));
@@ -2131,7 +2612,7 @@ function renderResumenCiclo(resultados, cursos = []) {
   const ponderadoHtml = ponderadoInfo && ponderadoInfo.creditosCalificados > 0
     ? `<div class="overview-tile" title="Promedio ponderado por créditos (${ponderadoInfo.creditosCalificados} de ${ponderadoInfo.totalCreditos} créditos evaluados)">
         <span class="overview-value">${formatNota(ponderadoInfo.promedioPonderado)}</span>
-        <span class="overview-label">Ponderado (${ponderadoInfo.creditosCalificados} cr)</span>
+        <span class="overview-label">Ponderado (${ponderadoInfo.creditosCalificados} Créditos)</span>
       </div>`
     : "";
 
@@ -2290,7 +2771,7 @@ async function actualizarSimulador(cursosPreloaded) {
       <div style="background:var(--surface-subtle); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:11px 13px; display:flex; justify-content:space-between; align-items:center; gap:12px;">
         <div style="min-width:0; flex:1;">
           <div style="font-weight:700; font-size:13.5px; color:var(--text-primary); line-height:1.3; margin-bottom:2px;">${escapeHtml(c.nombre)}</div>
-          <div style="font-size:11.5px; color:var(--text-secondary); line-height:1.3;">${c.creditos} crédito(s) · ${faltantesTexto}</div>
+          <div style="font-size:11.5px; color:var(--text-secondary); line-height:1.3;">${c.creditos} Créditos · ${faltantesTexto}</div>
         </div>
         <div style="text-align:right; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
           <div style="font-weight:700; font-size:14.5px; color:var(--deep-leaf); font-family:var(--font-mono);">${c.rendimiento.promedio !== null ? formatNota(c.rendimiento.promedio) : (c.rendimiento.sinNotas ? "—" : formatNota(c.rendimiento.acumulado))}</div>
@@ -2308,7 +2789,7 @@ function gradeCellHTML(label, valor) {
     </span>`;
 }
 
-function renderCursoCardHTML(c, r, ses) {
+function renderCursoCardHTML(c, r, ses, asist = null) {
   const info = ESTADO_NOTA_INFO[r.estado];
   const color = escapeHtml(c.color || COLOR_CURSO_DEFECTO);
   const horas = ses.minutos ? `${Number((ses.minutos / 60).toFixed(1))} h/sem` : "";
@@ -2320,14 +2801,22 @@ function renderCursoCardHTML(c, r, ses) {
   const valorCentral = tienePromedio ? r.promedio : (r.estado === "sin-notas" ? null : r.acumulado);
   const nombre = escapeHtml(c.nombre);
 
+  const faltasCount = asist ? (asist.faltas || 0) : 0;
+  const faltasTxt = asist ? (faltasCount > 0 ? `${faltasCount} ${faltasCount === 1 ? "falta" : "faltas"}` : "0 faltas") : "Asistencia";
+  const asistBadgeClass = asist && faltasCount > 0 ? (asist.enRiesgo ? "course-asist-badge danger-faltas" : "course-asist-badge has-faltas") : "course-asist-badge";
+
   return `
     <article class="course-card" data-id="${escapeHtml(c.id)}">
       <span class="class-card-stripe" style="background:${color}"></span>
-      <button type="button" class="course-card-main" data-action="notas" aria-label="Ver y registrar notas de ${nombre}">
+      <div class="course-card-main" data-action="notas" role="button" tabindex="0" aria-label="Ver y registrar notas de ${nombre}">
         <span class="course-card-head">
           <span class="class-card-title">${nombre}</span>
           <span class="class-card-details">
-            ${c.creditos ? `<span class="class-detail-tag">${c.creditos} cr</span>` : ""}
+            ${c.creditos ? `<span class="class-detail-tag">${c.creditos} Créditos</span>` : ""}
+            ${c.ciclo_curso ? `<span class="class-detail-tag">Ciclo ${escapeHtml(c.ciclo_curso)}</span>` : ""}
+            ${c.tipo_condicion === "electivo" ? `<span class="class-detail-tag" style="color:var(--status-warning);font-weight:600;">Electivo</span>` : ""}
+            ${c.codigo_asignatura ? `<span class="class-detail-tag">${escapeHtml(c.codigo_asignatura)}</span>` : ""}
+            ${c.grupo_seccion ? `<span class="class-detail-tag">Gr. ${escapeHtml(c.grupo_seccion)}</span>` : ""}
             ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
             ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
             <span class="class-detail-tag">${ICONS.layers} ${sesionesTxt}</span>
@@ -2345,11 +2834,11 @@ function renderCursoCardHTML(c, r, ses) {
         <span class="course-card-footer">
           <span class="grade-status-pill ${info.tone}">${info.label}</span>
           <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
-          <button type="button" class="asist-pill-btn" data-action="asistencia" data-id="${escapeHtml(c.id)}" style="margin-left:auto;font-size:11px;" title="Ver registro y límite de faltas">
-            ${ICONS.chart} Asistencia
+          <button type="button" class="asist-pill-btn ${asistBadgeClass}" data-action="asistencia" data-id="${escapeHtml(c.id)}" title="Ver registro y control de faltas (${faltasTxt})">
+            ${ICONS.chart} ${faltasTxt}
           </button>
         </span>
-      </button>
+      </div>
       <button type="button" class="icon-btn course-edit-btn" data-action="edit-curso" aria-label="Editar datos de ${nombre}" title="Editar curso">${ICONS.edit}</button>
     </article>`;
 }
@@ -2365,6 +2854,13 @@ function setCursoColor(color) {
 }
 
 async function openNewCursoModal(origin) {
+  const cicloActivo = await obtenerCicloActivo();
+  if (!cicloActivo) {
+    showToast("Debes registrar un Ciclo Académico antes de crear asignaturas.");
+    openNewCicloModal({ onSaved: () => openNewCursoModal(origin) });
+    return;
+  }
+
   state.cursoModalOrigin = origin || null;
   $("#modal-curso-title").textContent = "Nuevo Curso";
   $("#curso-id").value = "";
@@ -2373,6 +2869,10 @@ async function openNewCursoModal(origin) {
   $("#curso-aula").value = "";
   $("#curso-creditos").value = "3";
   $("#curso-notas").value = "";
+  if ($("#curso-ciclo-academico")) $("#curso-ciclo-academico").value = "";
+  if ($("#curso-tipo")) $("#curso-tipo").value = "obligatorio";
+  if ($("#curso-codigo")) $("#curso-codigo").value = "";
+  if ($("#curso-grupo")) $("#curso-grupo").value = "";
   $("#curso-form-error").classList.add("hidden");
   $("#btn-delete-curso").classList.add("hidden");
   $("#curso-sesiones-info").classList.add("hidden");
@@ -2398,6 +2898,10 @@ async function openEditCursoModal(id) {
   $("#curso-aula").value = c.aula || "";
   $("#curso-creditos").value = c.creditos || 3;
   $("#curso-notas").value = c.notas || "";
+  if ($("#curso-ciclo-academico")) $("#curso-ciclo-academico").value = c.ciclo_curso || "";
+  if ($("#curso-tipo")) $("#curso-tipo").value = c.tipo_condicion || "obligatorio";
+  if ($("#curso-codigo")) $("#curso-codigo").value = c.codigo_asignatura || "";
+  if ($("#curso-grupo")) $("#curso-grupo").value = c.grupo_seccion || "";
   setCursoColor(c.color || COLOR_CURSO_DEFECTO);
   $("#curso-form-error").classList.add("hidden");
   $("#btn-delete-curso").classList.remove("hidden");
@@ -2441,9 +2945,15 @@ async function guardarCurso(e) {
   const creditosRaw = parseInt($("#curso-creditos").value, 10);
   const creditos = Number.isFinite(creditosRaw) && creditosRaw > 0 ? Math.min(10, Math.max(1, creditosRaw)) : 3;
 
+  const cicloActivo = await obtenerCicloActivo();
   const previo = id ? existentes.find(c => c.id === id) : null;
   const curso = {
     id: id || uuid(),
+    ciclo_id: previo?.ciclo_id || cicloActivo?.id || "",
+    ciclo_curso: ($("#curso-ciclo-academico")?.value || "").trim(),
+    tipo_condicion: $("#curso-tipo")?.value || "obligatorio",
+    codigo_asignatura: ($("#curso-codigo")?.value || "").trim(),
+    grupo_seccion: ($("#curso-grupo")?.value || "").trim(),
     nombre,
     profesor: $("#curso-profesor").value.trim(),
     aula: $("#curso-aula").value.trim(),
@@ -2686,52 +3196,203 @@ async function actualizarPreviewCursoClase() {
   $("#class-aula").placeholder = curso.aula ? `Habitual: ${curso.aula}` : "Ej: Aula 204, Lab B (opcional)";
 }
 
+
+/* =====================================================================
+   SELECTOR DE HORAS 12H Y ACTIVIDADES NO ACADÉMICAS
+   ===================================================================== */
+function init12HourSelectors() {
+  const selIniH = $("#select-hora-inicio-h");
+  const selIniM = $("#select-hora-inicio-m");
+  const selFinH = $("#select-hora-fin-h");
+  const selFinM = $("#select-hora-fin-m");
+  if (!selIniH || !selIniM || !selFinH || !selFinM) return;
+
+  const hoursOpts = [];
+  for (let h = 1; h <= 12; h++) {
+    const val = pad2(h);
+    hoursOpts.push(`<option value="${val}">${val}</option>`);
+  }
+  const hoursHtml = hoursOpts.join("");
+  selIniH.innerHTML = hoursHtml;
+  selFinH.innerHTML = hoursHtml;
+
+  const minOpts = [];
+  for (let m = 0; m < 60; m += 5) {
+    const val = pad2(m);
+    minOpts.push(`<option value="${val}">${val}</option>`);
+  }
+  const minHtml = minOpts.join("");
+  selIniM.innerHTML = minHtml;
+  selFinM.innerHTML = minHtml;
+
+  const onChangeInicio = () => sincronizar24hDesde12("inicio");
+  const onChangeFin = () => sincronizar24hDesde12("fin");
+
+  selIniH.addEventListener("change", onChangeInicio);
+  selIniM.addEventListener("change", onChangeInicio);
+  selFinH.addEventListener("change", onChangeFin);
+  selFinM.addEventListener("change", onChangeFin);
+
+  const btnAmPmIni = $("#btn-hora-inicio-ampm");
+  if (btnAmPmIni) {
+    btnAmPmIni.addEventListener("click", () => {
+      btnAmPmIni.textContent = btnAmPmIni.textContent.trim().toUpperCase() === "AM" ? "PM" : "AM";
+      sincronizar24hDesde12("inicio");
+    });
+  }
+
+  const btnAmPmFin = $("#btn-hora-fin-ampm");
+  if (btnAmPmFin) {
+    btnAmPmFin.addEventListener("click", () => {
+      btnAmPmFin.textContent = btnAmPmFin.textContent.trim().toUpperCase() === "AM" ? "PM" : "AM";
+      sincronizar24hDesde12("fin");
+    });
+  }
+}
+
+function actualizarSelector12hDesde24(prefix, hora24Str) {
+  const hSel = $(`#select-hora-${prefix}-h`);
+  const mSel = $(`#select-hora-${prefix}-m`);
+  const ampmBtn = $(`#btn-hora-${prefix}-ampm`);
+  const hintEl = $(`#hint-hora-${prefix}`);
+  const hiddenInput = $(`#class-hora-${prefix}`);
+  if (!hSel || !mSel || !ampmBtn) return;
+
+  const [hRaw, mRaw] = (hora24Str || "08:00").split(":").map(Number);
+  let h = isNaN(hRaw) ? 8 : hRaw;
+  let m = isNaN(mRaw) ? 0 : mRaw;
+  const ampm = h >= 12 ? "PM" : "AM";
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  const h12Str = pad2(h12);
+
+  const mRedondeado = Math.min(55, Math.round(m / 5) * 5);
+  const mStr = pad2(mRedondeado);
+
+  hSel.value = h12Str;
+  mSel.value = mStr;
+  ampmBtn.textContent = ampm;
+
+  const formatted24 = `${pad2(h)}:${pad2(mRedondeado)}`;
+  if (hiddenInput) hiddenInput.value = formatted24;
+  if (hintEl) hintEl.textContent = `${h12Str}:${mStr} ${ampm}`;
+}
+
+function sincronizar24hDesde12(prefix) {
+  const hSel = $(`#select-hora-${prefix}-h`);
+  const mSel = $(`#select-hora-${prefix}-m`);
+  const ampmBtn = $(`#btn-hora-${prefix}-ampm`);
+  const hintEl = $(`#hint-hora-${prefix}`);
+  const hiddenInput = $(`#class-hora-${prefix}`);
+  if (!hSel || !mSel || !ampmBtn) return;
+
+  const h12 = parseInt(hSel.value, 10) || 12;
+  const m = parseInt(mSel.value, 10) || 0;
+  const ampm = ampmBtn.textContent.trim().toUpperCase();
+
+  let h24 = h12 % 12;
+  if (ampm === "PM") h24 += 12;
+  const hora24 = `${pad2(h24)}:${pad2(m)}`;
+
+  if (hiddenInput) hiddenInput.value = hora24;
+  if (hintEl) hintEl.textContent = `${pad2(h12)}:${pad2(m)} ${ampm}`;
+}
+
+function setClassTypeMode(mode) {
+  const isActividad = mode === "actividad";
+  const hiddenTipo = $("#class-tipo");
+  if (hiddenTipo) hiddenTipo.value = isActividad ? "actividad" : "curso";
+
+  const btnCurso = $("#btn-class-type-curso");
+  const btnAct = $("#btn-class-type-actividad");
+  if (btnCurso) btnCurso.classList.toggle("active", !isActividad);
+  if (btnAct) btnAct.classList.toggle("active", isActividad);
+
+  const grpCurso = $("#group-class-curso");
+  const grpAct = $("#group-class-actividad");
+  if (grpCurso) grpCurso.classList.toggle("hidden", isActividad);
+  if (grpAct) grpAct.classList.toggle("hidden", !isActividad);
+
+  const titleEl = $("#modal-class-title");
+  if (titleEl) {
+    const isEdit = Boolean($("#class-id").value);
+    titleEl.textContent = isActividad
+      ? (isEdit ? "Editar Actividad / Trabajo" : "Añadir Actividad o Trabajo")
+      : (isEdit ? "Editar Asignatura en Horario" : "Añadir Asignatura al Horario");
+  }
+}
+
+function setActividadColor(color) {
+  const norm = normalizarColorPastel(color || "#BAE6FD");
+  const hiddenCol = $("#class-actividad-color");
+  if (hiddenCol) hiddenCol.value = norm;
+  const picker = $("#class-actividad-color-picker");
+  if (picker) {
+    $$(".color-swatch", picker).forEach(s => {
+      s.classList.toggle("selected", s.dataset.color === norm);
+    });
+  }
+}
+
 function actualizarHintsHoraClase() {
-  const hIni = $("#hint-hora-inicio");
-  const hFin = $("#hint-hora-fin");
-  if (hIni) hIni.textContent = formatTime12($("#class-hora-inicio").value || "08:00");
-  if (hFin) hFin.textContent = formatTime12($("#class-hora-fin").value || "10:00");
+  actualizarSelector12hDesde24("inicio", $("#class-hora-inicio").value || "08:00");
+  actualizarSelector12hDesde24("fin", $("#class-hora-fin").value || "10:00");
 }
 
 async function openNewClassModal(preselectedDay, preselectedCursoId) {
   const dia = preselectedDay || state.selectedDay || "LUNES";
   const count = await db.cursos.count();
-  if (count === 0) {
-    showToast("Primero registra el curso; luego le asignas la hora.");
-    openNewCursoModal({ abrirClase: true, dia });
-    return;
-  }
 
-  $("#modal-class-title").textContent = "Añadir Clase al Horario";
+  $("#modal-class-title").textContent = "Añadir al Horario";
   $("#class-id").value = "";
   $("#class-dia").value = dia;
   $("#class-hora-inicio").value = "08:00";
   $("#class-hora-fin").value = "10:00";
   $("#class-aula").value = "";
+  $("#class-actividad-titulo").value = "";
+  $("#class-actividad-categoria").value = "practicas";
+  setActividadColor("#BAE6FD");
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.add("hidden");
-  actualizarHintsHoraClase();
 
-  await populateClassCursoSelect(preselectedCursoId || "");
+  actualizarSelector12hDesde24("inicio", "08:00");
+  actualizarSelector12hDesde24("fin", "10:00");
+
+  if (count === 0) {
+    setClassTypeMode("actividad");
+  } else {
+    setClassTypeMode("curso");
+    await populateClassCursoSelect(preselectedCursoId || "");
+  }
   $("#modal-class-backdrop").classList.remove("hidden");
-  $("#class-curso").focus();
 }
 
 async function openEditClassModal(id) {
   const c = await db.clases.get(id);
   if (!c) return;
 
-  $("#modal-class-title").textContent = "Editar Clase";
   $("#class-id").value = c.id;
   $("#class-dia").value = c.dia_semana || "LUNES";
-  $("#class-hora-inicio").value = to24Hour(c.hora_inicio || "08:00");
-  $("#class-hora-fin").value = to24Hour(c.hora_fin || "10:00");
+  const hIni24 = to24Hour(c.hora_inicio || "08:00");
+  const hFin24 = to24Hour(c.hora_fin || "10:00");
+  $("#class-hora-inicio").value = hIni24;
+  $("#class-hora-fin").value = hFin24;
   $("#class-aula").value = c.aula || "";
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.remove("hidden");
-  actualizarHintsHoraClase();
 
-  await populateClassCursoSelect(c.curso_id);
+  actualizarSelector12hDesde24("inicio", hIni24);
+  actualizarSelector12hDesde24("fin", hFin24);
+
+  if (c.tipo === "actividad") {
+    setClassTypeMode("actividad");
+    $("#class-actividad-titulo").value = c.titulo || "";
+    $("#class-actividad-categoria").value = c.categoria || "practicas";
+    setActividadColor(c.color || "#BAE6FD");
+  } else {
+    setClassTypeMode("curso");
+    await populateClassCursoSelect(c.curso_id);
+  }
   $("#modal-class-backdrop").classList.remove("hidden");
 }
 
@@ -2764,9 +3425,7 @@ function openNewTaskModal(defaultCursoId) {
   setImportanceStars(3);
 
   $("#task-descripcion").value = "";
-  const taskEstEl = $("#task-estimado");
-  if (taskEstEl) taskEstEl.value = "";
-  $$("#task-estimado-chips .filter-chip").forEach(c => c.classList.remove("active"));
+
   $("#task-completada").checked = false;
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.add("hidden");
@@ -2787,11 +3446,7 @@ async function openEditTaskModal(id) {
   $("#task-importancia").value = t.importancia || 3;
   setImportanceStars(t.importancia || 3);
   $("#task-descripcion").value = t.notas || "";
-  const taskEstEl = $("#task-estimado");
-  if (taskEstEl) taskEstEl.value = t.estimado_min || "";
-  $$("#task-estimado-chips .filter-chip").forEach(c => {
-    c.classList.toggle("active", Number(c.dataset.min) === Number(t.estimado_min));
-  });
+
   $("#task-completada").checked = !!t.completada;
   $("#task-form-error").classList.add("hidden");
   $("#btn-delete-task").classList.remove("hidden");
@@ -2967,6 +3622,7 @@ async function renderAjustesExcepciones() {
         if (typeof reprogramarTodo === "function") reprogramarTodo();
         renderAjustesExcepciones();
         if ($("#view-hoy").classList.contains("active")) renderHoy();
+        if ($("#view-cursos").classList.contains("active")) renderCursos();
       }
     });
   });
@@ -3030,20 +3686,26 @@ async function openAsistenciaModal(cursoId) {
   for (const a of ajustes) mapAjustes[a.clave] = a.valor;
   const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
 
+  const cicloActivo = await obtenerCicloActivo();
+  const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-01-01";
+  const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-12-31";
+
   const res = (typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia)({
     cursoId,
     clasesDelCurso,
     asistencias,
-    cicloInicio: cfg.ciclo_inicio || "2026-01-01",
-    cicloFin: cfg.ciclo_fin || "2026-12-31",
+    cicloInicio: fechaIni,
+    cicloFin: fechaFin,
     excepciones,
     limiteFaltasPct: cfg.limite_faltas_pct || 30
   });
 
   $("#asist-modal-title").textContent = `Asistencia: ${c.nombre}`;
-  $("#asist-ciclo-rango").textContent = cfg.ciclo_inicio && cfg.ciclo_fin
-    ? `Ciclo: ${cfg.ciclo_inicio} al ${cfg.ciclo_fin}`
-    : "Ciclo: Configura inicio y fin en Ajustes";
+  $("#asist-ciclo-rango").textContent = cicloActivo
+    ? `Ciclo: ${cicloActivo.nombre} (${fechaIni} al ${fechaFin})`
+    : (cfg.ciclo_inicio && cfg.ciclo_fin
+      ? `Ciclo: ${cfg.ciclo_inicio} al ${cfg.ciclo_fin}`
+      : "Ciclo: Configura inicio y fin en Ciclo Académico");
   $("#asist-total-sesiones").textContent = res.totalSesiones;
   $("#asist-faltas-registradas").textContent = res.faltas;
   $("#asist-max-faltas").textContent = res.maxFaltasPermitidas;
@@ -3062,14 +3724,25 @@ async function openAsistenciaModal(cursoId) {
   if (sesiones.length === 0) {
     listEl.innerHTML = `<p class="practicas-empty">No hay sesiones calculadas. Asigna horario a este curso y revisa las fechas del ciclo en Ajustes.</p>`;
   } else {
+    const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
     listEl.innerHTML = sesiones.map(s => {
       const asist = asistencias.find(a => a.fecha === s.fecha);
-      const est = asist ? asist.estado : (s.cancelada ? (s.feriado ? "feriado" : "cancelada") : "pendiente");
+      let est = "pendiente";
+      let esPorDefecto = false;
+      if (asist) {
+        est = asist.estado;
+      } else if (s.cancelada) {
+        est = s.feriado ? "feriado" : "cancelada";
+      } else if (s.fecha < hoyStr) {
+        est = "presente";
+        esPorDefecto = true;
+      }
       return `
         <div class="asist-session-row">
           <div>
             <strong>${s.fecha}</strong> · <span style="color:var(--text-secondary);">${DIAS_LABEL[DIAS_SEMANA[s.diaSemana - 1]] || ""} (${formatTimeRange12(s.horaInicio, s.horaFin)})</span>
             ${s.motivo ? `<div style="font-size:11px;color:var(--status-warning);">${escapeHtml(s.motivo)}</div>` : ""}
+            ${esPorDefecto ? `<span class="badge-subtle" style="font-size:10px; color:var(--deep-leaf); margin-left:6px;">Asistido (por defecto)</span>` : ""}
           </div>
           <div style="display:flex;gap:4px;">
             ${s.cancelada ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surface-subtle);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
@@ -3082,24 +3755,33 @@ async function openAsistenciaModal(cursoId) {
       `;
     }).join("");
 
-    $$("button[data-action='set-asist']", listEl).forEach(btn => {
+    $("button[data-action='set-asist']", listEl).forEach(btn => {
       btn.addEventListener("click", async () => {
         const f = btn.dataset.fecha;
         const nuevo = btn.dataset.estado;
+        if (nuevo === "presente" && f > hoyStr) {
+          showToast("No puedes registrar asistencia para una fecha futura.", true);
+          return;
+        }
         const curAsist = asistencias.find(a => a.fecha === f);
         if (curAsist && curAsist.estado === nuevo) {
-          await db.asistencia.where({ curso_id: cursoId, fecha: f }).delete();
+          if (curAsist.id) {
+            await db.asistencia.delete(curAsist.id);
+          }
+          await db.asistencia.where("fecha").equals(f).and(a => a.curso_id === cursoId).delete();
         } else {
           await db.asistencia.put({
-            id: `${cursoId}_${f}`,
+            id: curAsist?.id || `${cursoId}_${f}`,
             curso_id: cursoId,
+            clase_id: curAsist?.clase_id || "",
             fecha: f,
             estado: nuevo
           });
         }
         if (typeof reprogramarTodo === "function") reprogramarTodo();
         await openAsistenciaModal(cursoId);
-        if ($("#view-hoy").classList.contains("active")) renderHoy();
+        await renderCursos();
+        if ($("#view-hoy") && $("#view-hoy").classList.contains("active")) await renderHoy();
       });
     });
   }
@@ -3992,57 +4674,297 @@ async function importFullBackup(file) {
 
 async function loadDemoSemester() {
   const ok = await confirmDialog(
-    "Cargar Semestre Modelo",
-    "Se incorporarán cursos con notas de ejemplo (escala 0–20), horario semanal y tareas para probar el sistema. ¿Continuar?"
+    "Cargar Semestre Modelo (UNU)",
+    "Se configurará un Ciclo Académico completo (17 semanas), asignaturas con créditos y notas, actividades extracurriculares (prácticas, talleres), tareas presentadas y por hacer, asistencias y perfil estudiantil. ¿Continuar?"
   );
   if (!ok) return;
 
-  const cIA   = { id: uuid(), nombre: "Inteligencia Artificial y Sistemas Expertos", profesor: "Dr. Agurto", aula: "Aula 1", color: "#BAE6FD", notas: "Repositorio del curso y guías de laboratorio", evaluacion: { parcial: 14, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 15 }, { id: uuid(), titulo: "Práctica 2", nota: 13 }, { id: uuid(), titulo: "Trabajo heurísticas", nota: 16 }] } };
-  const cTop  = { id: uuid(), nombre: "Tópicos Avanzados en Ingeniería de Software", profesor: "Ing. Chaparro", aula: "Laboratorio de Redes", color: "#C7D2FE", notas: "Arquitectura limpia y despliegue continuo", evaluacion: { parcial: 12, final: 15, practicas: [{ id: uuid(), titulo: "Lab CI/CD", nota: 14 }, { id: uuid(), titulo: "Entrega Arquitectura", nota: 16 }] } };
-  const cForm = { id: uuid(), nombre: "Formulación y Evaluación de Proyectos", profesor: "Dra. Vargas", aula: "Aula 204", color: "#BBF7D0", notas: "Flujo de caja, VAN y TIR", evaluacion: { parcial: 9, final: null, practicas: [{ id: uuid(), titulo: "Control 1", nota: 10 }, { id: uuid(), titulo: "Avance Estudio Mercado", nota: 11 }] } };
-  const cAud  = { id: uuid(), nombre: "Auditoría y Seguridad en Informática", profesor: "Ing. Silva", aula: "Lab Sistemas", color: "#F5D0FE", notas: "Normativa ISO 27001 y pruebas OWASP", evaluacion: { parcial: 13, final: null, practicas: [{ id: uuid(), titulo: "Informe OWASP", nota: 14 }, { id: uuid(), titulo: "Práctica 2", nota: null }] } };
-  const cDist = { id: uuid(), nombre: "Sistemas Distribuidos", profesor: "Ing. Mendoza", aula: "Lab Redes", color: "#FED7AA", notas: "Consenso Raft y tolerancia a fallos", evaluacion: { parcial: 8, final: null, practicas: [{ id: uuid(), titulo: "Práctica 1", nota: 9 }, { id: uuid(), titulo: "Laboratorio RPC", nota: 8 }] } };
-  const cPrac = { id: uuid(), nombre: "Prácticas Pre Profesionales II", profesor: "Ing. Castillo", aula: "Oficina de TI", color: "#FEF08A", notas: "Supervisión e informes mensuales", evaluacion: { parcial: 17, final: 18, practicas: [{ id: uuid(), titulo: "Informe 1", nota: 17 }, { id: uuid(), titulo: "Informe 2", nota: 18 }] } };
+  const fnFecha = typeof fechaAString === "function" ? fechaAString : window.fechaAString;
+  const hoy = new Date();
 
-  const demoCursos = [cIA, cTop, cForm, cAud, cDist, cPrac];
+  // Calcular un lunes reciente (hace 3 semanas) para tener sesiones pasadas y futuras
+  const day = hoy.getDay();
+  const diffToCurrentMonday = day === 0 ? -6 : 1 - day;
+  const lunesActual = new Date(hoy);
+  lunesActual.setDate(hoy.getDate() + diffToCurrentMonday);
 
+  // Iniciar el ciclo hace 3 semanas
+  const lunesInicio = new Date(lunesActual);
+  lunesInicio.setDate(lunesActual.getDate() - 21);
+  const inicioCicloStr = fnFecha(lunesInicio);
+  const finCicloStr = typeof calcularFinCiclo17Semanas === "function"
+    ? calcularFinCiclo17Semanas(inicioCicloStr)
+    : "2027-01-10";
+
+  // 1. Ciclo Académico activo
+  const cicloId = "ciclo_unu_2026_2";
+  const demoCiclo = {
+    id: cicloId,
+    nombre: "Ciclo 2026-II",
+    fecha_inicio: inicioCicloStr,
+    fecha_fin: finCicloStr,
+    estado: "activo",
+    creado_por_usuario: true,
+    fecha_creacion: new Date().toISOString()
+  };
+
+  // 2. Perfil del Estudiante UNU
+  const demoPerfil = {
+    nombre: "Alex Mendoza Ríos",
+    codigo: "0002120456",
+    dni: "74892015",
+    sexo: "M",
+    facultad: "Facultad de Ingeniería de Sistemas e Ingeniería Civil",
+    escuela: "Escuela Profesional de Ingeniería de Sistemas",
+    telefono: "961849201",
+    correo: "alex.mendoza@unu.edu.pe"
+  };
+
+  // 3. Cursos Universitarios UNU
+  const cIA = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Inteligencia Artificial y Sistemas Expertos",
+    ciclo_curso: "IX",
+    tipo_condicion: "obligatorio",
+    codigo_asignatura: "SI-501",
+    grupo_seccion: "A",
+    profesor: "Dr. Agurto",
+    aula: "Aula 1",
+    color: "#BAE6FD",
+    creditos: 4,
+    notas: "Repositorio GitHub del curso y laboratorio de redes neuronales.",
+    evaluacion: {
+      parcial: 14.5,
+      final: null,
+      practicas: [
+        { id: uuid(), titulo: "Lab 1: Algoritmos de Búsqueda A*", nota: 15 },
+        { id: uuid(), titulo: "Lab 2: Agentes Inteligentes", nota: 13 },
+        { id: uuid(), titulo: "Avance Proyecto Heurístico", nota: 16 }
+      ]
+    }
+  };
+
+  const cTop = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Tópicos Avanzados en Ingeniería de Software",
+    ciclo_curso: "IX",
+    tipo_condicion: "obligatorio",
+    codigo_asignatura: "SI-502",
+    grupo_seccion: "A",
+    profesor: "Ing. Chaparro",
+    aula: "Laboratorio de Redes",
+    color: "#C7D2FE",
+    creditos: 4,
+    notas: "Arquitectura hexagonal, microservicios y despliegue CI/CD.",
+    evaluacion: {
+      parcial: 12.0,
+      final: 15.0,
+      practicas: [
+        { id: uuid(), titulo: "Pipeline CI/CD con Docker", nota: 14 },
+        { id: uuid(), titulo: "Documentación Arquitectura C4", nota: 16 }
+      ]
+    }
+  };
+
+  const cDist = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Sistemas Distribuidos",
+    ciclo_curso: "IX",
+    tipo_condicion: "obligatorio",
+    codigo_asignatura: "SI-503",
+    grupo_seccion: "A",
+    profesor: "Ing. Mendoza",
+    aula: "Lab Sistemas",
+    color: "#FED7AA",
+    creditos: 4,
+    notas: "Algoritmo de consenso Raft y tolerancia a fallas bizantinas.",
+    evaluacion: {
+      parcial: 8.0,
+      final: null,
+      practicas: [
+        { id: uuid(), titulo: "Práctica 1: Sockets TCP", nota: 9 },
+        { id: uuid(), titulo: "Práctica 2: RPC con gRPC", nota: 8.5 }
+      ]
+    }
+  };
+
+  const cForm = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Formulación y Evaluación de Proyectos TI",
+    ciclo_curso: "IX",
+    tipo_condicion: "obligatorio",
+    codigo_asignatura: "SI-504",
+    grupo_seccion: "B",
+    profesor: "Dra. Vargas",
+    aula: "Aula 204",
+    color: "#BBF7D0",
+    creditos: 3,
+    notas: "Metodología PMBOK, flujo de caja proyectado y TIR/VAN.",
+    evaluacion: {
+      parcial: 13.0,
+      final: null,
+      practicas: [
+        { id: uuid(), titulo: "Control 1: Estudio de Mercado", nota: 12 },
+        { id: uuid(), titulo: "Flujo de Caja y Análisis VAN", nota: 14 }
+      ]
+    }
+  };
+
+  const cAud = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Auditoría y Seguridad en Informática",
+    ciclo_curso: "IX",
+    tipo_condicion: "obligatorio",
+    codigo_asignatura: "SI-505",
+    grupo_seccion: "A",
+    profesor: "Ing. Silva",
+    aula: "Lab Virtual",
+    color: "#F5D0FE",
+    creditos: 3,
+    notas: "Norma ISO 27001, pentesting ético y pruebas OWASP Top 10.",
+    evaluacion: {
+      parcial: 13.5,
+      final: null,
+      practicas: [
+        { id: uuid(), titulo: "Informe Auditoría OWASP", nota: 14.5 }
+      ]
+    }
+  };
+
+  const cCloud = {
+    id: uuid(),
+    ciclo_id: cicloId,
+    nombre: "Cloud Computing y Serverless",
+    ciclo_curso: "IX",
+    tipo_condicion: "electivo",
+    codigo_asignatura: "SI-508",
+    grupo_seccion: "A",
+    profesor: "Ing. Pezo",
+    aula: "Laboratorio Cloud",
+    color: "#FEF08A",
+    creditos: 3,
+    notas: "Infraestructura como código con Terraform y arquitecturas serverless en AWS.",
+    evaluacion: {
+      parcial: 16.0,
+      final: null,
+      practicas: [
+        { id: uuid(), titulo: "Microservicio Serverless", nota: 17 },
+        { id: uuid(), titulo: "Infraestructura Terraform", nota: 16 }
+      ]
+    }
+  };
+
+  const demoCursos = [cIA, cTop, cDist, cForm, cAud, cCloud];
+
+  // 4. Clases Académicas y ACTIVIDADES NO ACADÉMICAS
   const demoClasses = [
-    { id: uuid(), curso_id: cIA.id,   dia_semana: "LUNES",     hora_inicio: "16:30", hora_fin: "19:00", aula: "" },
-    { id: uuid(), curso_id: cTop.id,  dia_semana: "LUNES",     hora_inicio: "19:00", hora_fin: "21:30", aula: "" },
-    { id: uuid(), curso_id: cIA.id,   dia_semana: "MARTES",    hora_inicio: "14:00", hora_fin: "16:30", aula: "" },
-    { id: uuid(), curso_id: cForm.id, dia_semana: "MARTES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
-    { id: uuid(), curso_id: cAud.id,  dia_semana: "MIERCOLES", hora_inicio: "14:50", hora_fin: "16:30", aula: "" },
-    { id: uuid(), curso_id: cDist.id, dia_semana: "MIERCOLES", hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
-    { id: uuid(), curso_id: cDist.id, dia_semana: "JUEVES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "" },
-    { id: uuid(), curso_id: cAud.id,  dia_semana: "VIERNES",   hora_inicio: "14:50", hora_fin: "16:30", aula: "" },
-    { id: uuid(), curso_id: cForm.id, dia_semana: "VIERNES",   hora_inicio: "17:20", hora_fin: "19:00", aula: "" },
-    { id: uuid(), curso_id: cPrac.id, dia_semana: "SABADO",    hora_inicio: "09:00", hora_fin: "12:20", aula: "" }
+    // Clases regulares
+    { id: uuid(), curso_id: cIA.id,   tipo: "curso", dia_semana: "LUNES",     hora_inicio: "16:30", hora_fin: "19:00", aula: "Aula 1", profesor: "Dr. Agurto" },
+    { id: uuid(), curso_id: cTop.id,  tipo: "curso", dia_semana: "LUNES",     hora_inicio: "19:00", hora_fin: "21:30", aula: "Lab Redes", profesor: "Ing. Chaparro" },
+    { id: uuid(), curso_id: cIA.id,   tipo: "curso", dia_semana: "MARTES",    hora_inicio: "14:00", hora_fin: "16:30", aula: "Aula 1", profesor: "Dr. Agurto" },
+    { id: uuid(), curso_id: cForm.id, tipo: "curso", dia_semana: "MARTES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "Aula 204", profesor: "Dra. Vargas" },
+    { id: uuid(), curso_id: cAud.id,  tipo: "curso", dia_semana: "MIERCOLES", hora_inicio: "14:50", hora_fin: "16:30", aula: "Lab Virtual", profesor: "Ing. Silva" },
+    { id: uuid(), curso_id: cDist.id, tipo: "curso", dia_semana: "MIERCOLES", hora_inicio: "19:50", hora_fin: "21:30", aula: "Lab Sistemas", profesor: "Ing. Mendoza" },
+    { id: uuid(), curso_id: cDist.id, tipo: "curso", dia_semana: "JUEVES",    hora_inicio: "19:50", hora_fin: "21:30", aula: "Lab Sistemas", profesor: "Ing. Mendoza" },
+    { id: uuid(), curso_id: cAud.id,  tipo: "curso", dia_semana: "VIERNES",   hora_inicio: "14:50", hora_fin: "16:30", aula: "Lab Virtual", profesor: "Ing. Silva" },
+    { id: uuid(), curso_id: cForm.id, tipo: "curso", dia_semana: "VIERNES",   hora_inicio: "17:20", hora_fin: "19:00", aula: "Aula 204", profesor: "Dra. Vargas" },
+    { id: uuid(), curso_id: cCloud.id,tipo: "curso", dia_semana: "SABADO",    hora_inicio: "08:30", hora_fin: "11:00", aula: "Lab Cloud", profesor: "Ing. Pezo" },
+
+    // Actividades No Académicas (Trabajo / Prácticas / Taller de media hora)
+    {
+      id: uuid(),
+      curso_id: "",
+      materia: "Prácticas Pre-Profesionales OTI",
+      tipo: "actividad",
+      dia_semana: "LUNES",
+      hora_inicio: "08:00",
+      hora_fin: "12:00",
+      aula: "Oficina TI - UNU",
+      profesor: "Ing. Castillo (Tutor)",
+      color: "#DDE8C8"
+    },
+    {
+      id: uuid(),
+      curso_id: "",
+      materia: "Gimnasio Universitario",
+      tipo: "actividad",
+      dia_semana: "MIERCOLES",
+      hora_inicio: "18:00",
+      hora_fin: "18:30", // Bloque de 30 min (ideal para probar texto compacto)
+      aula: "Complejo Deportivo UNU",
+      profesor: "",
+      color: "#FEE2E2"
+    },
+    {
+      id: uuid(),
+      curso_id: "",
+      materia: "Club de Programación Competitiva",
+      tipo: "actividad",
+      dia_semana: "SABADO",
+      hora_inicio: "11:30",
+      hora_fin: "13:30",
+      aula: "Auditorio Sistemas",
+      profesor: "Comité de Estudiantes",
+      color: "#99F6E4"
+    }
   ];
 
-  const now = new Date();
-  const d1 = new Date(now.getTime() + 24 * 3600000).toISOString().slice(0, 16);
-  const d2 = new Date(now.getTime() + 48 * 3600000).toISOString().slice(0, 16);
-  const d3 = new Date(now.getTime() + 96 * 3600000).toISOString().slice(0, 16);
-  const d4 = new Date(now.getTime() + 140 * 3600000).toISOString().slice(0, 16);
+  // 5. Tareas: Presentadas (hechas) y Pendientes (por hacer)
+  const d1 = new Date(hoy.getTime() + 24 * 3600000).toISOString().slice(0, 16);
+  const d2 = new Date(hoy.getTime() + 48 * 3600000).toISOString().slice(0, 16);
+  const d3 = new Date(hoy.getTime() + 96 * 3600000).toISOString().slice(0, 16);
+  const d4 = new Date(hoy.getTime() + 140 * 3600000).toISOString().slice(0, 16);
 
   const demoTasks = [
-    { id: uuid(), titulo: "Entrega de Proyecto: Agente de Búsqueda Heurística", curso_id: cIA.id, fecha_limite: d1, importancia: 5, completada: false, fecha_creacion: now.toISOString(), notas: "Implementación de algoritmo A* con heurística admisible." },
-    { id: uuid(), titulo: "Informe de Auditoría de Seguridad Web OWASP", curso_id: cAud.id, fecha_limite: d2, importancia: 4, completada: false, fecha_creacion: now.toISOString(), notas: "Escaneo de vulnerabilidades y matriz de riesgos." },
-    { id: uuid(), titulo: "Estudio de Mercado y Flujo de Caja", curso_id: cForm.id, fecha_limite: d3, importancia: 4, completada: false, fecha_creacion: now.toISOString(), notas: "Cálculo del VAN y TIR con escenarios de sensibilidad." },
-    { id: uuid(), titulo: "Implementación de Consenso Raft", curso_id: cDist.id, fecha_limite: d4, importancia: 3, completada: false, fecha_creacion: now.toISOString(), notas: "Módulo de elección de líder y replicación de log." },
-    { id: uuid(), titulo: "Bitácora semanal de actividades prácticas", curso_id: cPrac.id, fecha_limite: "", importancia: 2, completada: true, fecha_creacion: now.toISOString(), notas: "Firmada por el supervisor institucional." }
+    // Tareas pendientes por hacer
+    { id: uuid(), titulo: "Entrega Proyecto: Agente Inteligente A*", curso_id: cIA.id, fecha_limite: d1, importancia: 5, completada: false, fecha_creacion: hoy.toISOString(), notas: "Implementación en Python con interfaz gráfica interactiva." },
+    { id: uuid(), titulo: "Informe de Auditoría Web OWASP Top 10", curso_id: cAud.id, fecha_limite: d2, importancia: 4, completada: false, fecha_creacion: hoy.toISOString(), notas: "Reporte de escaneo estático y pruebas de inyección SQL." },
+    { id: uuid(), titulo: "Estudio de Mercado y Matriz VAN/TIR", curso_id: cForm.id, fecha_limite: d3, importancia: 4, completada: false, fecha_creacion: hoy.toISOString(), notas: "Modelo de inversión y tasa de descuento del 12%." },
+    { id: uuid(), titulo: "Laboratorio RPC con gRPC en Go", curso_id: cDist.id, fecha_limite: d4, importancia: 3, completada: false, fecha_creacion: hoy.toISOString(), notas: "Protocol buffers y serialización binaria distribuida." },
+
+    // Tareas ya presentadas y completadas
+    { id: uuid(), titulo: "Pipeline CI/CD con GitHub Actions y Docker", curso_id: cTop.id, fecha_limite: "", importancia: 4, completada: true, fecha_creacion: hoy.toISOString(), notas: "Pruebas unitarias automatizadas y build exitoso." },
+    { id: uuid(), titulo: "Informe Mensual de Prácticas OTI (Mes 1)", curso_id: "", materia: "Prácticas Pre-Profesionales OTI", fecha_limite: "", importancia: 5, completada: true, fecha_creacion: hoy.toISOString(), notas: "Firmado por el supervisor del área de redes." },
+    { id: uuid(), titulo: "Lectura Consenso Distribuido Raft", curso_id: cDist.id, fecha_limite: "", importancia: 2, completada: true, fecha_creacion: hoy.toISOString(), notas: "Resumen de los estados Follower, Candidate y Leader." },
+    { id: uuid(), titulo: "Despliegue de Función Serverless en AWS Lambda", curso_id: cCloud.id, fecha_limite: "", importancia: 3, completada: true, fecha_creacion: hoy.toISOString(), notas: "Integración con API Gateway y base DynamoDB." }
   ];
 
-  await db.transaction("rw", db.cursos, db.clases, db.tareas, async () => {
+  // 6. Asistencias de ejemplo (incluye 2 faltas en Sistemas Distribuidos para ver la alerta)
+  const fechaFalta1 = new Date(lunesActual);
+  fechaFalta1.setDate(lunesActual.getDate() - 5); // Miércoles pasado
+  const fFalta1Str = fnFecha(fechaFalta1);
+
+  const fechaFalta2 = new Date(lunesActual);
+  fechaFalta2.setDate(lunesActual.getDate() - 4); // Jueves pasado
+  const fFalta2Str = fnFecha(fechaFalta2);
+
+  const demoAsistencias = [
+    { id: `${cDist.id}_${fFalta1Str}`, curso_id: cDist.id, fecha: fFalta1Str, estado: "falta" },
+    { id: `${cDist.id}_${fFalta2Str}`, curso_id: cDist.id, fecha: fFalta2Str, estado: "falta" },
+    { id: `${cForm.id}_${fFalta1Str}`, curso_id: cForm.id, fecha: fFalta1Str, estado: "justificada" }
+  ];
+
+  // 7. Guardar en Base de Datos Local
+  await db.transaction("rw", db.ciclos, db.cursos, db.clases, db.tareas, db.asistencia, db.ajustes, async () => {
+    await db.ciclos.put(demoCiclo);
+    await db.ajustes.put({ clave: "perfil_estudiante", valor: demoPerfil });
+    await db.ajustes.put({ clave: "ciclo_inicio", valor: inicioCicloStr });
+    await db.ajustes.put({ clave: "ciclo_fin", valor: finCicloStr });
     await db.cursos.bulkPut(demoCursos);
     await db.clases.bulkPut(demoClasses);
     await db.tareas.bulkPut(demoTasks);
+    await db.asistencia.bulkPut(demoAsistencias);
   });
 
-  showToast("Semestre modelo cargado con cursos, notas y horario.");
+  await cargarPerfilEstudiante();
+  showToast("Semestre Modelo UNU cargado con ciclo, notas, actividades, tareas y asistencia.");
   switchTab("view-cursos");
 }
-
 async function clearAllData() {
   const ok = await confirmDialog(
     "Vaciar Base de Datos",
@@ -4062,7 +4984,7 @@ async function clearAllData() {
 async function guardarClase(e) {
   e.preventDefault();
   const id = $("#class-id").value || uuid();
-  const curso_id = $("#class-curso").value;
+  const tipo = $("#class-tipo")?.value || "curso";
   const dia_semana = $("#class-dia").value;
   const hora_inicio = $("#class-hora-inicio").value;
   const hora_fin = $("#class-hora-fin").value;
@@ -4071,10 +4993,27 @@ async function guardarClase(e) {
 
   errorEl.classList.add("hidden");
 
-  if (!curso_id) {
-    errorEl.textContent = "Selecciona un curso de la lista.";
-    errorEl.classList.remove("hidden");
-    return;
+  let curso_id = "";
+  let titulo = "";
+  let categoria = "";
+  let color = COLOR_CURSO_DEFECTO;
+
+  if (tipo === "actividad") {
+    titulo = $("#class-actividad-titulo").value.trim();
+    categoria = $("#class-actividad-categoria").value;
+    color = $("#class-actividad-color").value || "#BAE6FD";
+    if (!titulo) {
+      errorEl.textContent = "El nombre o título de la actividad es obligatorio.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+  } else {
+    curso_id = $("#class-curso").value;
+    if (!curso_id) {
+      errorEl.textContent = "Selecciona un curso de la lista.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
   }
 
   if (timeToMinutes(hora_fin) <= timeToMinutes(hora_inicio)) {
@@ -4094,15 +5033,26 @@ async function guardarClase(e) {
     overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
 
   if (conflict) {
-    const nombreConflicto = (cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase";
+    const nombreConflicto = conflict.tipo === "actividad"
+      ? (conflict.titulo || "otra actividad")
+      : ((cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase");
     errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}, ${DIAS_LABEL[conflict.dia_semana]}).`;
     errorEl.classList.remove("hidden");
     return;
   }
 
-  await db.clases.put({ id, curso_id, dia_semana, hora_inicio, hora_fin, aula });
+  const cicloActivo = await obtenerCicloActivo();
+  const ciclo_id = cicloActivo?.id || "";
+
+  if (tipo === "actividad") {
+    await db.clases.put({ id, tipo: "actividad", titulo, categoria, color, curso_id: "", dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
+    showToast("Actividad guardada en el horario.");
+  } else {
+    await db.clases.put({ id, tipo: "curso", curso_id, dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
+    showToast("Clase guardada en el horario.");
+  }
+
   closeClassModal();
-  showToast("Clase guardada en el horario.");
   if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
 }
@@ -4126,9 +5076,7 @@ async function guardarTarea(e) {
   const curso_id = $("#task-curso").value || "";
   const fecha_limite = $("#task-fecha").value;
   const importancia = parseInt($("#task-importancia").value) || 3;
-  const taskEstEl = $("#task-estimado");
-  const estVal = taskEstEl ? parseInt(taskEstEl.value, 10) : NaN;
-  const estimado_min = !isNaN(estVal) && estVal > 0 ? Math.min(480, estVal) : null;
+  const estimado_min = null;
   const notas = $("#task-descripcion").value.trim();
   const completada = $("#task-completada").checked;
   const errorEl = $("#task-form-error");
@@ -4205,6 +5153,427 @@ async function scheduleTestNotification() {
 /* =====================================================================
    13. EVENTOS Y FORMULARIOS
    ===================================================================== */
+
+/* =====================================================================
+   6.8 PERFIL DEL ESTUDIANTE (UNU) Y REPORTE DE FIN DE CICLO
+   ===================================================================== */
+async function cargarPerfilEstudiante() {
+  const reg = await db.ajustes.get("perfil_estudiante");
+  const p = reg?.valor || {};
+  if ($("#perfil-nombre")) $("#perfil-nombre").value = p.nombre || "";
+  if ($("#perfil-codigo")) $("#perfil-codigo").value = p.codigo || "";
+  if ($("#perfil-dni")) $("#perfil-dni").value = p.dni || "";
+  if ($("#perfil-sexo")) $("#perfil-sexo").value = p.sexo || "";
+  if ($("#perfil-telefono")) $("#perfil-telefono").value = p.telefono || "";
+  if ($("#perfil-facultad")) $("#perfil-facultad").value = p.facultad || "";
+  if ($("#perfil-escuela")) $("#perfil-escuela").value = p.escuela || "";
+  if ($("#perfil-correo")) $("#perfil-correo").value = p.correo || "";
+}
+
+async function guardarPerfilEstudiante(e) {
+  if (e) e.preventDefault();
+  const perfil = {
+    nombre: ($("#perfil-nombre")?.value || "").trim(),
+    codigo: ($("#perfil-codigo")?.value || "").trim(),
+    dni: ($("#perfil-dni")?.value || "").trim(),
+    sexo: ($("#perfil-sexo")?.value || "").trim(),
+    telefono: ($("#perfil-telefono")?.value || "").trim(),
+    facultad: ($("#perfil-facultad")?.value || "").trim(),
+    escuela: ($("#perfil-escuela")?.value || "").trim(),
+    correo: ($("#perfil-correo")?.value || "").trim()
+  };
+  await db.ajustes.put({ clave: "perfil_estudiante", valor: perfil });
+  showToast("Perfil de estudiante guardado exitosamente.");
+}
+
+let estadoUltimoReporte = null;
+
+async function openReporteFinCicloModal() {
+  const [{ list: cursos }, clases, asistencias, excepciones, cicloActivo, ajustes, regPerfil] = await Promise.all([
+    cargarCursos(),
+    db.clases.toArray(),
+    db.asistencia.toArray(),
+    db.excepciones.toArray(),
+    obtenerCicloActivo(),
+    db.ajustes.toArray(),
+    db.ajustes.get("perfil_estudiante")
+  ]);
+
+  const mapAjustes = {};
+  for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+  const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+  const perfil = regPerfil?.valor || {};
+
+  const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-03-16";
+  const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-07-12";
+  const limiteFaltasPct = cfg.limite_faltas_pct || 30;
+
+  const fnResumen = typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia;
+
+  let totalCreditosMatriculados = 0;
+  let totalCreditosAprobados = 0;
+  let sumaPonderada = 0;
+  let sumaCreditosConNota = 0;
+  let sumaSimple = 0;
+  let cursosConNotaCount = 0;
+
+  let totalSesionesGlobales = 0;
+  let totalFaltasGlobales = 0;
+  let totalJustificadasGlobales = 0;
+  let totalHorasLectivasSemana = 0;
+
+  const cursosReporte = cursos.map(c => {
+    const r = calcularRendimiento(c.evaluacion);
+    const clasesCurso = clases.filter(cl => cl.curso_id === c.id);
+
+    let minutosSemana = 0;
+    clasesCurso.forEach(cl => {
+      minutosSemana += Math.max(0, timeToMinutes(cl.hora_fin) - timeToMinutes(cl.hora_inicio));
+    });
+    totalHorasLectivasSemana += (minutosSemana / 60);
+
+    const cr = c.creditos || 3;
+    totalCreditosMatriculados += cr;
+
+    let asistRes = null;
+    if (fnResumen) {
+      asistRes = fnResumen({
+        cursoId: c.id,
+        clasesDelCurso: clasesCurso,
+        asistencias,
+        cicloInicio: fechaIni,
+        cicloFin: fechaFin,
+        excepciones,
+        limiteFaltasPct
+      });
+      totalSesionesGlobales += (asistRes.totalSesiones || 0);
+      totalFaltasGlobales += (asistRes.faltas || 0);
+      totalJustificadasGlobales += (asistRes.justificadas || 0);
+    }
+
+    const notaFinal = r.promedio !== null ? r.promedio : (r.estado === "sin-notas" ? null : r.acumulado);
+    const aprobado = notaFinal !== null && notaFinal >= 10.5;
+    if (aprobado) totalCreditosAprobados += cr;
+
+    if (notaFinal !== null) {
+      sumaPonderada += (notaFinal * cr);
+      sumaCreditosConNota += cr;
+      sumaSimple += notaFinal;
+      cursosConNotaCount++;
+    }
+
+    return {
+      id: c.id,
+      nombre: c.nombre,
+      ciclo_curso: c.ciclo_curso || "-",
+      tipo_condicion: c.tipo_condicion || "obligatorio",
+      codigo: c.codigo_asignatura || "-",
+      creditos: cr,
+      rendimiento: r,
+      notaFinal,
+      aprobado,
+      asistencia: asistRes
+    };
+  });
+
+  const pps = sumaCreditosConNota > 0 ? (sumaPonderada / sumaCreditosConNota) : null;
+  const promedioSimple = cursosConNotaCount > 0 ? (sumaSimple / cursosConNotaCount) : null;
+  const horasTotales17Semanas = Math.round(totalHorasLectivasSemana * 17);
+
+  const totalAsistidas = Math.max(0, totalSesionesGlobales - totalFaltasGlobales);
+  const pctAsistenciaGlobal = totalSesionesGlobales > 0 ? Math.round((totalAsistidas / totalSesionesGlobales) * 100) : 100;
+
+  // Diagnóstico Institucional UNU
+  let diagnostico = "";
+  let diagTipo = "st-ok";
+  if (cursos.length === 0) {
+    diagnostico = "Aún no tienes asignaturas registradas para este ciclo académico.";
+    diagTipo = "st-neutral";
+  } else if (totalCreditosAprobados === totalCreditosMatriculados && totalCreditosMatriculados > 0) {
+    diagnostico = "¡Ciclo Invictor! Has culminado satisfactoriamente el 100% de tus créditos matriculados sin observaciones reglamentarias.";
+    diagTipo = "st-ok";
+  } else if (totalCreditosAprobados >= totalCreditosMatriculados * 0.7) {
+    diagnostico = "Rendimiento regular. Se sugiere reforzar asignaturas pendientes en el siguiente periodo para mantener el avance curricular.";
+    diagTipo = "st-warn";
+  } else {
+    diagnostico = "Rendimiento observado. Revisa tu plan curricular y considera asesoría académica para recuperar créditos el próximo semestre.";
+    diagTipo = "st-bad";
+  }
+
+  estadoUltimoReporte = {
+    cicloNombre: cicloActivo?.nombre || "Ciclo Académico",
+    fechaIni,
+    fechaFin,
+    perfil,
+    pps,
+    promedioSimple,
+    totalCreditosMatriculados,
+    totalCreditosAprobados,
+    horasTotales17Semanas,
+    pctAsistenciaGlobal,
+    totalSesionesGlobales,
+    totalFaltasGlobales,
+    totalJustificadasGlobales,
+    diagnostico,
+    cursos: cursosReporte
+  };
+
+  const bodyEl = $("#reporte-ciclo-body");
+  if (!bodyEl) return;
+
+  const nombreEstudiante = perfil.nombre || "Estudiante";
+  const codigoEst = perfil.codigo ? `Cód. ${escapeHtml(perfil.codigo)}` : "Sin código registrado";
+  const carrera = perfil.escuela || "Escuela Profesional";
+  const fac = perfil.facultad ? ` · ${escapeHtml(perfil.facultad)}` : "";
+
+  bodyEl.innerHTML = `
+    <div class="report-header-banner">
+      <div class="report-inst-title">Universidad Nacional de Ucayali · UNUmbral Local</div>
+      <div class="report-student-name">${escapeHtml(nombreEstudiante)}</div>
+      <div class="report-student-meta">
+        <strong>${codigoEst}</strong> · ${escapeHtml(carrera)}${fac}
+      </div>
+      <div class="report-student-meta" style="margin-top:4px; font-weight:600; color:var(--deep-leaf);">
+        Semestre Académico: ${escapeHtml(cicloActivo?.nombre || "Ciclo Actual")} (${fechaIni} al ${fechaFin} · 17 Semanas)
+      </div>
+    </div>
+
+    <div class="report-stats-grid">
+      <div class="report-stat-card">
+        <div class="report-stat-val">${pps !== null ? formatNota(pps) : "—"}</div>
+        <div class="report-stat-lbl">Promedio Ponderado (PPS)</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-val">${promedioSimple !== null ? formatNota(promedioSimple) : "—"}</div>
+        <div class="report-stat-lbl">Promedio Simple</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-val">${totalCreditosAprobados} / ${totalCreditosMatriculados}</div>
+        <div class="report-stat-lbl">Créditos Aprobados</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-val">${pctAsistenciaGlobal}%</div>
+        <div class="report-stat-lbl">Asistencia (${totalFaltasGlobales} faltas)</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-val">${horasTotales17Semanas} h</div>
+        <div class="report-stat-lbl">Horas de Clase (17 Sem)</div>
+      </div>
+    </div>
+
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Asignatura</th>
+            <th style="text-align:center;">Ciclo</th>
+            <th style="text-align:center;">Tipo</th>
+            <th style="text-align:center;">Créditos</th>
+            <th style="text-align:center;">Faltas</th>
+            <th style="text-align:center;">Nota Final</th>
+            <th style="text-align:center;">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cursosReporte.map(c => `
+            <tr>
+              <td>
+                <div style="font-weight:700;">${escapeHtml(c.nombre)}</div>
+                ${c.codigo !== "-" ? `<div style="font-size:10px;color:var(--text-secondary);">${escapeHtml(c.codigo)}</div>` : ""}
+              </td>
+              <td style="text-align:center;">${escapeHtml(c.ciclo_curso)}</td>
+              <td style="text-align:center;text-transform:capitalize;">${escapeHtml(c.tipo_condicion)}</td>
+              <td style="text-align:center;font-weight:600;">${c.creditos}</td>
+              <td style="text-align:center;">${c.asistencia ? c.asistencia.faltas : 0}</td>
+              <td style="text-align:center;font-family:var(--font-mono);font-weight:700;">${c.notaFinal !== null ? formatNota(c.notaFinal) : "—"}</td>
+              <td style="text-align:center;">
+                <span class="grade-status-pill ${c.aprobado ? 'st-ok' : (c.notaFinal === null ? 'st-neutral' : 'st-bad')}" style="font-size:10px;padding:2px 7px;">
+                  ${c.aprobado ? "Aprobado" : (c.notaFinal === null ? "En curso" : "Desaprobado")}
+                </span>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="report-feedback-box">
+      <div class="report-feedback-title">Diagnóstico y Recomendaciones Académicas:</div>
+      <div>${escapeHtml(diagnostico)}</div>
+    </div>
+  `;
+
+  $("#modal-reporte-ciclo-backdrop").classList.remove("hidden");
+}
+
+function closeReporteFinCicloModal() {
+  $("#modal-reporte-ciclo-backdrop").classList.add("hidden");
+}
+
+function descargarReporteComoImagen(reporte) {
+  if (!reporte) return;
+  const canvas = document.createElement("canvas");
+  const W = 1200;
+  const H = 1550;
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+
+  // Fondo limpio marfil/blanco
+  ctx.fillStyle = "#FDFBF7";
+  ctx.fillRect(0, 0, W, H);
+
+  // Marco exterior
+  ctx.strokeStyle = "#E2E8F0";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(20, 20, W - 40, H - 40);
+
+  // Cabecera superior verde institucional
+  ctx.fillStyle = "#22432C";
+  ctx.fillRect(20, 20, W - 40, 160);
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = "bold 26px system-ui, -apple-system, sans-serif";
+  ctx.fillText("UNIVERSIDAD NACIONAL DE UCAYALI", 60, 75);
+
+  ctx.font = "18px system-ui, -apple-system, sans-serif";
+  ctx.fillStyle = "#A3E635";
+  ctx.fillText("UNUmbral · Récord Académico y Balance de Fin de Ciclo (17 Semanas)", 60, 110);
+
+  ctx.font = "16px system-ui, -apple-system, sans-serif";
+  ctx.fillStyle = "#E2E8F0";
+  ctx.fillText(`Semestre: ${reporte.cicloNombre} (${reporte.fechaIni} al ${reporte.fechaFin})`, 60, 142);
+
+  // Caja del Estudiante
+  ctx.fillStyle = "#FFFFFF";
+  ctx.strokeStyle = "#CBD5E1";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(60, 210, W - 120, 130, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#0F172A";
+  ctx.font = "bold 24px system-ui, -apple-system, sans-serif";
+  ctx.fillText(reporte.perfil?.nombre || "Estudiante UNU", 85, 255);
+
+  ctx.font = "16px system-ui, -apple-system, sans-serif";
+  ctx.fillStyle = "#475569";
+  const codTxt = reporte.perfil?.codigo ? `Cód: ${reporte.perfil.codigo}` : "Sin código";
+  const dniTxt = reporte.perfil?.dni ? `DNI: ${reporte.perfil.dni}` : "";
+  ctx.fillText(`${codTxt}   ${dniTxt}   |   ${reporte.perfil?.escuela || "Escuela Profesional"}`, 85, 290);
+  ctx.fillText(reporte.perfil?.facultad || "Facultad Universitaria", 85, 318);
+
+  // Bloques de Estadísticas Principales
+  const stats = [
+    { val: reporte.pps !== null ? Number(reporte.pps).toFixed(2) : "—", lbl: "Promedio Ponderado" },
+    { val: reporte.promedioSimple !== null ? Number(reporte.promedioSimple).toFixed(2) : "—", lbl: "Promedio Simple" },
+    { val: `${reporte.totalCreditosAprobados}/${reporte.totalCreditosMatriculados}`, lbl: "Créditos Aprobados" },
+    { val: `${reporte.pctAsistenciaGlobal}%`, lbl: "Asistencia Global" },
+    { val: `${reporte.horasTotales17Semanas} h`, lbl: "Horas Lectivas (17 Sem)" }
+  ];
+
+  const statW = (W - 120 - 40) / 5;
+  stats.forEach((st, idx) => {
+    const sx = 60 + idx * (statW + 10);
+    ctx.fillStyle = "#F8FAFC";
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.beginPath();
+    ctx.roundRect(sx, 365, statW, 95, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = "#22432C";
+    ctx.font = "bold 26px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(st.val, sx + statW / 2, 412);
+
+    ctx.fillStyle = "#64748B";
+    ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
+    ctx.fillText(st.lbl, sx + statW / 2, 440);
+  });
+  ctx.textAlign = "left";
+
+  // Tabla de Cursos
+  let currentY = 500;
+  ctx.fillStyle = "#22432C";
+  ctx.font = "bold 18px system-ui, -apple-system, sans-serif";
+  ctx.fillText("DETALLE DE ASIGNATURAS Y RENDIMIENTO:", 60, currentY);
+  currentY += 20;
+
+  // Header tabla
+  ctx.fillStyle = "#E2E8F0";
+  ctx.fillRect(60, currentY, W - 120, 36);
+  ctx.fillStyle = "#1E293B";
+  ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+  ctx.fillText("ASIGNATURA", 75, currentY + 23);
+  ctx.fillText("CICLO", 520, currentY + 23);
+  ctx.fillText("CONDICIÓN", 620, currentY + 23);
+  ctx.fillText("CRÉDITOS", 750, currentY + 23);
+  ctx.fillText("FALTAS", 870, currentY + 23);
+  ctx.fillText("NOTA FINAL", 960, currentY + 23);
+  ctx.fillText("ESTADO", 1060, currentY + 23);
+
+  currentY += 36;
+  ctx.font = "14px system-ui, -apple-system, sans-serif";
+
+  reporte.cursos.forEach((c, idx) => {
+    ctx.fillStyle = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+    ctx.fillRect(60, currentY, W - 120, 38);
+    ctx.strokeStyle = "#E2E8F0";
+    ctx.strokeRect(60, currentY, W - 120, 38);
+
+    ctx.fillStyle = "#0F172A";
+    ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
+    ctx.fillText(c.nombre.slice(0, 38), 75, currentY + 24);
+
+    ctx.font = "14px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#475569";
+    ctx.fillText(c.ciclo_curso || "-", 525, currentY + 24);
+    ctx.fillText(c.tipo_condicion || "Obligatorio", 625, currentY + 24);
+    ctx.fillText(String(c.creditos), 770, currentY + 24);
+    ctx.fillText(String(c.asistencia ? c.asistencia.faltas : 0), 885, currentY + 24);
+
+    ctx.font = "bold 15px monospace";
+    ctx.fillStyle = c.aprobado ? "#15803D" : (c.notaFinal !== null ? "#DC2626" : "#64748B");
+    ctx.fillText(c.notaFinal !== null ? Number(c.notaFinal).toFixed(1) : "—", 980, currentY + 24);
+
+    ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+    ctx.fillText(c.aprobado ? "APROBADO" : (c.notaFinal !== null ? "DESAPROBADO" : "EN CURSO"), 1060, currentY + 24);
+
+    currentY += 38;
+  });
+
+  // Caja de Diagnóstico / Feedback
+  currentY += 24;
+  ctx.fillStyle = "#EFF6FF";
+  ctx.strokeStyle = "#93C5FD";
+  ctx.beginPath();
+  ctx.roundRect(60, currentY, W - 120, 110, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = "#1E40AF";
+  ctx.font = "bold 16px system-ui, -apple-system, sans-serif";
+  ctx.fillText("DIAGNÓSTICO ACADÉMICO Y BALANCE INSTITUCIONAL:", 85, currentY + 36);
+
+  ctx.fillStyle = "#1E293B";
+  ctx.font = "15px system-ui, -apple-system, sans-serif";
+  ctx.fillText(reporte.diagnostico, 85, currentY + 70);
+
+  // Pie de Página
+  const fechaHoy = new Date().toLocaleDateString("es-PE", { year: "numeric", month: "long", day: "numeric" });
+  ctx.fillStyle = "#64748B";
+  ctx.font = "13px system-ui, -apple-system, sans-serif";
+  ctx.fillText(`Generado localmente por UNUmbral · 100% Offline · Fecha de emisión: ${fechaHoy}`, 60, H - 40);
+
+  // Descarga como archivo de imagen
+  const link = document.createElement("a");
+  link.download = `UNUmbral-Reporte-${(reporte.cicloNombre || "Ciclo").replace(/\s+/g, "_")}.png`;
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
+
 function wireGlobalEvents() {
   $$(".nav-tab").forEach(tab => {
     tab.addEventListener("click", () => switchTab(tab.dataset.view));
@@ -4234,6 +5603,17 @@ function wireGlobalEvents() {
     openNewClassModal();
   });
 
+    const btnGestionarCicloCursos = $("#btn-gestionar-ciclo-cursos");
+  if (btnGestionarCicloCursos) {
+    btnGestionarCicloCursos.addEventListener("click", async () => {
+      const cicloActivo = await obtenerCicloActivo();
+      if (cicloActivo) {
+        openEditCicloModal(cicloActivo);
+      } else {
+        openNewCicloModal({ onSaved: () => renderCursos() });
+      }
+    });
+  }
   $("#btn-add-curso").addEventListener("click", () => openNewCursoModal());
   $("#btn-add-task").addEventListener("click", () => openNewTaskModal());
   $("#btn-add-class").addEventListener("click", () => openNewClassModal());
@@ -4241,6 +5621,53 @@ function wireGlobalEvents() {
 
   $("#btn-mode-agenda").addEventListener("click", () => { state.scheduleMode = "agenda"; renderHorario(); });
   $("#btn-mode-matrix").addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
+  const btnModeCycle = $("#btn-mode-cycle");
+  if (btnModeCycle) {
+    btnModeCycle.addEventListener("click", () => { state.scheduleMode = "cycle"; renderHorario(); });
+  }
+
+  // Eventos del modal de Ciclo Académico
+
+  // Perfil del Estudiante
+  const formPerfil = $("#form-perfil-estudiante");
+  if (formPerfil) formPerfil.addEventListener("submit", guardarPerfilEstudiante);
+
+  // Modal Política de Privacidad
+  const btnVerPriv = $("#btn-ver-privacidad");
+  if (btnVerPriv) btnVerPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.remove("hidden"));
+  const btnCerrarPriv = $("#modal-privacidad-close");
+  if (btnCerrarPriv) btnCerrarPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.add("hidden"));
+  const btnEntendidoPriv = $("#btn-privacidad-entendido");
+  if (btnEntendidoPriv) btnEntendidoPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.add("hidden"));
+
+  // Modal Reporte Fin de Ciclo
+  const btnReporteCiclo = $("#btn-reporte-ciclo");
+  if (btnReporteCiclo) btnReporteCiclo.addEventListener("click", openReporteFinCicloModal);
+  const btnCerrarRep = $("#btn-cerrar-reporte-ciclo");
+  if (btnCerrarRep) btnCerrarRep.addEventListener("click", closeReporteFinCicloModal);
+  const btnCloseRepX = $("#modal-reporte-close");
+  if (btnCloseRepX) btnCloseRepX.addEventListener("click", closeReporteFinCicloModal);
+  const btnDescargarImg = $("#btn-descargar-reporte-img");
+  if (btnDescargarImg) btnDescargarImg.addEventListener("click", () => descargarReporteComoImagen(estadoUltimoReporte));
+
+  $("#modal-ciclo-close").addEventListener("click", closeModalCiclo);
+  $("#btn-cancel-ciclo").addEventListener("click", closeModalCiclo);
+  $("#modal-ciclo-backdrop").addEventListener("click", (e) => {
+    if (e.target.id === "modal-ciclo-backdrop") closeModalCiclo();
+  });
+  $("#form-ciclo").addEventListener("submit", guardarCiclo);
+  $("#ciclo-fecha-inicio").addEventListener("input", actualizarPreviewCiclo);
+
+  // Inicializar selector 12h y paleta de actividades
+  init12HourSelectors();
+  const actPicker = $("#class-actividad-color-picker");
+  if (actPicker) {
+    $$(".color-swatch", actPicker).forEach(s => {
+      s.addEventListener("click", () => setActividadColor(s.dataset.color));
+    });
+  }
+  $("#btn-class-type-curso").addEventListener("click", () => setClassTypeMode("curso"));
+  $("#btn-class-type-actividad").addEventListener("click", () => setClassTypeMode("actividad"));
 
   $$(".day-tab", $("#day-tabs-container")).forEach(btn => {
     btn.addEventListener("click", () => {
@@ -4401,14 +5828,7 @@ function wireGlobalEvents() {
   $$(".imp-star-btn", $("#task-importance-selector")).forEach(btn => {
     btn.addEventListener("click", () => setImportanceStars(parseInt(btn.dataset.val)));
   });
-  $$("#task-estimado-chips .filter-chip").forEach(chip => {
-    chip.addEventListener("click", () => {
-      const input = $("#task-estimado");
-      if (input) input.value = chip.dataset.min;
-      $$("#task-estimado-chips .filter-chip").forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-    });
-  });
+
   $("#modal-task-close").addEventListener("click", closeTaskModal);
   $("#btn-cancel-task").addEventListener("click", closeTaskModal);
   $("#modal-task-backdrop").addEventListener("click", (e) => {
@@ -4706,7 +6126,12 @@ async function init() {
     console.warn("Aviso abriendo IndexedDB:", err);
   }
 
-  wireGlobalEvents();
+  try {
+    wireGlobalEvents();
+    await cargarPerfilEstudiante();
+  } catch (err) {
+    console.error("Error en wireGlobalEvents:", err);
+  }
   switchTab("view-hoy");
   inicializarDeepLinks();
 
