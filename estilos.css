@@ -419,8 +419,58 @@ button:active, .btn-primary:active, .btn-secondary:active {
   border-bottom-left-radius: var(--radius-lg);
 }
 
+.live-card.in-class {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--surface-card) 100%);
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.1);
+}
+
 .live-card.in-class::before {
-  background: var(--status-success);
+  background: #f59e0b;
+}
+
+.live-card.in-class .live-dot.pulse {
+  background-color: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+  animation: pulseDotAmber 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes pulseDotAmber {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.live-badge-in-class {
+  color: #b45309;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.live-timer-in-class {
+  color: #b45309 !important;
+  font-weight: 700 !important;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.live-card.in-class .live-progress-fill {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+[data-theme="dark"] .live-card.in-class {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, var(--surface-card) 100%);
+  border-color: rgba(245, 158, 11, 0.45);
+}
+
+[data-theme="dark"] .live-badge-in-class {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .live-timer-in-class {
+  color: #fbbf24 !important;
 }
 
 .live-card-eyebrow {
@@ -2317,6 +2367,7 @@ button:active, .btn-primary:active, .btn-secondary:active {
 }
 
 .course-card-main {
+  cursor: pointer;
   flex: 1;
   min-width: 0;
   background: transparent;
@@ -2756,6 +2807,23 @@ button:active, .btn-primary:active, .btn-secondary:active {
   flex-wrap: wrap;
 }
 
+.course-asist-badge {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 8px;
+  gap: 5px;
+}
+.course-asist-badge.has-faltas {
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.4);
+  color: #b45309;
+}
+.course-asist-badge.danger-faltas {
+  background: rgba(220, 38, 38, 0.14);
+  border-color: rgba(220, 38, 38, 0.45);
+  color: #dc2626;
+}
+
 .asist-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -3082,4 +3150,397 @@ button:active, .btn-primary:active, .btn-secondary:active {
 /* UTILIDAD */
 .hidden {
   display: none !important;
+}
+
+/* =====================================================================
+   SELECTOR DE HORAS 12H (AM / PM) & SELECTOR DE TIPO CLASE
+   ===================================================================== */
+.time-12h-picker-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.time-12h-select {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 6px;
+  text-align: center;
+}
+
+.time-12h-colon {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.btn-ampm-toggle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-width: 44px;
+}
+
+.btn-ampm-toggle:hover {
+  background: var(--surface-card);
+  border-color: var(--primary);
+}
+
+.btn-ampm-toggle.is-pm {
+  background: var(--primary);
+  color: #ffffff;
+  border-color: var(--primary);
+}
+
+/* =====================================================================
+   ROADMAP DE CICLO ACADÉMICO (17 SEMANAS)
+   ===================================================================== */
+.cycle-active-header {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.cycle-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cycle-title-h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.cycle-progress-wrap {
+  margin-top: 12px;
+}
+
+.cycle-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.cycle-progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--border-hairline);
+}
+
+.cycle-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  border-radius: var(--radius-pill);
+  transition: width 0.3s ease;
+}
+
+.cycle-weeks-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cycle-week-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cycle-week-card.is-current {
+  border-color: var(--primary);
+  border-left-width: 5px;
+  border-left-color: var(--primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.cycle-week-card.is-exam {
+  border-color: #f59e0b;
+  border-left-width: 5px;
+  border-left-color: #f59e0b;
+  background: linear-gradient(to right, rgba(245, 158, 11, 0.05), var(--surface-card));
+}
+
+.cycle-week-card.is-final {
+  border-color: #8b5cf6;
+  border-left-width: 5px;
+  border-left-color: #8b5cf6;
+  background: linear-gradient(to right, rgba(139, 92, 246, 0.05), var(--surface-card));
+}
+
+.cycle-week-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.cycle-week-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cycle-week-dates {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.cycle-week-badge-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.cycle-week-badge-pill.current {
+  background: rgba(30, 100, 60, 0.15);
+  color: var(--primary);
+}
+
+.cycle-week-badge-pill.exam {
+  background: rgba(245, 158, 11, 0.18);
+  color: #b45309;
+}
+
+.cycle-week-badge-pill.final {
+  background: rgba(139, 92, 246, 0.18);
+  color: #6d28d9;
+}
+
+.cycle-week-items-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cycle-item-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+
+/* =====================================================================
+   ESTILOS PREMIUM PARA MODAL DE TAREA Y CHIPS DE TIEMPO
+   ===================================================================== */
+.task-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  min-height: 32px;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
+.filter-chip:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.filter-chip.active {
+  background: var(--deep-leaf);
+  color: #FFFFFF;
+  border-color: var(--deep-leaf);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(41, 70, 53, 0.25);
+}
+
+.check-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.check-row:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-medium);
+}
+
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--deep-leaf);
+  cursor: pointer;
+  margin: 0;
+}
+
+.check-row label {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  user-select: none;
+  margin: 0;
+}
+
+
+/* Disabled button state */
+.asist-pill-btn.disabled {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Reporte de Fin de Ciclo (Estilo Ficha UNU) */
+.report-header-banner {
+  background: linear-gradient(135deg, rgba(82, 183, 136, 0.12) 0%, rgba(34, 67, 44, 0.05) 100%);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.report-inst-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--deep-leaf);
+  margin-bottom: 4px;
+}
+.report-student-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.report-student-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.report-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.report-stat-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  text-align: center;
+}
+.report-stat-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--deep-leaf);
+  font-family: var(--font-mono);
+}
+.report-stat-lbl {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.report-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+}
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.report-table th {
+  background: var(--surface-subtle);
+  padding: 8px 10px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.report-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+}
+.report-table tr:last-child td {
+  border-bottom: none;
+}
+
+.report-feedback-box {
+  background: rgba(82, 183, 136, 0.08);
+  border-left: 3px solid var(--accent-teal);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.report-feedback-title {
+  font-weight: 700;
+  color: var(--deep-leaf);
+  margin-bottom: 4px;
 }

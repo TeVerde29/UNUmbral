@@ -150,6 +150,7 @@
         <div class="segmented-control">
           <button class="seg-btn active" id="btn-mode-agenda" data-mode="agenda">Día a Día</button>
           <button class="seg-btn" id="btn-mode-matrix" data-mode="matrix">Parrilla Semanal</button>
+          <button class="seg-btn" id="btn-mode-cycle" data-mode="cycle">Ciclo Académico</button>
         </div>
         <button id="btn-add-class" class="btn-secondary btn-sm">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -186,6 +187,12 @@
       <div id="schedule-container" class="schedule-body">
         <!-- Renderizado dinámico -->
       </div>
+
+      <!-- Contenedor del Roadmap del Ciclo Académico (17 semanas) -->
+      <div id="cycle-container" class="cycle-body hidden" style="margin-top: 12px;">
+        <div class="cycle-active-header" id="cycle-active-header"></div>
+        <div class="cycle-weeks-grid" id="cycle-weeks-list" style="margin-top: 12px;"></div>
+      </div>
     </section>
 
     <!-- VISTA 2.5: MIS CURSOS & NOTAS -->
@@ -194,10 +201,20 @@
         <div>
           <h2 class="section-title">Mis Cursos y Notas</h2>
         </div>
-        <button id="btn-add-curso" class="btn-primary btn-sm">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          <span>Curso</span>
-        </button>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <button id="btn-reporte-ciclo" type="button" class="btn-secondary btn-sm" title="Récord Académico y Feedback de Fin de Ciclo">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-right:4px;vertical-align:-2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span>Reporte</span>
+          </button>
+          <button id="btn-gestionar-ciclo-cursos" type="button" class="btn-secondary btn-sm" title="Gestionar Ciclo Académico">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-right:4px;vertical-align:-2px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Ciclo</span>
+          </button>
+          <button id="btn-add-curso" class="btn-primary btn-sm">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Curso</span>
+          </button>
+        </div>
       </div>
 
       <!-- Resumen general del ciclo -->
@@ -410,6 +427,69 @@
         </div>
       </div>
 
+      <!-- Perfil del Estudiante (UNU) -->
+      <div class="section-header" style="margin-top: 28px;">
+        <div>
+          <h2 class="section-title">Perfil del Estudiante</h2>
+          <p class="section-subtitle">Datos académicos institucionales para reportes y fichas de rendimiento</p>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <form id="form-perfil-estudiante">
+          <div class="form-row">
+            <div class="form-group flex-1">
+              <label class="form-label" for="perfil-nombre">Nombre Completo *</label>
+              <input type="text" id="perfil-nombre" class="field" placeholder="Ej. Juan Carlos Pérez Gómez">
+            </div>
+            <div class="form-group" style="width: 140px;">
+              <label class="form-label" for="perfil-codigo">Código UNU</label>
+              <input type="text" id="perfil-codigo" class="field" placeholder="0002120456" maxlength="15">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div class="form-group" style="width: 120px;">
+              <label class="form-label" for="perfil-dni">DNI</label>
+              <input type="text" id="perfil-dni" class="field" placeholder="73849201" maxlength="10">
+            </div>
+            <div class="form-group" style="width: 120px;">
+              <label class="form-label" for="perfil-sexo">Sexo</label>
+              <select id="perfil-sexo" class="field">
+                <option value="">Elegir…</option>
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label" for="perfil-telefono">Teléfono / Celular</label>
+              <input type="tel" id="perfil-telefono" class="field" placeholder="961234567">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div class="form-group flex-1">
+              <label class="form-label" for="perfil-facultad">Facultad</label>
+              <input type="text" id="perfil-facultad" class="field" placeholder="Ej. Fac. de Ingeniería de Sistemas e Ing. Civil">
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label" for="perfil-escuela">Escuela Profesional</label>
+              <input type="text" id="perfil-escuela" class="field" placeholder="Ej. Ingeniería de Sistemas">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label class="form-label" for="perfil-correo">Correo Electrónico</label>
+            <input type="email" id="perfil-correo" class="field" placeholder="usuario@unu.edu.pe">
+          </div>
+
+          <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
+            <button type="submit" id="btn-guardar-perfil" class="btn-primary btn-sm">Guardar Perfil</button>
+          </div>
+        </form>
+      </div>
+
       <!-- Ciclo Académico y Asistencia -->
       <div class="section-header" style="margin-top: 28px;">
         <div>
@@ -597,13 +677,13 @@
       <!-- Info PWA y Móvil -->
       <div class="info-box" id="privacidad">
         <strong>Dispositivo Móvil &amp; Privacidad 100% Local:</strong>
-        <p>Abre <a href="./" style="color:var(--accent);text-decoration:underline;">UNUmbral</a> en Chrome, Safari o Brave en tu teléfono y selecciona <em>"Añadir a pantalla de inicio"</em> para instalar la aplicación en modo nativo. Política de privacidad: todos tus datos académicos residen exclusivamente en tu dispositivo sin servidores externos.</p>
+        <p>Abre <a href="https://teverde29.github.io/UNUmbral/" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline;">UNUmbral</a> en Chrome, Safari o Brave en tu teléfono y selecciona <em>"Añadir a pantalla de inicio"</em> para instalar la aplicación en modo nativo. Política de privacidad: todos tus datos académicos residen exclusivamente en tu dispositivo sin servidores externos.</p>
         <div class="db-status-line">
           <span class="db-indicator ok" id="db-indicator-dot"></span>
           <span id="db-indicator-text">Almacenamiento persistente activo en el dispositivo</span>
         </div>
         <p style="margin-top:8px;font-size:12px;color:var(--text-tertiary);">
-          Desarrollado por <a href="https://github.com/TeVerde29" rel="author" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-26">26 de octubre de 2026</time> · <a href="#privacidad" style="color:var(--text-secondary);">Política de Privacidad</a>
+          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-27">27 de octubre de 2026</time> · <button type="button" id="btn-ver-privacidad" style="background:none;border:none;padding:0;color:var(--text-secondary);font:inherit;text-decoration:underline;cursor:pointer;">Política de Privacidad</button>
         </p>
       </div>
     </section>
@@ -675,15 +755,62 @@
     <form id="form-class" class="modal-body">
       <input type="hidden" id="class-id">
 
-      <div class="form-group">
+      <!-- Selector de Tipo: Asignatura Universitaria vs Actividad / Trabajo -->
+      <div class="segmented-control" style="margin-bottom: 14px;">
+        <button type="button" class="seg-btn active" id="btn-class-type-curso">Asignatura</button>
+        <button type="button" class="seg-btn" id="btn-class-type-actividad">Actividad / Trabajo</button>
+      </div>
+      <input type="hidden" id="class-tipo" value="curso">
+
+      <!-- Grupo para Asignatura Universitaria -->
+      <div class="form-group" id="group-class-curso">
         <div class="form-label-row">
           <label class="form-label" for="class-curso">Asignatura registrada *</label>
           <button type="button" class="btn-text-action" id="btn-new-curso-from-class">+ Nueva asignatura</button>
         </div>
-        <select id="class-curso" class="field" required>
+        <select id="class-curso" class="field">
           <option value="" disabled selected>Elige una asignatura…</option>
         </select>
         <div id="class-curso-preview" class="curso-preview hidden"></div>
+      </div>
+
+      <!-- Grupo para Actividad No Académica (Prácticas, Trabajo, Taller, etc.) -->
+      <div id="group-class-actividad" class="hidden">
+        <div class="form-group">
+          <label class="form-label" for="class-actividad-titulo">Nombre de la actividad / trabajo *</label>
+          <input type="text" id="class-actividad-titulo" class="field" placeholder="Ej. Prácticas OTI, Empleo oficina, Taller..." enterkeyhint="next">
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label" for="class-actividad-categoria">Categoría</label>
+          <select id="class-actividad-categoria" class="field">
+            <option value="practicas">Prácticas Pre-Profesionales</option>
+            <option value="trabajo">Trabajo / Empleo</option>
+            <option value="estudio">Estudio personal / Asesoría</option>
+            <option value="taller">Taller / Deporte / Salud</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label">Color distintivo</label>
+          <div class="color-palette-picker" id="class-actividad-color-picker">
+            <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" aria-label="Celeste Pastel" title="Celeste Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" aria-label="Lavanda Pastel" title="Lavanda Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" aria-label="Vainilla Pastel" title="Vainilla Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" aria-label="Menta Pastel" title="Menta Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" aria-label="Durazno Pastel" title="Durazno Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" aria-label="Índigo Pastel" title="Índigo Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" aria-label="Coral Pastel" title="Coral Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" aria-label="Turquesa Pastel" title="Turquesa Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" aria-label="Matcha Pastel" title="Matcha Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" aria-label="Salvia Pastel" title="Salvia Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#ECFCCB" style="background:#ECFCCB" aria-label="Lima Pastel" title="Lima suave Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#FAE8FF" style="background:#FAE8FF" aria-label="Orquídea Pastel" title="Orquídea Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#EDE9FE" style="background:#EDE9FE" aria-label="Violeta Pastel" title="Violeta suave Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#FEE2E2" style="background:#FEE2E2" aria-label="Fresa Pastel" title="Fresa suave Pastel"></button>
+            <button type="button" class="color-swatch" data-color="#E0F2FE" style="background:#E0F2FE" aria-label="Hielo Pastel" title="Celeste Hielo Pastel"></button>
+          </div>
+          <input type="hidden" id="class-actividad-color" value="#BAE6FD">
+        </div>
       </div>
 
       <div class="form-row">
@@ -701,20 +828,33 @@
         </div>
       </div>
 
+      <!-- Selector de Horas en Formato 12 Horas con AM / PM -->
       <div class="form-row">
         <div class="form-group">
           <div class="form-label-row">
-            <label class="form-label" for="class-hora-inicio">Hora Inicio *</label>
+            <label class="form-label">Hora Inicio (12h) *</label>
             <span id="hint-hora-inicio" class="time-12h-badge">08:00 AM</span>
           </div>
-          <input type="time" id="class-hora-inicio" class="field" required value="08:00" enterkeyhint="next">
+          <div class="time-12h-picker-wrap">
+            <select id="select-hora-inicio-h" class="field time-12h-select" aria-label="Hora inicio"></select>
+            <span class="time-12h-colon">:</span>
+            <select id="select-hora-inicio-m" class="field time-12h-select" aria-label="Minuto inicio"></select>
+            <button type="button" id="btn-hora-inicio-ampm" class="btn-ampm-toggle">AM</button>
+          </div>
+          <input type="time" id="class-hora-inicio" class="field hidden" required value="08:00">
         </div>
         <div class="form-group">
           <div class="form-label-row">
-            <label class="form-label" for="class-hora-fin">Hora Fin *</label>
+            <label class="form-label">Hora Fin (12h) *</label>
             <span id="hint-hora-fin" class="time-12h-badge">10:00 AM</span>
           </div>
-          <input type="time" id="class-hora-fin" class="field" required value="10:00" enterkeyhint="next">
+          <div class="time-12h-picker-wrap">
+            <select id="select-hora-fin-h" class="field time-12h-select" aria-label="Hora fin"></select>
+            <span class="time-12h-colon">:</span>
+            <select id="select-hora-fin-m" class="field time-12h-select" aria-label="Minuto fin"></select>
+            <button type="button" id="btn-hora-fin-ampm" class="btn-ampm-toggle">AM</button>
+          </div>
+          <input type="time" id="class-hora-fin" class="field hidden" required value="10:00">
         </div>
       </div>
 
@@ -731,6 +871,51 @@
           <button type="button" class="btn-secondary" id="btn-cancel-class">Cancelar</button>
           <button type="submit" class="btn-primary" id="btn-save-class">Guardar</button>
         </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+<!-- DIÁLOGO MODAL: CREAR / CONFIGURAR CICLO ACADÉMICO (17 SEMANAS) -->
+<div id="modal-ciclo-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-ciclo-title">
+    <div class="modal-header">
+      <h2 id="modal-ciclo-title">Ciclo Académico (17 Semanas)</h2>
+      <button class="icon-btn modal-close-btn" id="modal-ciclo-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <form id="form-ciclo" class="modal-body">
+      <input type="hidden" id="ciclo-id">
+
+      <div class="form-group">
+        <label class="form-label" for="ciclo-nombre">Nombre del Ciclo *</label>
+        <input type="text" id="ciclo-nombre" class="field" placeholder="Ej. 2026-I, 2026-II, Semestre 2026-A..." required enterkeyhint="next">
+        <span class="form-hint">Todas tus asignaturas, notas y horarios pertenecerán a este ciclo.</span>
+      </div>
+
+      <div class="form-group" style="margin-top: 10px;">
+        <label class="form-label" for="ciclo-fecha-inicio">Fecha de Inicio (Día Lunes) *</label>
+        <input type="date" id="ciclo-fecha-inicio" class="field" required enterkeyhint="done">
+        <span class="form-hint" id="ciclo-dia-aviso">El semestre universitario inicia en día lunes.</span>
+      </div>
+
+      <!-- Resumen de Proyección de 17 semanas -->
+      <div class="cycle-preview-card" style="margin-top: 14px; padding: 12px; background: var(--surface-subtle); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Estructura del Ciclo (17 Semanas):</div>
+        <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.6;">
+          <div><strong>Cierre de Semestre:</strong> <span id="ciclo-preview-fin">Elige fecha de inicio</span></div>
+          <div><strong>Semana 8 (Exámenes Parciales):</strong> <span id="ciclo-preview-sem8">-</span></div>
+          <div><strong>Semana 17 (Exámenes Finales):</strong> <span id="ciclo-preview-sem17">-</span></div>
+        </div>
+      </div>
+
+      <div id="ciclo-form-error" class="form-error hidden" style="margin-top: 10px;"></div>
+
+      <div class="modal-footer" style="margin-top: 16px;">
+        <button type="button" class="btn-secondary" id="btn-cancel-ciclo">Cancelar</button>
+        <button type="submit" class="btn-primary" id="btn-save-ciclo">Guardar Ciclo</button>
       </div>
     </form>
   </div>
@@ -795,6 +980,44 @@
         <div class="form-group">
           <label class="form-label" for="curso-notas">Comentarios o Enlaces (Opcional)</label>
           <input type="text" id="curso-notas" class="field" placeholder="Sílabo, Drive, apuntes…" enterkeyhint="done">
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top: 10px;">
+        <div class="form-group flex-1">
+          <label class="form-label" for="curso-ciclo-academico">Ciclo del Plan (UNU)</label>
+          <select id="curso-ciclo-academico" class="field">
+            <option value="">Seleccionar ciclo…</option>
+            <option value="I">Ciclo I</option>
+            <option value="II">Ciclo II</option>
+            <option value="III">Ciclo III</option>
+            <option value="IV">Ciclo IV</option>
+            <option value="V">Ciclo V</option>
+            <option value="VI">Ciclo VI</option>
+            <option value="VII">Ciclo VII</option>
+            <option value="VIII">Ciclo VIII</option>
+            <option value="IX">Ciclo IX</option>
+            <option value="X">Ciclo X</option>
+            <option value="Electivo">Electivo</option>
+          </select>
+        </div>
+        <div class="form-group" style="width: 140px;">
+          <label class="form-label" for="curso-tipo">Condición</label>
+          <select id="curso-tipo" class="field">
+            <option value="obligatorio" selected>Obligatorio</option>
+            <option value="electivo">Electivo</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top: 10px;">
+        <div class="form-group flex-1">
+          <label class="form-label" for="curso-codigo">Código de Curso</label>
+          <input type="text" id="curso-codigo" class="field" placeholder="Ej. SI-401, MAT-101">
+        </div>
+        <div class="form-group" style="width: 120px;">
+          <label class="form-label" for="curso-grupo">Grupo</label>
+          <input type="text" id="curso-grupo" class="field" placeholder="Ej. A, B">
         </div>
       </div>
 
@@ -920,22 +1143,6 @@
         <span class="form-hint" id="imp-hint-label">Nivel 3: Importancia Media (Guía semanal o lectura)</span>
       </div>
 
-      <div class="form-group">
-
-        <label class="form-label" for="task-estimado">Tiempo Estimado (opcional para sugerencias en huecos)</label>
-        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-          <input type="number" id="task-estimado" class="field" min="5" max="480" step="5" placeholder="45" style="width:100px;">
-          <span style="font-size:12px; color:var(--text-secondary);">minutos</span>
-        </div>
-        <div class="filter-chips-scroll" id="task-estimado-chips" style="gap:4px;">
-          <button type="button" class="filter-chip" data-min="15">15 min</button>
-          <button type="button" class="filter-chip" data-min="30">30 min</button>
-          <button type="button" class="filter-chip" data-min="45">45 min</button>
-          <button type="button" class="filter-chip" data-min="60">1 h</button>
-          <button type="button" class="filter-chip" data-min="90">1.5 h</button>
-          <button type="button" class="filter-chip" data-min="120">2 h</button>
-        </div>
-      </div>
 
       <div class="form-group">
         <label class="form-label" for="task-descripcion">Instrucciones o Apuntes</label>
@@ -1333,6 +1540,54 @@
 <script src="lib/qr.js"></script>
 <script src="lib/deeplink.js"></script>
 <script src="app.js"></script>
+
+<!-- MODAL DE POLÍTICA DE PRIVACIDAD LOCAL -->
+<div id="modal-privacidad-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-privacidad-title">
+    <div class="modal-header">
+      <h2 id="modal-privacidad-title">Privacidad y Almacenamiento 100% Local</h2>
+      <button class="icon-btn modal-close-btn" id="modal-privacidad-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="font-size: 13.5px; line-height: 1.6; color: var(--text-secondary);">
+      <p style="margin-bottom: 10px;"><strong>Arquitectura Local-First y Zero-Tracking:</strong></p>
+      <p style="margin-bottom: 10px;">UNUmbral opera de forma íntegramente offline. Todos tus datos (cursos, calificaciones, horarios, asistencias, tareas y perfil) se almacenan de manera exclusiva en la base de datos <code>IndexedDB</code> de tu propio dispositivo.</p>
+      <p style="margin-bottom: 10px;"><strong>Sin Servidores Externos:</strong></p>
+      <p style="margin-bottom: 10px;">La aplicación no realiza llamadas de telemetría ni transmite información privada a servidores de terceros.</p>
+      <p style="margin-bottom: 10px;"><strong>Copias de Seguridad y Control Total:</strong></p>
+      <p>Puedes exportar tu información en formato <code>.json</code> o transferirla mediante códigos QR sin necesidad de conexión a internet ni cuentas en la nube.</p>
+    </div>
+    <div class="modal-footer" style="margin-top: 16px;">
+      <button type="button" class="btn-primary" id="btn-privacidad-entendido">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- DIÁLOGO MODAL: REPORTE & FEEDBACK DE FIN DE CICLO -->
+<div id="modal-reporte-ciclo-backdrop" class="modal-backdrop hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-reporte-title" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-header">
+      <div>
+        <h2 id="modal-reporte-title">Récord Académico y Reporte de Fin de Ciclo</h2>
+        <p class="modal-subtitle" id="reporte-ciclo-sub">Balance semestral integral y diagnóstico de rendimiento</p>
+      </div>
+      <button class="icon-btn modal-close-btn" id="modal-reporte-close" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="reporte-ciclo-body">
+      <!-- Renderizado dinámico -->
+    </div>
+    <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+      <button type="button" class="btn-secondary" id="btn-cerrar-reporte-ciclo">Cerrar</button>
+      <button type="button" class="btn-primary" id="btn-descargar-reporte-img">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-right:4px;vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>Descargar Reporte (Imagen PNG)</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

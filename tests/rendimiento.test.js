@@ -119,4 +119,9 @@ test("generarSvgBarrasComparativas y generarSvgEvolucionCurso devuelven SVG vál
   assert.ok(svgEvolucion.includes("<svg"));
   assert.ok(svgEvolucion.includes("polyline"));
   assert.ok(svgEvolucion.includes("Parcial"));
+  assert.ok(!svgEvolucion.includes("NaN"));
+
+  const svgConObjeto = generarSvgEvolucionCurso(curso, { width: 380, height: 160 });
+  assert.ok(svgConObjeto.includes("<svg"));
+  assert.ok(!svgConObjeto.includes("NaN"));
 });

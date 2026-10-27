@@ -139,3 +139,93 @@ test('detectarUmbralCruzado detecta 10%, 20% y 30% exactamente al traspasar', ()
   assert.equal(detectarUmbralCruzado(2, 2, totalSesiones), null);
   assert.equal(detectarUmbralCruzado(0, 1, 0), null);
 });
+
+test('fechasDeSesion y resumenAsistencia manejan dia_semana en formato texto (LUNES, MIERCOLES)', () => {
+  const { parsearDiaSemana } = require('../lib/asistencia.js');
+  assert.equal(parsearDiaSemana('LUNES'), 1);
+  assert.equal(parsearDiaSemana('MARTES'), 2);
+  assert.equal(parsearDiaSemana('MIERCOLES'), 3);
+  assert.equal(parsearDiaSemana('JUEVES'), 4);
+  assert.equal(parsearDiaSemana('VIERNES'), 5);
+  assert.equal(parsearDiaSemana('SABADO'), 6);
+  assert.equal(parsearDiaSemana('DOMINGO'), 7);
+
+  const clases = [
+    { id: 'c1', curso_id: 'curso-1', dia_semana: 'LUNES', hora_inicio: '08:00', hora_fin: '10:00' },
+    { id: 'c2', curso_id: 'curso-1', dia_semana: 'MIERCOLES', hora_inicio: '10:00', hora_fin: '12:00' }
+  ];
+
+  // 2 semanas: 2 sesiones por semana = 4 sesiones proyectadas
+  const sesiones = fechasDeSesion(clases, '2026-03-02', '2026-03-15', []);
+  assert.equal(sesiones.length, 4);
+
+  const res = resumenAsistencia({
+    cursoId: 'curso-1',
+    clasesDelCurso: clases,
+    asistencias: [{ curso_id: 'curso-1', fecha: '2026-03-02', estado: 'falta' }],
+    cicloInicio: '2026-03-02',
+    cicloFin: '2026-03-15',
+    limiteFaltasPct: 30
+  });
+
+  assert.equal(res.totalSesiones, 4);
+  assert.equal(res.faltas, 1);
+  assert.equal(res.maxFaltasPermitidas, 1); // 4 * 0.3 = 1.2 -> floor = 1
+  assert.equal(res.enRiesgo, true);
+});
+
+test('calcularFinCiclo17Semanas y proyectarSemanasCiclo estructuran correctamente el semestre', () => {
+  const { calcularFinCiclo17Semanas, proyectarSemanasCiclo } = require('../lib/asistencia.js');
+  // Lunes 16 de marzo de 2026
+  const inicio = '2026-03-16';
+  const fin = calcularFinCiclo17Semanas(inicio);
+  assert.equal(fin, '2026-07-12'); // Domingo de la semana 17
+
+  const semanas = proyectarSemanasCiclo(inicio, '2026-05-06');
+  assert.equal(semanas.length, 17);
+
+  // Semana 1
+  assert.equal(semanas[0].numero, 1);
+  assert.equal(semanas[0].fechaInicio, '2026-03-16');
+  assert.equal(semanas[0].fechaFin, '2026-03-22');
+
+  // Semana 8: Exámenes parciales
+  assert.equal(semanas[7].numero, 8);
+  assert.equal(semanas[7].esSemanaExamenes, true);
+  assert.equal(semanas[7].esSemanaActual, true); // 2026-05-06 cae en la semana 8 (04 May al 10 May)
+  assert.ok(semanas[7].titulo.includes('Semana 8'));
+  assert.ok(semanas[7].titulo.includes('Exámenes Parciales'));
+
+  // Semana 17: Cierre
+  assert.equal(semanas[16].numero, 17);
+  assert.equal(semanas[16].esSemanaFinal, true);
+  assert.equal(semanas[16].fechaFin, '2026-07-12');
+});
+
+test('sesiones pasadas del ciclo se cuentan como asistidas por defecto si no tienen falta explícita', () => {
+  const clases = [
+    { id: 'clase-fis', curso_id: 'curso-fis', dia_semana: 1, hora_inicio: '08:00', hora_fin: '10:00' } // Lunes
+  ];
+  // 4 lunes: 2026-04-06, 2026-04-13, 2026-04-20, 2026-04-27
+  // Si hoy es 2026-04-28 (martes), han pasado las 4 sesiones.
+  // Solo se registró falta explícita el 2026-04-13.
+  const asistencias = [
+    { curso_id: 'curso-fis', fecha: '2026-04-13', estado: 'falta' }
+  ];
+
+  const res = resumenAsistencia({
+    cursoId: 'curso-fis',
+    clasesDelCurso: clases,
+    asistencias,
+    cicloInicio: '2026-04-01',
+    cicloFin: '2026-04-30',
+    limiteFaltasPct: 30,
+    fechaHoy: '2026-04-28'
+  });
+
+  assert.equal(res.totalSesiones, 4);
+  assert.equal(res.sesionesTranscurridas, 4);
+  assert.equal(res.faltas, 1);
+  // Las otras 3 sesiones que ya pasaron son contabilizadas como presentes por defecto
+  assert.equal(res.presentes, 3);
+});
