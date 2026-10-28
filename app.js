@@ -287,7 +287,7 @@ function evaluacionVacia() {
  * Reutiliza los cursos existentes que coincidan por nombre (sin distinguir tildes ni mayúsculas).
  * Las clases y tareas que ya tienen curso_id se respetan tal cual.
  */
-function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cursosSueltos) {
+function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cursosSueltos, cicloId = null) {
   const porNombre = new Map((cursosExistentes || []).map(c => [normalizarNombre(c.nombre), c]));
   const porId = new Map((cursosExistentes || []).filter(c => c && c.id).map(c => [String(c.id), c]));
   const idOriginalACurso = new Map();
@@ -302,10 +302,12 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
       const d = datos || {};
       curso = {
         id: uuid(),
+        ciclo_id: cicloId || (d && d.ciclo_id) || null,
         nombre: limpio,
         profesor: d.profesor || "",
         aula: d.aula || "",
         color: normalizarColorPastel(d.color || COLOR_CURSO_DEFECTO),
+        creditos: (d && typeof d.creditos === "number") ? d.creditos : 3,
         notas: d.notas || "",
         evaluacion: evaluacionVacia()
       };
@@ -370,6 +372,8 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
     clases.push({
       id: c.id || uuid(),
       curso_id: curso.id,
+      ciclo_id: cicloId || (curso && curso.ciclo_id) || null,
+      tipo: c.tipo || "curso",
       dia_semana: c.dia_semana,
       hora_inicio: hInicio,
       hora_fin: hFin,
@@ -772,26 +776,10 @@ function actualizarBadgeTareas(pendingCount) {
 }
 
 async function actualizarBadgeNativo(count) {
+  // Se cancela la notificación persistente 99999 para no saturar la barra de estado
   if (!window.Capacitor?.Plugins?.LocalNotifications) return;
   const { LocalNotifications } = window.Capacitor.Plugins;
-  if (count <= 0) {
-    await LocalNotifications.cancel({ notifications: [{ id: 99999 }] }).catch(() => {});
-    return;
-  }
-  await LocalNotifications.schedule({
-    notifications: [{
-      id: 99999,
-      title: "UNUmbral",
-      body: `Tienes ${count} ${count === 1 ? "tarea pendiente" : "tareas pendientes"}`,
-      channelId: "clases",
-      ongoing: true,
-      autoCancel: false,
-      smallIcon: "ic_stat_icon",
-      iconColor: "#1e2327",
-      schedule: { at: new Date(Date.now() + 100) },
-      extra: { tipo: "badge_tareas", count }
-    }]
-  }).catch(() => {});
+  await LocalNotifications.cancel({ notifications: [{ id: 99999 }] }).catch(() => {});
 }
 
 /* =====================================================================
@@ -4062,7 +4050,8 @@ async function importScheduleFromFriends(file) {
 
     const existentes = await db.cursos.toArray();
     const clasesExistentes = await db.clases.toArray();
-    const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
+    const cicloActivo = await obtenerCicloActivo();
+    const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || [], cicloActivo?.id);
 
     const firmasExistentes = new Set(clasesExistentes.map(c =>
       `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`
@@ -4566,7 +4555,8 @@ async function procesarTextoQrEscaneado(rawText) {
 async function ejecutarImportacionHorario(data) {
   const existentes = await db.cursos.toArray();
   const clasesExistentes = await db.clases.toArray();
-  const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || []);
+  const cicloActivo = await obtenerCicloActivo();
+  const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || [], cicloActivo?.id);
 
   const firmasExistentes = new Set(clasesExistentes.map(c =>
     `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`
@@ -4595,7 +4585,8 @@ async function ejecutarImportacionHorario(data) {
 }
 
 async function exportFullBackup() {
-  const [cursos, classes, tasks, eventos, asistencia, excepciones, ajustes] = await Promise.all([
+  const [ciclos, cursos, classes, tasks, eventos, asistencia, excepciones, ajustes] = await Promise.all([
+    db.ciclos.toArray(),
     db.cursos.toArray(),
     db.clases.toArray(),
     db.tareas.toArray(),
@@ -4607,8 +4598,9 @@ async function exportFullBackup() {
 
   const payload = {
     tipo: "unumbral-backup-total",
-    version: 4,
+    version: 5,
     fecha_creacion: new Date().toISOString(),
+    ciclos: ciclos || [],
     cursos,
     clases: classes,
     tareas: tasks,
@@ -4638,7 +4630,10 @@ async function importFullBackup(file) {
     );
     if (!ok) return;
 
-    await db.transaction("rw", [db.cursos, db.clases, db.tareas, db.eventos, db.asistencia, db.excepciones, db.ajustes], async () => {
+    await db.transaction("rw", [db.ciclos, db.cursos, db.clases, db.tareas, db.eventos, db.asistencia, db.excepciones, db.ajustes], async () => {
+      if (Array.isArray(data.ciclos) && data.ciclos.length > 0) {
+        await db.ciclos.bulkPut(data.ciclos);
+      }
       if (Array.isArray(data.cursos) && data.cursos.length > 0) {
         const cursosSanitizados = data.cursos.map(sanitizarCursoImportado).filter(Boolean);
         if (cursosSanitizados.length) await db.cursos.bulkPut(cursosSanitizados);
@@ -5649,6 +5644,19 @@ function wireGlobalEvents() {
   if (btnCloseRepX) btnCloseRepX.addEventListener("click", closeReporteFinCicloModal);
   const btnDescargarImg = $("#btn-descargar-reporte-img");
   if (btnDescargarImg) btnDescargarImg.addEventListener("click", () => descargarReporteComoImagen(estadoUltimoReporte));
+
+  const modRepBackdrop = $("#modal-reporte-ciclo-backdrop");
+  if (modRepBackdrop) {
+    modRepBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-reporte-ciclo-backdrop") closeReporteFinCicloModal();
+    });
+  }
+  const modPrivBackdrop = $("#modal-privacidad-backdrop");
+  if (modPrivBackdrop) {
+    modPrivBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-privacidad-backdrop") $("#modal-privacidad-backdrop").classList.add("hidden");
+    });
+  }
 
   $("#modal-ciclo-close").addEventListener("click", closeModalCiclo);
   $("#btn-cancel-ciclo").addEventListener("click", closeModalCiclo);

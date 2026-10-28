@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self';">
   <meta name="theme-color" content="#F4F6EE">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -841,7 +841,7 @@
             <select id="select-hora-inicio-m" class="field time-12h-select" aria-label="Minuto inicio"></select>
             <button type="button" id="btn-hora-inicio-ampm" class="btn-ampm-toggle">AM</button>
           </div>
-          <input type="time" id="class-hora-inicio" class="field hidden" required value="08:00">
+          <input type="time" id="class-hora-inicio" class="field hidden" aria-label="Hora de inicio en formato 24 horas" required value="08:00">
         </div>
         <div class="form-group">
           <div class="form-label-row">
@@ -854,7 +854,7 @@
             <select id="select-hora-fin-m" class="field time-12h-select" aria-label="Minuto fin"></select>
             <button type="button" id="btn-hora-fin-ampm" class="btn-ampm-toggle">AM</button>
           </div>
-          <input type="time" id="class-hora-fin" class="field hidden" required value="10:00">
+          <input type="time" id="class-hora-fin" class="field hidden" aria-label="Hora de fin en formato 24 horas" required value="10:00">
         </div>
       </div>
 
@@ -1481,7 +1481,7 @@
     <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
       <!-- Visor de cámara en vivo si BarcodeDetector está disponible -->
       <div id="qr-camera-wrap" class="hidden" style="position:relative; width:100%; border-radius:var(--radius-md); overflow:hidden; background:#000;">
-        <video id="qr-scanner-video" autoplay playsinline style="width:100%; height:220px; object-fit:cover;"></video>
+        <video id="qr-scanner-video" autoplay playsinline poster="icon-192.png" style="width:100%; height:220px; object-fit:cover;"></video>
         <div style="position:absolute; inset:20px; border:2px dashed rgba(255,255,255,0.7); border-radius:12px; pointer-events:none;"></div>
       </div>
 
@@ -1501,7 +1501,8 @@
         <details style="margin-top:4px;">
           <summary style="font-size:12px; color:var(--text-secondary); cursor:pointer; padding:4px 0;">O pegar código de texto UNU1:</summary>
           <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
-            <textarea id="textarea-qr-manual" class="field" rows="3" placeholder="Pega aquí el código que empieza con UNU1:"></textarea>
+            <label for="textarea-qr-manual" class="sr-only" style="position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0);">Código de texto QR del horario</label>
+            <textarea id="textarea-qr-manual" aria-label="Código de texto QR del horario" class="field" rows="3" placeholder="Pega aquí el código que empieza con UNU1:"></textarea>
             <button type="button" id="btn-procesar-qr-manual" class="btn-primary btn-sm">Procesar código</button>
           </div>
         </details>
