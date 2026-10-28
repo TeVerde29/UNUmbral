@@ -6,7 +6,7 @@
 [![PWA: Offline-First](https://img.shields.io/badge/PWA-Offline--First-AFC49A?style=flat-square&logo=pwa&logoColor=111A13)](https://teverde29.github.io/unumbral/)
 [![Dexie.js: 4.4.4](https://img.shields.io/badge/Dexie.js-v4.4.4-4F7256?style=flat-square)](https://dexie.org/)
 [![JavaScript: ES6+](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/es/docs/Web/JavaScript)
-[![Tests: 51 Pass](https://img.shields.io/badge/Pruebas-51%20pass-829B78?style=flat-square)](tests/)
+[![Tests: 52 Pass](https://img.shields.io/badge/Pruebas-52%20pass-829B78?style=flat-square)](tests/)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-829B78?style=flat-square)](LICENSE)
 
 Los estudiantes universitarios registran sus ciclos académicos de 17 semanas, organizan su horario combinando cursos y actividades extracurriculares (prácticas, trabajo, deporte) en formato de 12 horas (`AM / PM`), llevan el control y proyección de sus calificaciones en escala vigesimal (`0 a 20`), gestionan entregas académicas por nivel de prioridad, registran asistencia con alertas automáticas de inasistencias (10%, 20%, 30%), generan un reporte gráfico descargable en imagen al finalizar el ciclo y comparten su horario mediante códigos QR o archivos JSON sin exponer notas ni tareas personales.
@@ -126,7 +126,7 @@ unumbral/
 │   ├── qrcode.min.js    # Generador offline de códigos QR
 │   ├── qr.js            # Compresión y ensamble multiparte de horarios para QR
 │   └── deeplink.js      # Enrutamiento de accesos directos y deep links
-└── tests/               # Suite de 51 pruebas unitarias puras (node --test)
+└── tests/               # Suite de 52 pruebas unitarias puras (node --test)
 ```
 
 ---
@@ -245,7 +245,7 @@ UNUmbral cuenta con soporte nativo para Android mediante **Capacitor**, lo que p
 
 ## Pruebas Automatizadas
 
-UNUmbral cuenta con una suite de **51 pruebas unitarias puras** que verifican la integridad de toda la lógica de negocio:
+UNUmbral cuenta con una suite de **52 pruebas unitarias puras** que verifican la integridad de toda la lógica de negocio:
 
 ```bash
 npm test

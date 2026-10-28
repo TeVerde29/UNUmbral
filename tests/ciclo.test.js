@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 const {
   calcularFinCiclo17Semanas,
   proyectarSemanasCiclo,
@@ -58,35 +61,35 @@ test('asistencia proyecta correctamente sesiones con días en texto (LUNES, VIER
     { id: 'clase-2', curso_id: 'curso-alg', dia_semana: 'VIERNES', hora_inicio: '10:00', hora_fin: '12:00' }
   ];
 
-  // Ciclo de 17 semanas: 2 clases por semana = 34 sesiones en total
-  const cicloInicio = '2026-03-16';
-  const cicloFin = '2026-07-12';
-
-  const resInicial = resumenAsistencia({
+  // 17 semanas = 34 sesiones totales
+  const res = resumenAsistencia({
     cursoId: 'curso-alg',
     clasesDelCurso: clases,
-    asistencias: [],
-    cicloInicio,
-    cicloFin,
-    excepciones: [],
+    asistencias: [
+      { curso_id: 'curso-alg', fecha: '2026-03-16', estado: 'falta' },
+      { curso_id: 'curso-alg', fecha: '2026-03-20', estado: 'falta' },
+      { curso_id: 'curso-alg', fecha: '2026-03-23', estado: 'falta' },
+      { curso_id: 'curso-alg', fecha: '2026-03-27', estado: 'falta' }
+    ],
+    cicloInicio: '2026-03-16',
+    cicloFin: '2026-07-12',
     limiteFaltasPct: 30
   });
 
-  assert.equal(resInicial.totalSesiones, 34);
-  assert.equal(resInicial.faltas, 0);
-  // 30% de 34 = floor(10.2) = 10 faltas permitidas
-  assert.equal(resInicial.maxFaltasPermitidas, 10);
-  assert.equal(resInicial.faltasRestantes, 10);
+  assert.equal(res.totalSesiones, 34);
+  assert.equal(res.faltas, 4);
+  assert.equal(res.maxFaltasPermitidas, 10); // 30% de 34 = 10.2 -> 10
+  assert.equal(res.faltasRestantes, 6);
+  assert.equal(res.porcentajeFaltasCiclo, 11.8); // 4 / 34 = 11.76% -> 11.8%
+  assert.equal(res.umbralActual, 10); // Cruzó el 10%
 
-  // Simular cruce de umbral 10% (34 * 0.10 = 3.4 -> al llegar a 4 faltas cruza el 10%)
+  // Detectores de traspaso exacto
   const u10 = detectarUmbralCruzado(3, 4, 34, [10, 20, 30]);
   assert.equal(u10, 10);
 
-  // Simular cruce de umbral 20% (34 * 0.20 = 6.8 -> al llegar a 7 faltas cruza el 20%)
   const u20 = detectarUmbralCruzado(6, 7, 34, [10, 20, 30]);
   assert.equal(u20, 20);
 
-  // Simular cruce de umbral 30% (34 * 0.30 = 10.2 -> al llegar a 11 faltas cruza el 30%)
   const u30 = detectarUmbralCruzado(10, 11, 34, [10, 20, 30]);
   assert.equal(u30, 30);
 });
@@ -115,4 +118,41 @@ test('asistencia por defecto: sesiones pasadas cuentan como asistidas salvo regi
   assert.equal(res.sesionesTranscurridas, 3);
   assert.equal(res.faltas, 1);
   assert.equal(res.presentes, 2); // 2 pasadas por defecto
+});
+
+test('convertirFormatoPlano asocia ciclo_id al importar cursos y clases', () => {
+  const root = path.resolve(__dirname, '..');
+  const code = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+
+  function DummyDexie() {
+    this.version = () => ({ stores: () => ({ upgrade: () => {} }) });
+  }
+
+  const sandbox = {
+    window: { crypto: { randomUUID: () => 'uuid-' + Math.random().toString(36).slice(2, 9) } },
+    crypto: { randomUUID: () => 'uuid-' + Math.random().toString(36).slice(2, 9) },
+    document: { addEventListener: () => {}, querySelector: () => null, querySelectorAll: () => [], documentElement: { setAttribute: () => {} } },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    navigator: {},
+    Dexie: DummyDexie,
+    setInterval: () => {},
+    setTimeout: () => {},
+    clearTimeout: () => {},
+    requestAnimationFrame: (fn) => fn(),
+    console
+  };
+
+  vm.createContext(sandbox);
+  vm.runInContext(code, sandbox);
+
+  const clasesPlanas = [
+    { materia: 'Redes II', dia_semana: 'LUNES', hora_inicio: '08:00 AM', hora_fin: '10:00 AM', aula: 'Lab 1' }
+  ];
+  const resultado = sandbox.convertirFormatoPlano(clasesPlanas, [], [], [], 'ciclo-2026-2');
+
+  assert.equal(resultado.cursosNuevos.length, 1);
+  assert.equal(resultado.cursosNuevos[0].nombre, 'Redes II');
+  assert.equal(resultado.cursosNuevos[0].ciclo_id, 'ciclo-2026-2');
+  assert.equal(resultado.clases.length, 1);
+  assert.equal(resultado.clases[0].ciclo_id, 'ciclo-2026-2');
 });
