@@ -155,3 +155,71 @@ test("comprimirHorarioParaQr y descomprimirHorarioDeQr con UUIDs reales conserva
   assert.equal(res.horario.clases[0].curso_id, "0");
   assert.equal(res.horario.clases[1].curso_id, "1");
 });
+
+test("comprimirHorarioParaQr v3 incluye ciclo académico y notas de evaluación", () => {
+  const ciclo = {
+    nombre: "Ciclo 2026-II",
+    fecha_inicio: "2026-08-17",
+    fecha_fin: "2026-12-13"
+  };
+  const cursos = [
+    {
+      id: "curso-sistemas-1",
+      nombre: "Inteligencia Artificial",
+      color: "#BAE6FD",
+      aula: "Lab 4",
+      profesor: "Dr. Sánchez",
+      creditos: 4,
+      evaluacion: {
+        parcial: 15.5,
+        final: null,
+        practicas: [
+          { id: "p1", titulo: "Práctica 1", nota: 16 },
+          { id: "p2", titulo: "Práctica 2", nota: 14 }
+        ]
+      }
+    }
+  ];
+  const clases = [
+    {
+      curso_id: "curso-sistemas-1",
+      dia_semana: "LUNES",
+      hora_inicio: "08:00",
+      hora_fin: "10:00",
+      aula: "Lab 4"
+    }
+  ];
+
+  const payload = {
+    tipo: "unumbral-horario-compartido",
+    version: 3,
+    ciclo,
+    cursos,
+    clases,
+    asistencias: [
+      { curso_id: "curso-sistemas-1", fecha: "2026-09-07", estado: "falta" },
+      { curso_id: "curso-sistemas-1", fecha: "2026-09-14", estado: "justificada" }
+    ]
+  };
+
+  const qrList = comprimirHorarioParaQr(payload);
+  assert.equal(qrList.length, 1);
+
+  const res = descomprimirHorarioDeQr(qrList[0]);
+  assert.equal(res.horario.version, 3);
+  assert.ok(res.horario.ciclo);
+  assert.equal(res.horario.ciclo.nombre, "Ciclo 2026-II");
+  assert.equal(res.horario.ciclo.fecha_inicio, "2026-08-17");
+  assert.equal(res.horario.ciclo.fecha_fin, "2026-12-13");
+  assert.equal(res.horario.cursos.length, 1);
+  assert.equal(res.horario.cursos[0].nombre, "Inteligencia Artificial");
+  assert.equal(res.horario.cursos[0].evaluacion.parcial, 15.5);
+  assert.equal(res.horario.cursos[0].evaluacion.final, null);
+  assert.equal(res.horario.cursos[0].evaluacion.practicas.length, 2);
+  assert.equal(res.horario.cursos[0].evaluacion.practicas[0].nota, 16);
+  assert.equal(res.horario.asistencias.length, 2);
+  assert.equal(res.horario.asistencias[0].curso_id, "0");
+  assert.equal(res.horario.asistencias[0].fecha, "2026-09-07");
+  assert.equal(res.horario.asistencias[0].estado, "falta");
+  assert.equal(res.horario.asistencias[1].estado, "justificada");
+});

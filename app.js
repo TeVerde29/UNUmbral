@@ -309,7 +309,7 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
         color: normalizarColorPastel(d.color || COLOR_CURSO_DEFECTO),
         creditos: (d && typeof d.creditos === "number") ? d.creditos : 3,
         notas: d.notas || "",
-        evaluacion: evaluacionVacia()
+        evaluacion: (d && d.evaluacion) ? d.evaluacion : evaluacionVacia()
       };
       porNombre.set(clave, curso);
       porId.set(String(curso.id), curso);
@@ -635,14 +635,8 @@ function overlaps(startA, endA, startB, endB) {
 }
 
 function getContrastTextColor(hex) {
-  if (!hex || hex.length < 6) return "#FFFFFF";
-  let h = hex.replace("#", "");
-  if (h.length === 3) h = h.split("").map(c => c + c).join("");
-  const r = parseInt(h.substring(0, 2), 16) || 0;
-  const g = parseInt(h.substring(2, 4), 16) || 0;
-  const b = parseInt(h.substring(4, 6), 16) || 0;
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq >= 155 ? "#111A13" : "#FFFFFF";
+  // Los cursos usan gama pastel: siempre texto oscuro/negro (#111827) de alto contraste
+  return "#111827";
 }
 
 function darkenColor(hex, factor = 0.28) {
@@ -894,10 +888,16 @@ async function renderHoy() {
   const badgeHuecos = $("#badge-huecos-hoy");
 
   if (secHuecos && listHuecos && typeof huecosDelDia === "function") {
+    const ajustesListHoy = await db.ajustes.toArray();
+    const mapAjHoy = {};
+    for (const a of ajustesListHoy) mapAjHoy[a.clave] = a.valor;
     const huecos = huecosDelDia(classesToday, {
       fecha: fechaHoyStr,
       excepciones,
-      minMinutos: 30
+      ventanaDesde: mapAjHoy.huecos_ventana_desde || "07:00",
+      ventanaHasta: mapAjHoy.huecos_ventana_hasta || "22:00",
+      minMinutos: parseInt(mapAjHoy.huecos_min || 30, 10),
+      soloEntreClases: true
     });
 
     if (huecos.length > 0) {
@@ -1009,6 +1009,18 @@ function formatearTiempoRestanteHMS(diffSeconds) {
   return parts.join(" ");
 }
 
+function formatearCuentaAtrasHMS(diffSeconds) {
+  if (diffSeconds <= 0) return "0s";
+  const h = Math.floor(diffSeconds / 3600);
+  const m = Math.floor((diffSeconds % 3600) / 60);
+  const s = diffSeconds % 60;
+  const parts = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return parts.join(" ");
+}
+
 function renderLiveStatusCard(classesToday) {
   const container = $("#live-status-card");
   const now = new Date();
@@ -1099,11 +1111,12 @@ function renderLiveStatusCard(classesToday) {
   const nextClass = classesToday.find(c => timeToMinutes(c.hora_inicio) > currentMin);
 
   if (nextClass) {
-    const s = timeToMinutes(nextClass.hora_inicio);
-    const until = s - currentMin;
-    const hours = Math.floor(until / 60);
-    const mins = until % 60;
-    const countdown = hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+    const [hIni, mIni] = nextClass.hora_inicio.split(":").map(Number);
+    const sSec = hIni * 3600 + mIni * 60;
+    const curNow = new Date();
+    const curSec = curNow.getHours() * 3600 + curNow.getMinutes() * 60 + curNow.getSeconds();
+    const untilSec = Math.max(0, sSec - curSec);
+    const countdown = formatearCuentaAtrasHMS(untilSec);
 
     container.className = "live-card";
     container.innerHTML = `
@@ -1113,10 +1126,31 @@ function renderLiveStatusCard(classesToday) {
       </div>
       <div class="live-card-title">${escapeHtml(nextClass.materia)}</div>
       <div class="live-card-meta">
-        <span class="live-meta-item">${ICONS.clock} ${formatTimeRange12(nextClass.hora_inicio, nextClass.hora_fin)} (en ${countdown})</span>
+        <span class="live-meta-item" id="live-next-class-timer">${ICONS.clock} ${formatTimeRange12(nextClass.hora_inicio, nextClass.hora_fin)} (en <span id="live-next-countdown">${countdown}</span>)</span>
         <span class="live-meta-item">${ICONS.location} ${escapeHtml(nextClass.aula || "Sin aula")}</span>
         <span class="live-meta-item">${ICONS.person} ${escapeHtml(nextClass.profesor || "Profesor(a)")}</span>
       </div>`;
+
+    state.liveCountdownInterval = setInterval(() => {
+      if (state.currentTab !== "view-hoy") {
+        clearInterval(state.liveCountdownInterval);
+        state.liveCountdownInterval = null;
+        return;
+      }
+      const tickNow = new Date();
+      const tickSec = tickNow.getHours() * 3600 + tickNow.getMinutes() * 60 + tickNow.getSeconds();
+      if (tickSec >= sSec) {
+        clearInterval(state.liveCountdownInterval);
+        state.liveCountdownInterval = null;
+        renderHoy();
+        return;
+      }
+      const tickUntilSec = Math.max(0, sSec - tickSec);
+      const countdownEl = document.getElementById("live-next-countdown");
+      if (countdownEl) {
+        countdownEl.textContent = formatearCuentaAtrasHMS(tickUntilSec);
+      }
+    }, 1000);
     return;
   }
 
@@ -1474,7 +1508,6 @@ async function confirmarArchivarCiclo(ciclo) {
   if (!ok) return;
 
   await db.ciclos.update(ciclo.id, { estado: "archivado", fecha_archivado: new Date().toISOString() });
-  await db.clases.clear();
 
   showToast(`Ciclo "${ciclo.nombre}" archivado. Horario semanal reiniciado.`);
   if (typeof reprogramarTodo === "function") reprogramarTodo();
@@ -2256,13 +2289,29 @@ async function renderCalendarioMensual() {
     titleEl.textContent = `${MESES_LABEL[mes - 1]} ${anio}`;
   }
 
-  const [clases, tareas, eventos, excepciones, { map: cursosMap }] = await Promise.all([
+  const [clases, tareas, eventos, excepciones, { map: cursosMap }, cicloActivo, ajustes] = await Promise.all([
     obtenerClasesEnriquecidas(),
     db.tareas.toArray(),
     db.eventos.toArray(),
     db.excepciones.toArray(),
-    cargarCursos()
+    cargarCursos(),
+    obtenerCicloActivo(),
+    db.ajustes.toArray()
   ]);
+
+  const mapAjustes = {};
+  for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+  const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+  const fechaIniCiclo = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || null;
+  const fechaFinCiclo = cicloActivo?.fecha_fin || cfg.ciclo_fin || (fechaIniCiclo && typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(fechaIniCiclo) : null);
+
+  const COLORES_IMPORTANCIA_TAREA = {
+    1: "#FACC15",
+    2: "#FBBF24",
+    3: "#FB923C",
+    4: "#F87171",
+    5: "#EF4444"
+  };
 
   const matriz = (typeof generarMatrizMes === "function" ? generarMatrizMes : window.generarMatrizMes)(anio, mes, hoy);
   const gridEl = $("#cal-days-grid");
@@ -2276,8 +2325,10 @@ async function renderCalendarioMensual() {
     const isSelected = state.selectedCalDate === fecha;
 
     const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fecha, excepciones);
+    const dentroDelCiclo = (!fechaIniCiclo || fecha >= fechaIniCiclo) && (!fechaFinCiclo || fecha <= fechaFinCiclo);
     const dayKey = DIAS_SEMANA[celda.diaSemana - 1];
-    const clasesDelDia = feriado ? [] : clases.filter(c => c.dia_semana === dayKey && !(typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fecha, excepciones));
+    // Solo proyectar clases si la fecha está dentro de las 17 semanas del ciclo académico activo
+    const clasesDelDia = (!dentroDelCiclo || feriado) ? [] : clases.filter(c => c.dia_semana === dayKey && !(typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fecha, excepciones));
     const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
     const eventosDelDia = eventos.filter(e => e.fecha === fecha);
 
@@ -2292,19 +2343,33 @@ async function renderCalendarioMensual() {
       const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
       indicatorsHtml += `<span class="cal-dot" style="background:${color};" title="Clase: ${escapeHtml(c.materia)}"></span>`;
     });
-    tareasDelDia.slice(0, 2).forEach(t => {
-      indicatorsHtml += `<span class="cal-dot" style="background:${t.completada ? '#10b981' : '#f59e0b'};" title="Tarea: ${escapeHtml(t.titulo)}"></span>`;
+    tareasDelDia.slice(0, 3).forEach(t => {
+      const imp = Math.min(5, Math.max(1, Number(t.importancia) || 3));
+      const color = t.completada ? "#10B981" : (COLORES_IMPORTANCIA_TAREA[imp] || "#FB923C");
+      indicatorsHtml += `<span class="cal-dot" style="background:${color};" title="Tarea (Nivel ${imp}): ${escapeHtml(t.titulo)}"></span>`;
     });
+
+    const tareasPendientes = tareasDelDia.filter(t => !t.completada);
+    const tieneTareasPendientes = tareasPendientes.length > 0;
+    const tieneTareas = tareasDelDia.length > 0;
+
+    let borderStyle = "";
+    if (tieneTareasPendientes) {
+      const maxImp = Math.max(...tareasPendientes.map(t => Math.min(5, Math.max(1, Number(t.importancia) || 3))));
+      const borderCol = COLORES_IMPORTANCIA_TAREA[maxImp] || "#FB923C";
+      borderStyle = `style="--task-border-color: ${borderCol};"`;
+    }
 
     const cellClasses = [
       "cal-cell",
       !esDelMes ? "is-other-month" : "",
       esHoy ? "is-today" : "",
-      isSelected ? "is-selected" : ""
+      isSelected ? "is-selected" : "",
+      tieneTareasPendientes ? "has-pending-task" : (tieneTareas ? "has-completed-task" : "")
     ].filter(Boolean).join(" ");
 
     return `
-      <div class="${cellClasses}" data-date="${fecha}">
+      <div class="${cellClasses}" data-date="${fecha}" ${borderStyle}>
         <span class="cal-day-num">${diaNum}</span>
         <div class="cal-cell-indicators">
           ${indicatorsHtml}
@@ -2440,6 +2505,7 @@ function renderTaskCardHTML(t) {
           <span class="subject-pill">${escapeHtml(t.materia || "General")}</span>
           <span class="importance-gauge ${imp.class}">${imp.badge}</span>
           <span class="due-badge ${dueClass}">${ICONS.clock} ${due.text}</span>
+          ${t.enlace ? `<a href="${escapeHtml(t.enlace)}" target="_blank" rel="noopener noreferrer" class="task-enlace-badge" onclick="event.stopPropagation();" title="Abrir enlace"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Enlace</a>` : ""}
         </div>
       </div>
     </div>`;
@@ -2803,7 +2869,7 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
             ${c.creditos ? `<span class="class-detail-tag">${c.creditos} Créditos</span>` : ""}
             ${c.ciclo_curso ? `<span class="class-detail-tag">Ciclo ${escapeHtml(c.ciclo_curso)}</span>` : ""}
             ${c.tipo_condicion === "electivo" ? `<span class="class-detail-tag" style="color:var(--status-warning);font-weight:600;">Electivo</span>` : ""}
-            ${c.codigo_asignatura ? `<span class="class-detail-tag">${escapeHtml(c.codigo_asignatura)}</span>` : ""}
+            
             ${c.grupo_seccion ? `<span class="class-detail-tag">Gr. ${escapeHtml(c.grupo_seccion)}</span>` : ""}
             ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
             ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
@@ -2834,10 +2900,80 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
 /* =====================================================================
    9.6 MODAL: NUEVO / EDITAR CURSO (CATÁLOGO)
    ===================================================================== */
+const MAPA_PASTEL_A_SWATCH = {
+  "#BAE6FD": "#38BDF8", "#BBF7D0": "#34D399", "#FEF08A": "#FBBF24",
+  "#FECACA": "#F87171", "#DDD6FE": "#A78BFA", "#FED7AA": "#FB923C",
+  "#DCFCE7": "#4ADE80", "#F5D0FE": "#E879F9", "#C7D2FE": "#818CF8",
+  "#FFE4E6": "#FB7185", "#99F6E4": "#2DD4BF", "#ECFCCB": "#A3E635",
+  "#FEF9C3": "#FACC15", "#E9D5FF": "#C084FC", "#CFFAFE": "#06B6D4",
+  "#FFEDD5": "#EA580C", "#DBEAFE": "#60A5FA", "#D1FAE5": "#10B981",
+  "#F1F5F9": "#94A3B8"
+};
+
+async function actualizarDisponibilidadColores(pickerEl, colorActualPermitido = null, idEntidadActual = null) {
+  if (!pickerEl) return;
+  const [cursos, clases] = await Promise.all([
+    db.cursos.toArray(),
+    db.clases.where("tipo").equals("actividad").toArray()
+  ]);
+
+  const coloresEnUso = new Set();
+  for (const c of cursos) {
+    if (c.id !== idEntidadActual && c.color) {
+      const up = c.color.toUpperCase();
+      coloresEnUso.add(up);
+      if (MAPA_PASTEL_A_SWATCH[up]) coloresEnUso.add(MAPA_PASTEL_A_SWATCH[up]);
+      const norm = normalizarColorPastel(up);
+      if (norm) coloresEnUso.add(norm.toUpperCase());
+    }
+  }
+  for (const act of clases) {
+    if (act.id !== idEntidadActual && act.color) {
+      const up = act.color.toUpperCase();
+      coloresEnUso.add(up);
+      if (MAPA_PASTEL_A_SWATCH[up]) coloresEnUso.add(MAPA_PASTEL_A_SWATCH[up]);
+      const norm = normalizarColorPastel(up);
+      if (norm) coloresEnUso.add(norm.toUpperCase());
+    }
+  }
+
+  const permitidos = new Set();
+  if (colorActualPermitido) {
+    const upP = colorActualPermitido.toUpperCase();
+    permitidos.add(upP);
+    if (MAPA_PASTEL_A_SWATCH[upP]) permitidos.add(MAPA_PASTEL_A_SWATCH[upP]);
+    const norm = normalizarColorPastel(upP);
+    if (norm) permitidos.add(norm.toUpperCase());
+  }
+
+  const swatches = $$(".color-swatch", pickerEl);
+  let primerDisponible = null;
+  let seleccionadoVisible = false;
+
+  swatches.forEach(s => {
+    const swColor = (s.dataset.color || "").toUpperCase();
+    const esTomado = !permitidos.has(swColor) && coloresEnUso.has(swColor);
+    if (esTomado) {
+      s.style.display = "none";
+      s.classList.remove("selected");
+    } else {
+      s.style.display = "";
+      if (!primerDisponible) primerDisponible = s;
+      if (s.classList.contains("selected")) seleccionadoVisible = true;
+    }
+  });
+
+  if (!seleccionadoVisible && primerDisponible) {
+    primerDisponible.click();
+  }
+}
+
 function setCursoColor(color) {
-  $("#curso-color").value = color;
+  const cUpper = (color || "#38BDF8").toUpperCase();
+  $("#curso-color").value = cUpper;
   $$(".color-swatch", $("#curso-color-picker")).forEach(s => {
-    s.classList.toggle("selected", s.dataset.color === color);
+    const swUpper = (s.dataset.color || "").toUpperCase();
+    s.classList.toggle("selected", swUpper === cUpper || MAPA_PASTEL_A_SWATCH[cUpper] === swUpper);
   });
 }
 
@@ -2859,16 +2995,13 @@ async function openNewCursoModal(origin) {
   $("#curso-notas").value = "";
   if ($("#curso-ciclo-academico")) $("#curso-ciclo-academico").value = "";
   if ($("#curso-tipo")) $("#curso-tipo").value = "obligatorio";
-  if ($("#curso-codigo")) $("#curso-codigo").value = "";
+  
   if ($("#curso-grupo")) $("#curso-grupo").value = "";
   $("#curso-form-error").classList.add("hidden");
   $("#btn-delete-curso").classList.add("hidden");
   $("#curso-sesiones-info").classList.add("hidden");
 
-  // Proponer un color que aún no use otro curso
-  const usados = new Set((await db.cursos.toArray()).map(c => c.color));
-  const paleta = $$(".color-swatch", $("#curso-color-picker")).map(s => s.dataset.color);
-  setCursoColor(paleta.find(c => !usados.has(c)) || paleta[0]);
+  await actualizarDisponibilidadColores($("#curso-color-picker"), null, null);
 
   $("#modal-curso-backdrop").classList.remove("hidden");
   $("#curso-nombre").focus();
@@ -2888,9 +3021,11 @@ async function openEditCursoModal(id) {
   $("#curso-notas").value = c.notas || "";
   if ($("#curso-ciclo-academico")) $("#curso-ciclo-academico").value = c.ciclo_curso || "";
   if ($("#curso-tipo")) $("#curso-tipo").value = c.tipo_condicion || "obligatorio";
-  if ($("#curso-codigo")) $("#curso-codigo").value = c.codigo_asignatura || "";
+  
   if ($("#curso-grupo")) $("#curso-grupo").value = c.grupo_seccion || "";
   setCursoColor(c.color || COLOR_CURSO_DEFECTO);
+  await actualizarDisponibilidadColores($("#curso-color-picker"), c.color, c.id);
+
   $("#curso-form-error").classList.add("hidden");
   $("#btn-delete-curso").classList.remove("hidden");
 
@@ -2940,7 +3075,7 @@ async function guardarCurso(e) {
     ciclo_id: previo?.ciclo_id || cicloActivo?.id || "",
     ciclo_curso: ($("#curso-ciclo-academico")?.value || "").trim(),
     tipo_condicion: $("#curso-tipo")?.value || "obligatorio",
-    codigo_asignatura: ($("#curso-codigo")?.value || "").trim(),
+    
     grupo_seccion: ($("#curso-grupo")?.value || "").trim(),
     nombre,
     profesor: $("#curso-profesor").value.trim(),
@@ -3308,16 +3443,23 @@ function setClassTypeMode(mode) {
       ? (isEdit ? "Editar Actividad / Trabajo" : "Añadir Actividad o Trabajo")
       : (isEdit ? "Editar Asignatura en Horario" : "Añadir Asignatura al Horario");
   }
+
+  if (isActividad) {
+    const curId = $("#class-id").value || null;
+    const curColor = $("#class-actividad-color").value || null;
+    actualizarDisponibilidadColores($("#class-actividad-color-picker"), curColor, curId);
+  }
 }
 
 function setActividadColor(color) {
-  const norm = normalizarColorPastel(color || "#BAE6FD");
+  const cUpper = (color || "#38BDF8").toUpperCase();
   const hiddenCol = $("#class-actividad-color");
-  if (hiddenCol) hiddenCol.value = norm;
+  if (hiddenCol) hiddenCol.value = cUpper;
   const picker = $("#class-actividad-color-picker");
   if (picker) {
     $$(".color-swatch", picker).forEach(s => {
-      s.classList.toggle("selected", s.dataset.color === norm);
+      const swUpper = (s.dataset.color || "").toUpperCase();
+      s.classList.toggle("selected", swUpper === cUpper || MAPA_PASTEL_A_SWATCH[cUpper] === swUpper);
     });
   }
 }
@@ -3339,12 +3481,14 @@ async function openNewClassModal(preselectedDay, preselectedCursoId) {
   $("#class-aula").value = "";
   $("#class-actividad-titulo").value = "";
   $("#class-actividad-categoria").value = "practicas";
-  setActividadColor("#BAE6FD");
+  setActividadColor("#38BDF8");
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.add("hidden");
 
   actualizarSelector12hDesde24("inicio", "08:00");
   actualizarSelector12hDesde24("fin", "10:00");
+
+  await actualizarDisponibilidadColores($("#class-actividad-color-picker"), null, null);
 
   if (count === 0) {
     setClassTypeMode("actividad");
@@ -3376,7 +3520,8 @@ async function openEditClassModal(id) {
     setClassTypeMode("actividad");
     $("#class-actividad-titulo").value = c.titulo || "";
     $("#class-actividad-categoria").value = c.categoria || "practicas";
-    setActividadColor(c.color || "#BAE6FD");
+    setActividadColor(c.color || "#38BDF8");
+    await actualizarDisponibilidadColores($("#class-actividad-color-picker"), c.color, c.id);
   } else {
     setClassTypeMode("curso");
     await populateClassCursoSelect(c.curso_id);
@@ -3402,6 +3547,7 @@ function openNewTaskModal(defaultCursoId) {
   $("#modal-task-title").textContent = "Nueva Tarea";
   $("#task-id").value = "";
   $("#task-titulo").value = "";
+  if ($("#task-enlace")) $("#task-enlace").value = "";
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -3431,6 +3577,7 @@ async function openEditTaskModal(id) {
   $("#task-id").value = t.id;
   $("#task-titulo").value = t.titulo || "";
   $("#task-fecha").value = t.fecha_limite || "";
+  if ($("#task-enlace")) $("#task-enlace").value = t.enlace || "";
   $("#task-importancia").value = t.importancia || 3;
   setImportanceStars(t.importancia || 3);
   $("#task-descripcion").value = t.notas || "";
@@ -3528,7 +3675,89 @@ async function cargarAjustesUI() {
   setVal("#ajuste-huecos-desde", map.huecos_ventana_desde ?? "07:00");
   setVal("#ajuste-huecos-hasta", map.huecos_ventana_hasta ?? "22:00");
   setVal("#ajuste-huecos-min", map.huecos_min ?? 30);
+  const listaAjustes12h = [
+    ["ajuste-resumen", "#ajuste-resumen-hora", "#badge-resumen-hora", map.resumen_hora ?? "07:00"],
+    ["ajuste-silencio-desde", "#ajuste-silencio-desde", "#badge-silencio-desde", map.silencio_desde ?? "22:00"],
+    ["ajuste-silencio-hasta", "#ajuste-silencio-hasta", "#badge-silencio-hasta", map.silencio_hasta ?? "07:00"],
+    ["ajuste-huecos-desde", "#ajuste-huecos-desde", "#badge-huecos-desde", map.huecos_ventana_desde ?? "07:00"],
+    ["ajuste-huecos-hasta", "#ajuste-huecos-hasta", "#badge-huecos-hasta", map.huecos_ventana_hasta ?? "22:00"]
+  ];
+  listaAjustes12h.forEach(([pfx, hid, bdg, val]) => {
+    configurarSelectorAjuste12h(pfx, hid, bdg);
+    fijarHora12EnAjuste(pfx, hid, bdg, val);
+  });
 }
+
+
+
+function configurarSelectorAjuste12h(prefix, hiddenInputId, badgeId) {
+  const hSel = $(`#select-${prefix}-h`);
+  const mSel = $(`#select-${prefix}-m`);
+  const ampmBtn = $(`#btn-${prefix}-ampm`);
+  const badgeEl = $(badgeId);
+  const hiddenInput = $(hiddenInputId);
+  if (!hSel || !mSel || !ampmBtn || !hiddenInput) return;
+
+  if (hSel.children.length === 0) {
+    const hours = [];
+    for (let h = 1; h <= 12; h++) hours.push(`<option value="${pad2(h)}">${pad2(h)}</option>`);
+    hSel.innerHTML = hours.join("");
+
+    const mins = [];
+    for (let m = 0; m < 60; m += 5) mins.push(`<option value="${pad2(m)}">${pad2(m)}</option>`);
+    mSel.innerHTML = mins.join("");
+  }
+
+  const syncToHidden = () => {
+    const h12 = parseInt(hSel.value, 10) || 12;
+    const m = parseInt(mSel.value, 10) || 0;
+    const ampm = ampmBtn.textContent.trim().toUpperCase();
+    let h24 = h12 % 12;
+    if (ampm === "PM") h24 += 12;
+    const hora24 = `${pad2(h24)}:${pad2(m)}`;
+    hiddenInput.value = hora24;
+    const text12 = `${pad2(h12)}:${pad2(m)} ${ampm}`;
+    if (badgeEl) badgeEl.textContent = text12;
+  };
+
+  hSel.onchange = syncToHidden;
+  mSel.onchange = syncToHidden;
+  ampmBtn.onclick = () => {
+    const isAm = ampmBtn.textContent.trim().toUpperCase() === "AM";
+    ampmBtn.textContent = isAm ? "PM" : "AM";
+    ampmBtn.classList.toggle("is-pm", isAm);
+    syncToHidden();
+  };
+}
+
+function fijarHora12EnAjuste(prefix, hiddenInputId, badgeId, hora24Str) {
+  const hSel = $(`#select-${prefix}-h`);
+  const mSel = $(`#select-${prefix}-m`);
+  const ampmBtn = $(`#btn-${prefix}-ampm`);
+  const badgeEl = $(badgeId);
+  const hiddenInput = $(hiddenInputId);
+  if (!hSel || !mSel || !ampmBtn || !hiddenInput) return;
+
+  const [hRaw, mRaw] = (hora24Str || "07:00").split(":").map(Number);
+  let h = isNaN(hRaw) ? 7 : hRaw;
+  let m = isNaN(mRaw) ? 0 : mRaw;
+  const ampm = h >= 12 ? "PM" : "AM";
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  const h12Str = pad2(h12);
+  const mRedondeado = Math.min(55, Math.round(m / 5) * 5);
+  const mStr = pad2(mRedondeado);
+
+  hSel.value = h12Str;
+  mSel.value = mStr;
+  ampmBtn.textContent = ampm;
+  ampmBtn.classList.toggle("is-pm", ampm === "PM");
+
+  const formatted24 = `${pad2(h)}:${pad2(mRedondeado)}`;
+  hiddenInput.value = formatted24;
+  if (badgeEl) badgeEl.textContent = `${h12Str}:${mStr} ${ampm}`;
+}
+
 
 async function guardarAjustesUI() {
   const getVal = (id, dflt) => $(id) ? $(id).value : dflt;
@@ -3674,9 +3903,21 @@ async function openAsistenciaModal(cursoId) {
   for (const a of ajustes) mapAjustes[a.clave] = a.valor;
   const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
 
-  const cicloActivo = await obtenerCicloActivo();
-  const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-01-01";
-  const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-12-31";
+  // Buscar primero el ciclo asociado al curso, o activo, o el último registrado aunque haya concluido
+  let ciclo = null;
+  if (c.ciclo_id) {
+    ciclo = await db.ciclos.get(c.ciclo_id);
+  }
+  if (!ciclo) {
+    ciclo = await obtenerCicloActivo();
+  }
+  if (!ciclo) {
+    const todosCiclos = await db.ciclos.toArray();
+    if (todosCiclos.length > 0) ciclo = todosCiclos[todosCiclos.length - 1];
+  }
+  const cicloActivo = ciclo;
+  const fechaIni = ciclo?.fecha_inicio || cfg.ciclo_inicio || "2026-01-01";
+  const fechaFin = ciclo?.fecha_fin || cfg.ciclo_fin || (typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(fechaIni) : "2026-12-31");
 
   const res = (typeof resumenAsistencia === "function" ? resumenAsistencia : window.resumenAsistencia)({
     cursoId,
@@ -3695,26 +3936,39 @@ async function openAsistenciaModal(cursoId) {
       ? `Ciclo: ${cfg.ciclo_inicio} al ${cfg.ciclo_fin}`
       : "Ciclo: Configura inicio y fin en Ciclo Académico");
   $("#asist-total-sesiones").textContent = res.totalSesiones;
-  $("#asist-faltas-registradas").textContent = res.faltas;
+  $("#asist-faltas-registradas").textContent = `${res.faltas} (${res.justificadas || 0} justif.)`;
   $("#asist-max-faltas").textContent = res.maxFaltasPermitidas;
   $("#asist-faltas-restantes").textContent = res.faltasRestantes;
   $("#asist-faltas-restantes").style.color = res.enRiesgo ? "var(--status-danger)" : (res.faltasRestantes <= 2 ? "var(--status-warning)" : "var(--deep-leaf)");
   $("#asist-pct-faltas").textContent = `${res.porcentajeFaltasCiclo}%`;
 
-  $("#asist-progreso-texto").textContent = `${res.porcentajeFaltasCiclo}% (Límite: ${res.limiteFaltasPct}%)`;
+  $("#asist-progreso-texto").textContent = `${res.porcentajeFaltasCiclo}% (Límite: ${res.limiteFaltasPct}%) · ${res.justificadas || 0} justificadas`;
   const fillPct = Math.min(100, (res.porcentajeFaltasCiclo / (res.limiteFaltasPct || 30)) * 100);
   const fillEl = $("#asist-progress-fill");
   fillEl.style.width = `${fillPct}%`;
   fillEl.style.backgroundColor = res.enRiesgo ? "var(--status-danger)" : (res.porcentajeFaltasCiclo >= 20 ? "var(--status-warning)" : "var(--accent-teal)");
 
   const listEl = $("#asist-sesiones-lista");
-  const sesiones = res.todasLasSesiones;
+  let sesiones = res.todasLasSesiones;
+
+  if (sesiones.length === 0 && asistencias.length > 0) {
+    sesiones = asistencias.map(a => ({
+      fecha: a.fecha,
+      diaSemana: new Date(a.fecha + "T12:00:00").getDay() || 7,
+      claseId: a.clase_id || "",
+      horaInicio: "08:00",
+      horaFin: "10:00",
+      cancelada: false,
+      feriado: false
+    })).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
   if (sesiones.length === 0) {
-    listEl.innerHTML = `<p class="practicas-empty">No hay sesiones calculadas. Asigna horario a este curso y revisa las fechas del ciclo en Ajustes.</p>`;
+    listEl.innerHTML = `<p class="practicas-empty">No hay sesiones calculadas. Asigna un horario semanal a este curso en Horario o verifica las fechas del ciclo académico.</p>`;
   } else {
     const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
     listEl.innerHTML = sesiones.map(s => {
-      const asist = asistencias.find(a => a.fecha === s.fecha);
+      const asist = asistencias.find(a => (s.claseId && a.clase_id === s.claseId && a.fecha === s.fecha) || a.fecha === s.fecha);
       let est = "pendiente";
       let esPorDefecto = false;
       if (asist) {
@@ -3725,33 +3979,54 @@ async function openAsistenciaModal(cursoId) {
         est = "presente";
         esPorDefecto = true;
       }
+
+      let badgeHtml = "";
+      if (s.cancelada) {
+        badgeHtml = `<span class="badge-subtle">${s.feriado ? "Feriado" : "Cancelada"}</span>`;
+      } else if (est === "falta") {
+        badgeHtml = `<span class="badge-asist-falta">Inasistencia</span>`;
+      } else if (est === "justificada") {
+        badgeHtml = `<span class="badge-asist-justificada">Falta Justificada</span>`;
+      } else if (est === "presente") {
+        badgeHtml = `<span class="badge-asist-presente">${esPorDefecto ? "Asistido (por defecto)" : "Asistencia registrada"}</span>`;
+      } else {
+        badgeHtml = `<span class="badge-subtle">Pendiente</span>`;
+      }
+
+      const diaNombre = DIAS_LABEL[DIAS_SEMANA[s.diaSemana - 1]] || "";
+      const rangoHora = s.horaInicio && s.horaFin ? ` · ${formatTimeRange12(s.horaInicio, s.horaFin)}` : "";
+
       return `
         <div class="asist-session-row">
-          <div>
-            <strong>${s.fecha}</strong> · <span style="color:var(--text-secondary);">${DIAS_LABEL[DIAS_SEMANA[s.diaSemana - 1]] || ""} (${formatTimeRange12(s.horaInicio, s.horaFin)})</span>
-            ${s.motivo ? `<div style="font-size:11px;color:var(--status-warning);">${escapeHtml(s.motivo)}</div>` : ""}
-            ${esPorDefecto ? `<span class="badge-subtle" style="font-size:10px; color:var(--deep-leaf); margin-left:6px;">Asistido (por defecto)</span>` : ""}
+          <div class="asist-session-info">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <strong>${s.fecha}</strong>
+              <span style="color:var(--text-secondary);font-size:11.5px;">${diaNombre}${rangoHora}</span>
+              ${badgeHtml}
+            </div>
+            ${s.motivo ? `<div style="font-size:11px;color:var(--status-warning);margin-top:2px;">${escapeHtml(s.motivo)}</div>` : ""}
           </div>
-          <div style="display:flex;gap:4px;">
-            ${s.cancelada ? `<span style="font-size:11px;padding:2px 8px;border-radius:4px;background:var(--surface-subtle);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
-              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar presente">${ICONS.check}</button>
-              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar falta">${ICONS.x}</button>
-              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar justificada">${ICONS.message}</button>
+          <div class="asist-session-actions" style="display:flex;gap:4px;flex-shrink:0;">
+            ${s.cancelada ? `<span style="font-size:11px;padding:3px 8px;border-radius:var(--radius-pill);background:var(--surface-subtle);color:var(--text-secondary);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
+              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar como presente">${ICONS.check} <span>Presente</span></button>
+              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar como inasistencia">${ICONS.x} <span>Falta</span></button>
+              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar como falta justificada">${ICONS.message} <span>Justif.</span></button>
             `}
           </div>
         </div>
       `;
     }).join("");
 
-    $("button[data-action='set-asist']", listEl).forEach(btn => {
+    $$("button[data-action='set-asist']", listEl).forEach(btn => {
       btn.addEventListener("click", async () => {
         const f = btn.dataset.fecha;
         const nuevo = btn.dataset.estado;
+        const claseId = btn.dataset.claseId || "";
         if (nuevo === "presente" && f > hoyStr) {
           showToast("No puedes registrar asistencia para una fecha futura.", true);
           return;
         }
-        const curAsist = asistencias.find(a => a.fecha === f);
+        const curAsist = asistencias.find(a => (claseId && a.clase_id === claseId && a.fecha === f) || a.fecha === f);
         if (curAsist && curAsist.estado === nuevo) {
           if (curAsist.id) {
             await db.asistencia.delete(curAsist.id);
@@ -3759,9 +4034,9 @@ async function openAsistenciaModal(cursoId) {
           await db.asistencia.where("fecha").equals(f).and(a => a.curso_id === cursoId).delete();
         } else {
           await db.asistencia.put({
-            id: curAsist?.id || `${cursoId}_${f}`,
+            id: curAsist?.id || (claseId ? `${cursoId}_${claseId}_${f}` : `${cursoId}_${f}`),
             curso_id: cursoId,
-            clase_id: curAsist?.clase_id || "",
+            clase_id: claseId,
             fecha: f,
             estado: nuevo
           });
@@ -4091,7 +4366,10 @@ let partesQrAcumuladas = [];
 let qrScannerStream = null;
 
 async function openModalQrSchedule() {
-  const [cursosRaw, clasesRaw] = await Promise.all([db.cursos.toArray(), db.clases.toArray()]);
+  const [cursosRaw, clasesRaw] = await Promise.all([
+    db.cursos.toArray(),
+    db.clases.toArray()
+  ]);
   if (cursosRaw.length === 0 && clasesRaw.length === 0) {
     showToast("No tienes cursos ni clases para compartir por QR.", true);
     return;
@@ -4119,6 +4397,8 @@ async function openModalQrSchedule() {
   const vistasClase = new Set();
 
   for (const k of clasesRaw) {
+    // Solo compartir horario de cursos universitarios (excluir actividades personales o laborales)
+    if (k.tipo === "actividad") continue;
     const cid = mapaIdOriginalAUnico.get(k.curso_id) || k.curso_id;
     if (!idsCursosValidos.has(cid)) continue;
     const sig = `${cid}|${k.dia_semana}|${k.hora_inicio}|${k.hora_fin}`;
@@ -4127,10 +4407,18 @@ async function openModalQrSchedule() {
     clasesUnicas.push({ ...k, curso_id: cid });
   }
 
+  const cicloActivo = await obtenerCicloActivo();
+
+  // QR optimizado: comparte ciclo académico, catálogo de cursos y horario semanal (sin notas ni faltas personales)
   const horarioCompartido = {
     tipo: "unumbral-horario-compartido",
-    version: 2,
+    version: 3,
     exportado_el: new Date().toISOString(),
+    ciclo: cicloActivo ? {
+      nombre: cicloActivo.nombre,
+      fecha_inicio: cicloActivo.fecha_inicio,
+      fecha_fin: cicloActivo.fecha_fin
+    } : null,
     cursos: cursosUnicos.map(c => ({
       id: c.id,
       nombre: c.nombre,
@@ -4149,7 +4437,9 @@ async function openModalQrSchedule() {
   };
 
   try {
-    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido, 4000);
+    // Límite de 600 caracteres: con compresión Deflate interna, hasta 8-9 cursos caben en 1 solo código QR de cuadros grandes (~77x77 módulos)
+    // Si excede ese volumen, el sistema lo divide automáticamente en 2 partes
+    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido, 600);
   } catch (err) {
     showToast("Error generando código QR: " + err.message, true);
     return;
@@ -4159,7 +4449,15 @@ async function openModalQrSchedule() {
   renderQrEnDisplay(qrPartesActuales[0]);
 
   const multiControls = $("#qr-multipart-controls");
-  if (multiControls) multiControls.classList.add("hidden");
+  if (multiControls) {
+    if (qrPartesActuales.length > 1) {
+      multiControls.classList.remove("hidden");
+      const indicator = $("#qr-part-indicator");
+      if (indicator) indicator.textContent = `Parte 1 de ${qrPartesActuales.length}`;
+    } else {
+      multiControls.classList.add("hidden");
+    }
+  }
 
   $("#modal-qr-schedule-backdrop").classList.remove("hidden");
 }
@@ -4177,7 +4475,14 @@ function renderQrEnDisplay(textoQr) {
       const qr = qrcode(0, "L");
       qr.addData(textoQr);
       qr.make();
-      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 3 });
+      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 4 });
+      const svg = container.querySelector("svg");
+      if (svg) {
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        svg.style.display = "block";
+        svg.style.shapeRendering = "crispEdges";
+      }
       return;
     } catch (err) {
       console.error("Error generando QR:", err);
@@ -4336,8 +4641,9 @@ async function openModalQrScanner() {
       qrScannerStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: { ideal: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { ideal: 1080 },
+          height: { ideal: 1080 },
+          aspectRatio: { ideal: 1.0 }
         },
         audio: false
       });
@@ -4371,42 +4677,59 @@ async function iniciarDeteccionCamara(video) {
   const scanCanvas = document.createElement("canvas");
   const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
 
-  const interval = setInterval(async () => {
-    if (!qrScannerStream || $("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
-      clearInterval(interval);
+  let activa = true;
+
+  async function tick() {
+    if (!activa || !qrScannerStream || $("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
       return;
     }
     try {
       if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        if (typeof window.jsQR === "function" && scanCtx) {
-          const maxDim = 640;
-          const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
-          const w = Math.max(1, Math.round(video.videoWidth * scale));
-          const h = Math.max(1, Math.round(video.videoHeight * scale));
-          scanCanvas.width = w;
-          scanCanvas.height = h;
-          scanCtx.drawImage(video, 0, 0, w, h);
-          const imgData = scanCtx.getImageData(0, 0, w, h);
-          const code = window.jsQR(imgData.data, w, h, { inversionAttempts: "dontInvert" });
-          if (code && code.data) {
-            clearInterval(interval);
-            procesarTextoQrEscaneado(code.data);
-            return;
+        // 1. BarcodeDetector nativo primero (evalúa el stream completo por hardware sin pérdida de nitidez)
+        if (detector) {
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0 && barcodes[0].rawValue) {
+              activa = false;
+              procesarTextoQrEscaneado(barcodes[0].rawValue);
+              return;
+            }
+          } catch {
+            // Seguir con jsQR recortado
           }
         }
-        if (detector) {
-          const barcodes = await detector.detect(video);
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            clearInterval(interval);
-            procesarTextoQrEscaneado(barcodes[0].rawValue);
+
+        // 2. jsQR enfocado en el centro 1:1 del visor (recorte central de alta resolución)
+        if (typeof window.jsQR === "function" && scanCtx) {
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const cropSize = Math.round(Math.min(vw, vh) * 0.85);
+          const sx = Math.round((vw - cropSize) / 2);
+          const sy = Math.round((vh - cropSize) / 2);
+          const targetDim = Math.min(cropSize, 720);
+
+          scanCanvas.width = targetDim;
+          scanCanvas.height = targetDim;
+          scanCtx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, targetDim, targetDim);
+          const imgData = scanCtx.getImageData(0, 0, targetDim, targetDim);
+          const code = window.jsQR(imgData.data, targetDim, targetDim, { inversionAttempts: "attemptBoth" });
+          if (code && code.data) {
+            activa = false;
+            procesarTextoQrEscaneado(code.data);
             return;
           }
         }
       }
     } catch {
-      // Ignorar cuadros en movimiento
+      // Ignorar cuadros en transición
     }
-  }, 250);
+
+    if (activa && qrScannerStream && !$("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
+      setTimeout(tick, 140);
+    }
+  }
+
+  tick();
 }
 
 function cargarImagenDesdeArchivo(file) {
@@ -4467,7 +4790,21 @@ async function procesarArchivoImagenQr(file) {
       return;
     }
 
-    // 1. Intentar jsQR en imagen completa a distintas escalas (normal y binarizada)
+    // 1. Detección nativa por BarcodeDetector (instantánea y con aceleración GPU)
+    if ("BarcodeDetector" in window) {
+      try {
+        const detector = new BarcodeDetector({ formats: ["qr_code"] });
+        const barcodes = await detector.detect(img);
+        if (barcodes.length > 0 && barcodes[0].rawValue) {
+          procesarTextoQrEscaneado(barcodes[0].rawValue);
+          return;
+        }
+      } catch {
+        // Fallback a escaneo multiescala
+      }
+    }
+
+    // 2. Intentar jsQR en imagen completa a distintas escalas (normal y binarizada)
     for (const dim of [800, 1200, 550, 1600]) {
       const res = intentarJsQrEnRegion(img, 0, 0, iw, ih, dim, null) ||
                   intentarJsQrEnRegion(img, 0, 0, iw, ih, dim, 160);
@@ -4477,7 +4814,7 @@ async function procesarArchivoImagenQr(file) {
       }
     }
 
-    // 2. Intentar jsQR en recortes de pantalla (incluyendo bottom-sheet donde se ubica el modal en el celular)
+    // 3. Intentar jsQR en recortes de pantalla (incluyendo bottom-sheet donde se ubica el modal en el celular)
     const crops = [
       [iw * 0.08, ih * 0.44, iw * 0.84, ih * 0.42], // Bottom-sheet QR exacto
       [0, ih * 0.36, iw, ih * 0.56],                 // Mitad inferior de captura de pantalla
@@ -4492,16 +4829,6 @@ async function procesarArchivoImagenQr(file) {
           procesarTextoQrEscaneado(res);
           return;
         }
-      }
-    }
-
-    // 3. Fallback con BarcodeDetector nativo si existe
-    if ("BarcodeDetector" in window) {
-      const detector = new BarcodeDetector({ formats: ["qr_code"] });
-      const barcodes = await detector.detect(img);
-      if (barcodes.length > 0 && barcodes[0].rawValue) {
-        procesarTextoQrEscaneado(barcodes[0].rawValue);
-        return;
       }
     }
   } catch (err) {
@@ -4555,8 +4882,33 @@ async function procesarTextoQrEscaneado(rawText) {
 async function ejecutarImportacionHorario(data) {
   const existentes = await db.cursos.toArray();
   const clasesExistentes = await db.clases.toArray();
-  const cicloActivo = await obtenerCicloActivo();
-  const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || [], cicloActivo?.id);
+  let cicloActivo = await obtenerCicloActivo();
+
+  // Si el QR contiene ciclo académico, verificar si existe o crearlo y activarlo
+  let cicloIdAUsar = cicloActivo?.id || null;
+  if (data.ciclo && data.ciclo.nombre && data.ciclo.fecha_inicio) {
+    const ciclos = await db.ciclos.toArray();
+    const coincide = ciclos.find(ci =>
+      ci.nombre.toLowerCase().trim() === data.ciclo.nombre.toLowerCase().trim() ||
+      ci.fecha_inicio === data.ciclo.fecha_inicio
+    );
+    if (coincide) {
+      cicloIdAUsar = coincide.id;
+    } else {
+      const nuevoCiclo = {
+        id: `ciclo_${Date.now()}`,
+        nombre: data.ciclo.nombre,
+        fecha_inicio: data.ciclo.fecha_inicio,
+        fecha_fin: data.ciclo.fecha_fin || (typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(data.ciclo.fecha_inicio) : ""),
+        estado: "activo",
+        fecha_creacion: new Date().toISOString()
+      };
+      await db.ciclos.put(nuevoCiclo);
+      cicloIdAUsar = nuevoCiclo.id;
+    }
+  }
+
+  const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || [], cicloIdAUsar);
 
   const firmasExistentes = new Set(clasesExistentes.map(c =>
     `${c.curso_id}|${c.dia_semana}|${to24Hour(c.hora_inicio)}|${to24Hour(c.hora_fin)}`
@@ -4571,9 +4923,28 @@ async function ejecutarImportacionHorario(data) {
     }
   }
 
-  await db.transaction("rw", db.cursos, db.clases, async () => {
+  const asistenciasParaInsertar = [];
+  if (Array.isArray(data.asistencias) && data.asistencias.length > 0) {
+    for (const a of data.asistencias) {
+      const realCurso = r.porId.get(String(a.curso_id));
+      const targetCid = realCurso ? realCurso.id : a.curso_id;
+      if (targetCid && a.fecha && a.estado) {
+        asistenciasParaInsertar.push({
+          id: `${targetCid}_${a.fecha}`,
+          curso_id: targetCid,
+          fecha: a.fecha,
+          estado: a.estado,
+          tipo_registro: "qr_import",
+          modificado_el: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  await db.transaction("rw", db.cursos, db.clases, db.asistencia, async () => {
     if (r.cursosNuevos.length) await db.cursos.bulkPut(r.cursosNuevos);
     if (clasesParaInsertar.length) await db.clases.bulkPut(clasesParaInsertar);
+    if (asistenciasParaInsertar.length) await db.asistencia.bulkPut(asistenciasParaInsertar);
   });
 
   await limpiarCursosResidualesNumericos();
@@ -4707,8 +5078,6 @@ async function loadDemoSemester() {
   const demoPerfil = {
     nombre: "Alex Mendoza Ríos",
     codigo: "0002120456",
-    dni: "74892015",
-    sexo: "M",
     facultad: "Facultad de Ingeniería de Sistemas e Ingeniería Civil",
     escuela: "Escuela Profesional de Ingeniería de Sistemas",
     telefono: "961849201",
@@ -5072,6 +5441,7 @@ async function guardarTarea(e) {
   const fecha_limite = $("#task-fecha").value;
   const importancia = parseInt($("#task-importancia").value) || 3;
   const estimado_min = null;
+  const enlace = ($("#task-enlace")?.value || "").trim();
   const notas = $("#task-descripcion").value.trim();
   const completada = $("#task-completada").checked;
   const errorEl = $("#task-form-error");
@@ -5086,7 +5456,7 @@ async function guardarTarea(e) {
 
   const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
 
-  await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, estimado_min, completada, fecha_creacion, notas });
+  await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, estimado_min, completada, fecha_creacion, notas, enlace });
   closeTaskModal();
   showToast("Tarea guardada.");
   if (typeof reprogramarTodo === "function") reprogramarTodo();
@@ -5107,43 +5477,7 @@ async function eliminarTarea() {
   else renderTareas();
 }
 
-async function scheduleTestNotification() {
-  const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
-  if (!LocalNotifications) {
-    showToast("Las alertas programadas requieren instalar el APK en Android. (En web este modo es simulado).");
-    setTimeout(() => {
-      showToast("[Simulación] ¡Alerta en 10 s! Cálculo II en 10 min · Aula 3 · Dr. Pérez");
-    }, 10000);
-    return;
-  }
 
-  try {
-    const permStatus = await LocalNotifications.requestPermissions();
-    if (permStatus.display !== "granted") {
-      alert("Debes permitir las notificaciones en el sistema para recibir alertas.");
-      return;
-    }
-
-    const atDate = new Date(Date.now() + 10000);
-    await LocalNotifications.schedule({
-      notifications: [
-        {
-          id: 9999,
-          title: "UNUmbral · Prueba de Alerta",
-          body: "¡Alerta offline funcionando! Tu clase o tarea te avisará a tiempo.",
-          schedule: { at: atDate, allowWhileIdle: true },
-          smallIcon: "ic_stat_icon",
-          largeIcon: "ic_stat_logo",
-          iconColor: "#294635"
-        }
-      ]
-    });
-    showToast("Alerta programada en 10 s. Puedes cerrar la app para probarla.");
-  } catch (err) {
-    console.error("Error programando notificación de prueba:", err);
-    showToast("Error programando notificación: " + (err.message || err));
-  }
-}
 
 /* =====================================================================
    13. EVENTOS Y FORMULARIOS
@@ -5157,8 +5491,6 @@ async function cargarPerfilEstudiante() {
   const p = reg?.valor || {};
   if ($("#perfil-nombre")) $("#perfil-nombre").value = p.nombre || "";
   if ($("#perfil-codigo")) $("#perfil-codigo").value = p.codigo || "";
-  if ($("#perfil-dni")) $("#perfil-dni").value = p.dni || "";
-  if ($("#perfil-sexo")) $("#perfil-sexo").value = p.sexo || "";
   if ($("#perfil-telefono")) $("#perfil-telefono").value = p.telefono || "";
   if ($("#perfil-facultad")) $("#perfil-facultad").value = p.facultad || "";
   if ($("#perfil-escuela")) $("#perfil-escuela").value = p.escuela || "";
@@ -5170,8 +5502,6 @@ async function guardarPerfilEstudiante(e) {
   const perfil = {
     nombre: ($("#perfil-nombre")?.value || "").trim(),
     codigo: ($("#perfil-codigo")?.value || "").trim(),
-    dni: ($("#perfil-dni")?.value || "").trim(),
-    sexo: ($("#perfil-sexo")?.value || "").trim(),
     telefono: ($("#perfil-telefono")?.value || "").trim(),
     facultad: ($("#perfil-facultad")?.value || "").trim(),
     escuela: ($("#perfil-escuela")?.value || "").trim(),
@@ -5455,8 +5785,7 @@ function descargarReporteComoImagen(reporte) {
   ctx.font = "16px system-ui, -apple-system, sans-serif";
   ctx.fillStyle = "#475569";
   const codTxt = reporte.perfil?.codigo ? `Cód: ${reporte.perfil.codigo}` : "Sin código";
-  const dniTxt = reporte.perfil?.dni ? `DNI: ${reporte.perfil.dni}` : "";
-  ctx.fillText(`${codTxt}   ${dniTxt}   |   ${reporte.perfil?.escuela || "Escuela Profesional"}`, 85, 290);
+  ctx.fillText(`${codTxt}   |   ${reporte.perfil?.escuela || "Escuela Profesional"}`, 85, 290);
   ctx.fillText(reporte.perfil?.facultad || "Facultad Universitaria", 85, 318);
 
   // Bloques de Estadísticas Principales
@@ -5846,29 +6175,27 @@ function wireGlobalEvents() {
   $("#btn-delete-task").addEventListener("click", eliminarTarea);
 
   // Eventos de Ajustes y Backups
-  $("#btn-export-schedule").addEventListener("click", exportScheduleForFriends);
-  $("#input-import-schedule").addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      importScheduleFromFriends(e.target.files[0]);
-      e.target.value = "";
-    }
-  });
-
-  $("#btn-export-backup").addEventListener("click", exportFullBackup);
-  $("#input-import-backup").addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      importFullBackup(e.target.files[0]);
-      e.target.value = "";
+  // Actualización en tiempo real de badges en formato 12 horas
+  [
+    ["#ajuste-resumen-hora", "#badge-resumen-hora"],
+    ["#ajuste-silencio-desde", "#badge-silencio-desde"],
+    ["#ajuste-silencio-hasta", "#badge-silencio-hasta"],
+    ["#ajuste-huecos-desde", "#badge-huecos-desde"],
+    ["#ajuste-huecos-hasta", "#badge-huecos-hasta"]
+  ].forEach(([inpId, badgeId]) => {
+    const el = $(inpId);
+    if (el) {
+      el.addEventListener("input", () => {
+        const b = $(badgeId);
+        if (b && el.value) b.textContent = formatTime12(el.value);
+      });
     }
   });
 
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
-  const btnTestNotif = $("#btn-test-notification");
-  if (btnTestNotif) {
-    btnTestNotif.addEventListener("click", scheduleTestNotification);
-  }
+
 
   const btnSaveAjustes = $("#btn-save-ajustes");
   if (btnSaveAjustes) {
