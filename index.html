@@ -546,20 +546,6 @@
         <div class="form-row" style="margin-top: 14px;">
           <div class="form-group">
             <div class="form-label-row">
-              <label class="form-label">Hora del Resumen</label>
-              <span id="badge-resumen-hora" class="time-12h-badge">07:00 AM</span>
-            </div>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-resumen-h" class="field time-12h-select" aria-label="Hora resumen"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-resumen-m" class="field time-12h-select" aria-label="Minuto resumen"></select>
-              <button type="button" id="btn-ajuste-resumen-ampm" class="btn-ampm-toggle">AM</button>
-            </div>
-            <input type="hidden" id="ajuste-resumen-hora" value="07:00">
-          </div>
-
-          <div class="form-group">
-            <div class="form-label-row">
               <label class="form-label">Silencio: Desde</label>
               <span id="badge-silencio-desde" class="time-12h-badge">10:00 PM</span>
             </div>
@@ -615,9 +601,27 @@
             </div>
             <input type="hidden" id="ajuste-huecos-hasta" value="22:00">
           </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 10px;">
+          <div class="form-group">
+            <div class="form-label-row">
+              <label class="form-label">Hora del Resumen</label>
+              <span id="badge-resumen-hora" class="time-12h-badge">07:00 AM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-resumen-h" class="field time-12h-select" aria-label="Hora resumen"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-resumen-m" class="field time-12h-select" aria-label="Minuto resumen"></select>
+              <button type="button" id="btn-ajuste-resumen-ampm" class="btn-ampm-toggle">AM</button>
+            </div>
+            <input type="hidden" id="ajuste-resumen-hora" value="07:00">
+          </div>
 
           <div class="form-group">
-            <label class="form-label" for="ajuste-huecos-min">Mínimo Hueco (min)</label>
+            <div class="form-label-row">
+              <label class="form-label" for="ajuste-huecos-min">Mínimo Hueco (min)</label>
+            </div>
             <input type="number" id="ajuste-huecos-min" class="field" min="15" max="180" step="5" value="30">
           </div>
         </div>
@@ -678,7 +682,7 @@
           <span id="db-indicator-text">Almacenamiento persistente activo en el dispositivo</span>
         </div>
         <p style="margin-top:8px;font-size:12px;color:var(--text-tertiary);">
-          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-27">27 de octubre de 2026</time> · <button type="button" id="btn-ver-privacidad" style="background:none;border:none;padding:0;color:var(--text-secondary);font:inherit;text-decoration:underline;cursor:pointer;">Política de Privacidad</button>
+          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-29">29 de octubre de 2026</time> · <button type="button" id="btn-ver-privacidad" style="background:none;border:none;padding:0;color:var(--text-secondary);font:inherit;text-decoration:underline;cursor:pointer;">Política de Privacidad</button>
         </p>
       </div>
     </section>
@@ -771,9 +775,15 @@
 
       <!-- Grupo para Actividad No Académica (Prácticas, Trabajo, Taller, etc.) -->
       <div id="group-class-actividad" class="hidden">
-        <div class="form-group">
+        <div class="form-group" id="group-actividad-selector">
+          <label class="form-label" for="select-actividad-existente">Actividad registrada o nueva</label>
+          <select id="select-actividad-existente" class="field">
+            <option value="__nueva__">+ Crear nueva actividad…</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
           <label class="form-label" for="class-actividad-titulo">Nombre de la actividad / trabajo *</label>
-          <input type="text" id="class-actividad-titulo" class="field" placeholder="Ej. Prácticas OTI, Empleo oficina, Taller..." enterkeyhint="next">
+          <input type="text" id="class-actividad-titulo" class="field" placeholder="Ej. Prácticas pre Profesionales, Empleo oficina, Taller..." enterkeyhint="next">
         </div>
         <div class="form-group" style="margin-top: 10px;">
           <label class="form-label" for="class-actividad-categoria">Categoría</label>
@@ -786,7 +796,10 @@
           </select>
         </div>
         <div class="form-group" style="margin-top: 10px;">
-          <label class="form-label">Color distintivo</label>
+          <div class="form-label-row">
+            <label class="form-label">Color distintivo</label>
+            <span id="actividad-color-sync-hint" class="form-hint" style="font-size:11px; color:var(--text-muted);"></span>
+          </div>
           <div class="color-palette-picker" id="class-actividad-color-picker">
             <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Cielo" title="Azul Cielo"></button>
             <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
@@ -813,19 +826,30 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label" for="class-dia">Día de la semana *</label>
-          <select id="class-dia" class="field" required>
-            <option value="LUNES">Lunes</option>
-            <option value="MARTES">Martes</option>
-            <option value="MIERCOLES">Miércoles</option>
-            <option value="JUEVES">Jueves</option>
-            <option value="VIERNES">Viernes</option>
-            <option value="SABADO">Sábado</option>
-            <option value="DOMINGO">Domingo</option>
-          </select>
+      <div class="form-group" id="group-class-dias">
+        <div class="form-label-row">
+          <label class="form-label" id="label-class-dias">Día(s) de la semana *</label>
+          <button type="button" class="btn-text-action" id="btn-quick-weekdays">Lun a Vie</button>
         </div>
+        <div class="day-chips-grid" id="class-day-chips" role="group" aria-label="Seleccionar días">
+          <button type="button" class="day-chip active" data-day="LUNES">Lun</button>
+          <button type="button" class="day-chip" data-day="MARTES">Mar</button>
+          <button type="button" class="day-chip" data-day="MIERCOLES">Mié</button>
+          <button type="button" class="day-chip" data-day="JUEVES">Jue</button>
+          <button type="button" class="day-chip" data-day="VIERNES">Vie</button>
+          <button type="button" class="day-chip" data-day="SABADO">Sáb</button>
+          <button type="button" class="day-chip" data-day="DOMINGO">Dom</button>
+        </div>
+        <select id="class-dia" class="field hidden" required aria-label="Día principal">
+          <option value="LUNES">Lunes</option>
+          <option value="MARTES">Martes</option>
+          <option value="MIERCOLES">Miércoles</option>
+          <option value="JUEVES">Jueves</option>
+          <option value="VIERNES">Viernes</option>
+          <option value="SABADO">Sábado</option>
+          <option value="DOMINGO">Domingo</option>
+        </select>
+        <div id="class-dias-hint" class="form-hint" style="margin-top: 5px;">Selecciona uno o varios días para repetir este horario.</div>
       </div>
 
       <!-- Selector de Horas en Formato 12 Horas con AM / PM -->
@@ -1554,13 +1578,22 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
-    <div class="modal-body" style="font-size: 13.5px; line-height: 1.6; color: var(--text-secondary);">
-      <p style="margin-bottom: 10px;"><strong>Arquitectura Local-First y Zero-Tracking:</strong></p>
-      <p style="margin-bottom: 10px;">UNUmbral opera de forma íntegramente offline. Todos tus datos (cursos, calificaciones, horarios, asistencias, tareas y perfil) se almacenan de manera exclusiva en la base de datos <code>IndexedDB</code> de tu propio dispositivo.</p>
-      <p style="margin-bottom: 10px;"><strong>Sin Servidores Externos:</strong></p>
-      <p style="margin-bottom: 10px;">La aplicación no realiza llamadas de telemetría ni transmite información privada a servidores de terceros.</p>
-      <p style="margin-bottom: 10px;"><strong>Copias de Seguridad y Control Total:</strong></p>
-      <p>Puedes exportar tu información en formato <code>.json</code> o transferirla mediante códigos QR sin necesidad de conexión a internet ni cuentas en la nube.</p>
+    <div class="modal-body" style="font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); max-height: 70vh; overflow-y: auto;">
+      <p style="margin-bottom: 10px;"><strong>1. Arquitectura Local-First y Zero-Tracking:</strong><br>
+      UNUmbral opera de forma 100% offline. Toda tu información académica (cursos, horarios, actividades, calificaciones, asistencias, tareas, feriados y perfil de estudiante) reside exclusivamente en la base de datos <code>IndexedDB</code> (<code>UmbralDB</code>) de tu navegador o dispositivo móvil. No existe ningún servidor central, base de datos en la nube ni telemetría.</p>
+
+      <p style="margin-bottom: 10px;"><strong>2. Cero Rastreo y Sin Servidores Externos:</strong><br>
+      La aplicación no utiliza cookies de rastreo, identificadores de publicidad ni librerías de analítica de terceros. Ningún dato sale de tu dispositivo sin tu acción deliberada.</p>
+
+      <p style="margin-bottom: 10px;"><strong>3. Permisos del Dispositivo:</strong><br>
+      • <strong>Cámara:</strong> Empleada únicamente en tiempo real mediante la librería cliente <code>jsQR</code> para escanear códigos QR de horarios. Ninguna imagen o fotograma se guarda, almacena ni transmite externamente.<br>
+      • <strong>Notificaciones Locales:</strong> Programadas localmente en el gestor de alarmas de Android (vía Capacitor LocalNotifications) o la API del navegador. No se utilizan servidores push remotos (sin Firebase Cloud Messaging ni APNs).</p>
+
+      <p style="margin-bottom: 10px;"><strong>4. Transferencia Segura P2P por Código QR:</strong><br>
+      Al compartir tu horario, los datos se comprimen en memoria mediante Deflate (Zlib) y se muestran en pantalla como código QR para ser leídos físicamente cámara a pantalla. Por diseño de privacidad, las notas personales, asistencias y tareas nunca se incluyen en el código QR de horario.</p>
+
+      <p style="margin-bottom: 6px;"><strong>5. Copias de Seguridad y Derecho de Supresión:</strong><br>
+      Tienes control total sobre tus datos: puedes exportar un respaldo completo en archivo <code>.json</code> en cualquier momento y puedes vaciar completamente la base de datos con un clic desde el panel de Ajustes.</p>
     </div>
     <div class="modal-footer" style="margin-top: 16px;">
       <button type="button" class="btn-primary" id="btn-privacidad-entendido">Entendido</button>

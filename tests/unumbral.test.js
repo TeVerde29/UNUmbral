@@ -168,3 +168,22 @@ test("computeDayEventPositions places irregular hours and handles parallel overl
   assert.equal(overlapPositions[0].leftStyle, "calc(2px + 0%)");
   assert.equal(overlapPositions[1].leftStyle, "calc(2px + 50%)");
 });
+
+
+test("formatRelativeDue formats calendar days accurately avoiding premature 'Hoy'", () => {
+  const { sandbox } = loadAppContext();
+  const now = new Date();
+
+  // Tarea de manana a las 11:00 AM (nunca debe decir 'Hoy' aunque falten menos de 24 horas)
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 11, 0, 0);
+  const dueTomorrow = sandbox.formatRelativeDue(tomorrow.toISOString());
+  assert.equal(dueTomorrow.text, "Mañana a las 11:00 AM");
+  assert.equal(dueTomorrow.isUrgent, false);
+  assert.equal(dueTomorrow.isSoon, true);
+
+  // Tarea de ayer a las 10:00 AM
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 10, 0, 0);
+  const dueYesterday = sandbox.formatRelativeDue(yesterday.toISOString());
+  assert.equal(dueYesterday.text, "Atrasada ayer (10:00 AM)");
+  assert.equal(dueYesterday.isUrgent, true);
+});
