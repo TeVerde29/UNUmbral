@@ -396,32 +396,21 @@
       <div class="settings-card highlight-card">
         <div class="settings-card-header">
           <div class="icon-circle" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           </div>
           <div>
             <h3>Compartir Horario Académico</h3>
-            <p>Genera un archivo seguro y liviano con tus materias, aulas y profesores para transferir sin conexión a tus compañeros.</p>
+            <p>Transfiere tu horario y materias a tus compañeros mediante códigos QR de forma rápida y sin conexión a internet.</p>
           </div>
         </div>
         <div class="settings-card-actions">
-          <button id="btn-export-schedule" class="btn-primary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <span>Exportar Horario (.json)</span>
+          <button id="btn-compartir-qr" class="btn-primary" type="button" style="width:100%;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Compartir por Código QR</span>
           </button>
 
-          <label class="btn-secondary file-upload-btn">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-            <span>Importar Horario</span>
-            <input type="file" id="input-import-schedule" accept=".json" class="hidden">
-          </label>
-
-          <button id="btn-compartir-qr" class="btn-primary" type="button" style="background:var(--forest-shadow); width:100%; margin-top:4px;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            <span>Compartir por Código QR (Offline)</span>
-          </button>
-
-          <button id="btn-escanear-qr" class="btn-secondary" type="button" style="width:100%; margin-top:4px;">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+          <button id="btn-escanear-qr" class="btn-secondary" type="button" style="width:100%; margin-top:8px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
             <span>Escanear / Leer Código QR</span>
           </button>
         </div>
@@ -442,29 +431,20 @@
               <label class="form-label" for="perfil-nombre">Nombre Completo *</label>
               <input type="text" id="perfil-nombre" class="field" placeholder="Ej. Juan Carlos Pérez Gómez">
             </div>
-            <div class="form-group" style="width: 140px;">
+            <div class="form-group" style="width: 160px;">
               <label class="form-label" for="perfil-codigo">Código UNU</label>
               <input type="text" id="perfil-codigo" class="field" placeholder="0002120456" maxlength="15">
             </div>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
-            <div class="form-group" style="width: 120px;">
-              <label class="form-label" for="perfil-dni">DNI</label>
-              <input type="text" id="perfil-dni" class="field" placeholder="73849201" maxlength="10">
-            </div>
-            <div class="form-group" style="width: 120px;">
-              <label class="form-label" for="perfil-sexo">Sexo</label>
-              <select id="perfil-sexo" class="field">
-                <option value="">Elegir…</option>
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-telefono">Teléfono / Celular</label>
               <input type="tel" id="perfil-telefono" class="field" placeholder="961234567">
+            </div>
+            <div class="form-group flex-1">
+              <label class="form-label" for="perfil-correo">Correo Electrónico</label>
+              <input type="email" id="perfil-correo" class="field" placeholder="usuario@unu.edu.pe">
             </div>
           </div>
 
@@ -477,11 +457,6 @@
               <label class="form-label" for="perfil-escuela">Escuela Profesional</label>
               <input type="text" id="perfil-escuela" class="field" placeholder="Ej. Ingeniería de Sistemas">
             </div>
-          </div>
-
-          <div class="form-group" style="margin-top: 10px;">
-            <label class="form-label" for="perfil-correo">Correo Electrónico</label>
-            <input type="email" id="perfil-correo" class="field" placeholder="usuario@unu.edu.pe">
           </div>
 
           <div style="margin-top: 14px; display: flex; justify-content: flex-end;">
@@ -525,15 +500,6 @@
       </div>
 
       <div class="settings-card highlight-card">
-        <div class="settings-card-actions">
-          <button id="btn-test-notification" class="btn-primary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-            <span>Probar notificación (en 10 s)</span>
-          </button>
-        </div>
-        <p class="form-hint" style="margin-top: 8px;">Programa una alerta local de prueba a 10 segundos para verificar que suena incluso con la aplicación cerrada.</p>
-
-        <hr style="border:0; border-top: 1px solid var(--border-hairline); margin: 16px 0;">
 
         <div class="settings-toggle-group">
           <label class="settings-toggle-item">
@@ -579,28 +545,77 @@
 
         <div class="form-row" style="margin-top: 14px;">
           <div class="form-group">
-            <label class="form-label" for="ajuste-resumen-hora">Hora del Resumen</label>
-            <input type="time" id="ajuste-resumen-hora" class="field" value="07:00">
+            <div class="form-label-row">
+              <label class="form-label">Hora del Resumen</label>
+              <span id="badge-resumen-hora" class="time-12h-badge">07:00 AM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-resumen-h" class="field time-12h-select" aria-label="Hora resumen"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-resumen-m" class="field time-12h-select" aria-label="Minuto resumen"></select>
+              <button type="button" id="btn-ajuste-resumen-ampm" class="btn-ampm-toggle">AM</button>
+            </div>
+            <input type="hidden" id="ajuste-resumen-hora" value="07:00">
           </div>
+
           <div class="form-group">
-            <label class="form-label" for="ajuste-silencio-desde">Silencio: Desde</label>
-            <input type="time" id="ajuste-silencio-desde" class="field" value="22:00">
+            <div class="form-label-row">
+              <label class="form-label">Silencio: Desde</label>
+              <span id="badge-silencio-desde" class="time-12h-badge">10:00 PM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-silencio-desde-h" class="field time-12h-select" aria-label="Hora silencio desde"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-silencio-desde-m" class="field time-12h-select" aria-label="Minuto silencio desde"></select>
+              <button type="button" id="btn-ajuste-silencio-desde-ampm" class="btn-ampm-toggle is-pm">PM</button>
+            </div>
+            <input type="hidden" id="ajuste-silencio-desde" value="22:00">
           </div>
+
           <div class="form-group">
-            <label class="form-label" for="ajuste-silencio-hasta">Silencio: Hasta</label>
-            <input type="time" id="ajuste-silencio-hasta" class="field" value="07:00">
+            <div class="form-label-row">
+              <label class="form-label">Silencio: Hasta</label>
+              <span id="badge-silencio-hasta" class="time-12h-badge">07:00 AM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-silencio-hasta-h" class="field time-12h-select" aria-label="Hora silencio hasta"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-silencio-hasta-m" class="field time-12h-select" aria-label="Minuto silencio hasta"></select>
+              <button type="button" id="btn-ajuste-silencio-hasta-ampm" class="btn-ampm-toggle">AM</button>
+            </div>
+            <input type="hidden" id="ajuste-silencio-hasta" value="07:00">
           </div>
         </div>
 
         <div class="form-row" style="margin-top: 10px;">
           <div class="form-group">
-            <label class="form-label" for="ajuste-huecos-desde">Ventana Huecos: Desde</label>
-            <input type="time" id="ajuste-huecos-desde" class="field" value="07:00">
+            <div class="form-label-row">
+              <label class="form-label">Ventana Huecos: Desde</label>
+              <span id="badge-huecos-desde" class="time-12h-badge">07:00 AM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-huecos-desde-h" class="field time-12h-select" aria-label="Hora huecos desde"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-huecos-desde-m" class="field time-12h-select" aria-label="Minuto huecos desde"></select>
+              <button type="button" id="btn-ajuste-huecos-desde-ampm" class="btn-ampm-toggle">AM</button>
+            </div>
+            <input type="hidden" id="ajuste-huecos-desde" value="07:00">
           </div>
+
           <div class="form-group">
-            <label class="form-label" for="ajuste-huecos-hasta">Ventana Huecos: Hasta</label>
-            <input type="time" id="ajuste-huecos-hasta" class="field" value="22:00">
+            <div class="form-label-row">
+              <label class="form-label">Ventana Huecos: Hasta</label>
+              <span id="badge-huecos-hasta" class="time-12h-badge">10:00 PM</span>
+            </div>
+            <div class="time-12h-picker-wrap">
+              <select id="select-ajuste-huecos-hasta-h" class="field time-12h-select" aria-label="Hora huecos hasta"></select>
+              <span class="time-12h-colon">:</span>
+              <select id="select-ajuste-huecos-hasta-m" class="field time-12h-select" aria-label="Minuto huecos hasta"></select>
+              <button type="button" id="btn-ajuste-huecos-hasta-ampm" class="btn-ampm-toggle is-pm">PM</button>
+            </div>
+            <input type="hidden" id="ajuste-huecos-hasta" value="22:00">
           </div>
+
           <div class="form-group">
             <label class="form-label" for="ajuste-huecos-min">Mínimo Hueco (min)</label>
             <input type="number" id="ajuste-huecos-min" class="field" min="15" max="180" step="5" value="30">
@@ -632,27 +647,7 @@
         </div>
       </div>
 
-      <!-- Copia de seguridad total -->
-      <div class="section-header" style="margin-top: 28px;">
-        <div>
-          <h2 class="section-title">Copia de Seguridad Personal</h2>
-          <p class="section-subtitle">Respalda la totalidad de tus materias, notas, tareas e historial</p>
-        </div>
-      </div>
-
-      <div class="settings-card">
-        <div class="settings-card-actions">
-          <button id="btn-export-backup" class="btn-secondary">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-            <span>Crear Backup Completo</span>
-          </button>
-          <label class="btn-secondary file-upload-btn">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-            <span>Restaurar Backup</span>
-            <input type="file" id="input-import-backup" accept=".json" class="hidden">
-          </label>
-        </div>
-      </div>
+      
 
       <!-- Demo Semestre Universitario -->
       <div class="section-header" style="margin-top: 28px;">
@@ -793,23 +788,28 @@
         <div class="form-group" style="margin-top: 10px;">
           <label class="form-label">Color distintivo</label>
           <div class="color-palette-picker" id="class-actividad-color-picker">
-            <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" aria-label="Celeste Pastel" title="Celeste Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" aria-label="Lavanda Pastel" title="Lavanda Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" aria-label="Vainilla Pastel" title="Vainilla Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" aria-label="Menta Pastel" title="Menta Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" aria-label="Durazno Pastel" title="Durazno Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" aria-label="Índigo Pastel" title="Índigo Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" aria-label="Coral Pastel" title="Coral Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" aria-label="Turquesa Pastel" title="Turquesa Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" aria-label="Matcha Pastel" title="Matcha Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" aria-label="Salvia Pastel" title="Salvia Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#ECFCCB" style="background:#ECFCCB" aria-label="Lima Pastel" title="Lima suave Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#FAE8FF" style="background:#FAE8FF" aria-label="Orquídea Pastel" title="Orquídea Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#EDE9FE" style="background:#EDE9FE" aria-label="Violeta Pastel" title="Violeta suave Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#FEE2E2" style="background:#FEE2E2" aria-label="Fresa Pastel" title="Fresa suave Pastel"></button>
-            <button type="button" class="color-swatch" data-color="#E0F2FE" style="background:#E0F2FE" aria-label="Hielo Pastel" title="Celeste Hielo Pastel"></button>
+            <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Cielo" title="Azul Cielo"></button>
+            <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
+            <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Cálido"></button>
+            <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Rojizo"></button>
+            <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Lavanda" title="Lavanda Púrpura"></button>
+            <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Vivo"></button>
+            <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Verde Menta"></button>
+            <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Fucsia" title="Fucsia Orquídea"></button>
+            <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Índigo" title="Índigo Suave"></button>
+            <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Carmín"></button>
+            <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
+            <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
+            <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
+            <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
+            <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
+            <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
+            <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
+            <button type="button" class="color-swatch" data-color="#60A5FA" style="background:#60A5FA" aria-label="Azul Rey" title="Azul Rey"></button>
+            <button type="button" class="color-swatch" data-color="#10B981" style="background:#10B981" aria-label="Jade" title="Verde Jade"></button>
+            <button type="button" class="color-swatch" data-color="#94A3B8" style="background:#94A3B8" aria-label="Pizarra" title="Gris Pizarra"></button>
           </div>
-          <input type="hidden" id="class-actividad-color" value="#BAE6FD">
+          <input type="hidden" id="class-actividad-color" value="#38BDF8">
         </div>
       </div>
 
@@ -952,24 +952,28 @@
       <div class="form-group">
         <span class="form-label">Color Pastel del Curso</span>
         <div class="color-palette-picker" id="curso-color-picker">
-          <button type="button" class="color-swatch selected" data-color="#BAE6FD" style="background:#BAE6FD" aria-label="Celeste Pastel" title="Celeste Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#F5D0FE" style="background:#F5D0FE" aria-label="Lavanda Pastel" title="Lavanda Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FEF08A" style="background:#FEF08A" aria-label="Vainilla Pastel" title="Vainilla Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#BBF7D0" style="background:#BBF7D0" aria-label="Menta Pastel" title="Menta Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FED7AA" style="background:#FED7AA" aria-label="Durazno Pastel" title="Durazno Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#C7D2FE" style="background:#C7D2FE" aria-label="Índigo Pastel" title="Índigo Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FECACA" style="background:#FECACA" aria-label="Coral Pastel" title="Coral Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#99F6E4" style="background:#99F6E4" aria-label="Turquesa Pastel" title="Turquesa Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#DDE8C8" style="background:#DDE8C8" aria-label="Matcha Pastel" title="Matcha Pastel (Ricra)"></button>
-          <button type="button" class="color-swatch" data-color="#C5D6B8" style="background:#C5D6B8" aria-label="Salvia Pastel" title="Salvia Pastel (Ricra)"></button>
-          <button type="button" class="color-swatch" data-color="#ECFCCB" style="background:#ECFCCB" aria-label="Lima Pastel" title="Lima suave Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FAE8FF" style="background:#FAE8FF" aria-label="Orquídea Pastel" title="Orquídea Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#EDE9FE" style="background:#EDE9FE" aria-label="Violeta Pastel" title="Violeta suave Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#FEE2E2" style="background:#FEE2E2" aria-label="Fresa Pastel" title="Fresa suave Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#E0F2FE" style="background:#E0F2FE" aria-label="Hielo Pastel" title="Celeste Hielo Pastel"></button>
-          <button type="button" class="color-swatch" data-color="#F5F5F4" style="background:#F5F5F4" aria-label="Arena Pastel" title="Arena suave Pastel"></button>
+          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Celeste" title="Celeste Océano"></button>
+          <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
+          <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Dorado"></button>
+          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Intenso"></button>
+          <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Violeta" title="Violeta Real"></button>
+          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Cálido"></button>
+          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Menta Viva"></button>
+          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Orquídea" title="Orquídea Magenta"></button>
+          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Añil" title="Añil Índigo"></button>
+          <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Frutal"></button>
+          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
+          <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
+          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
+          <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
+          <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
+          <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
+          <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
+          <button type="button" class="color-swatch" data-color="#60A5FA" style="background:#60A5FA" aria-label="Azul Rey" title="Azul Rey"></button>
+          <button type="button" class="color-swatch" data-color="#10B981" style="background:#10B981" aria-label="Jade" title="Verde Jade"></button>
+          <button type="button" class="color-swatch" data-color="#94A3B8" style="background:#94A3B8" aria-label="Pizarra" title="Gris Pizarra"></button>
         </div>
-        <input type="hidden" id="curso-color" value="#BAE6FD">
+        <input type="hidden" id="curso-color" value="#38BDF8">
       </div>
 
       <div class="form-row">
@@ -1001,21 +1005,14 @@
             <option value="Electivo">Electivo</option>
           </select>
         </div>
-        <div class="form-group" style="width: 140px;">
+        <div class="form-group" style="width: 130px;">
           <label class="form-label" for="curso-tipo">Condición</label>
           <select id="curso-tipo" class="field">
             <option value="obligatorio" selected>Obligatorio</option>
             <option value="electivo">Electivo</option>
           </select>
         </div>
-      </div>
-
-      <div class="form-row" style="margin-top: 10px;">
-        <div class="form-group flex-1">
-          <label class="form-label" for="curso-codigo">Código de Curso</label>
-          <input type="text" id="curso-codigo" class="field" placeholder="Ej. SI-401, MAT-101">
-        </div>
-        <div class="form-group" style="width: 120px;">
+        <div class="form-group" style="width: 100px;">
           <label class="form-label" for="curso-grupo">Grupo</label>
           <input type="text" id="curso-grupo" class="field" placeholder="Ej. A, B">
         </div>
@@ -1145,8 +1142,13 @@
 
 
       <div class="form-group">
+        <label class="form-label" for="task-enlace">Enlace (URL / Drive / Aula Virtual)</label>
+        <input type="url" id="task-enlace" class="field" placeholder="https://drive.google.com/... o enlace de entrega" enterkeyhint="next">
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="task-descripcion">Instrucciones o Apuntes</label>
-        <textarea id="task-descripcion" class="field" rows="3" placeholder="Pautas de entrega, integrantes de equipo, enlaces…" enterkeyhint="done"></textarea>
+        <textarea id="task-descripcion" class="field" rows="3" placeholder="Pautas de entrega, integrantes de equipo…" enterkeyhint="done"></textarea>
       </div>
 
       <div class="form-group check-row">
@@ -1440,7 +1442,7 @@
 
     <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
       <!-- Contenedor del código QR -->
-      <div id="qr-display-container" style="background:#ffffff; padding:16px; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.1); width:280px; height:280px; display:flex; justify-content:center; align-items:center;">
+      <div id="qr-display-container" style="background:#ffffff; padding:12px; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.1); width:100%; max-width:320px; aspect-ratio:1/1; display:flex; justify-content:center; align-items:center;">
         <!-- SVG del QR generado dinámicamente -->
       </div>
 
@@ -1479,10 +1481,10 @@
     </div>
 
     <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
-      <!-- Visor de cámara en vivo si BarcodeDetector está disponible -->
-      <div id="qr-camera-wrap" class="hidden" style="position:relative; width:100%; border-radius:var(--radius-md); overflow:hidden; background:#000;">
-        <video id="qr-scanner-video" autoplay playsinline poster="icon-192.png" style="width:100%; height:220px; object-fit:cover;"></video>
-        <div style="position:absolute; inset:20px; border:2px dashed rgba(255,255,255,0.7); border-radius:12px; pointer-events:none;"></div>
+      <!-- Visor de cámara en vivo en formato 1:1 cuadrado para celular -->
+      <div id="qr-camera-wrap" class="hidden" style="position:relative; width:100%; max-width:320px; aspect-ratio:1/1; margin:0 auto; border-radius:var(--radius-md); overflow:hidden; background:#000;">
+        <video id="qr-scanner-video" autoplay playsinline poster="icon-192.png" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block;"></video>
+        <div style="position:absolute; inset:20px; border:2.5px solid var(--accent, #4F7256); border-radius:16px; box-shadow:0 0 0 9999px rgba(0,0,0,0.45); pointer-events:none;"></div>
       </div>
 
       <!-- Estado / progreso del escaneo -->
@@ -1538,6 +1540,7 @@
 <script src="lib/huecos.js"></script>
 <script src="lib/qrcode.min.js"></script>
 <script src="lib/jsqr.min.js"></script>
+<script src="lib/pako.min.js"></script>
 <script src="lib/qr.js"></script>
 <script src="lib/deeplink.js"></script>
 <script src="app.js"></script>

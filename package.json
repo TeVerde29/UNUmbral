@@ -30,6 +30,7 @@
     "@capacitor/core": "^8.5.3",
     "@capacitor/local-notifications": "^8.3.1",
     "jsqr": "^1.4.0",
+    "pako": "^3.0.3",
     "qrcode-generator": "^2.0.4"
   }
 }
