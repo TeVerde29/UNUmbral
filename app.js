@@ -664,42 +664,58 @@ function formatReadableDate(d) {
 function formatRelativeDue(isoDateStr) {
   if (!isoDateStr) return { text: "Sin fecha", isUrgent: false, isSoon: false };
   const target = new Date(isoDateStr);
+  if (isNaN(target.getTime())) return { text: "Fecha inválida", isUrgent: false, isSoon: false };
   const now = new Date();
-  const diffMs = target.getTime() - now.getTime();
-  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
+  // Comparación por día de calendario (medianoche a medianoche local)
+  const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const calendarDayDiff = Math.round((targetMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
+
+  const diffMs = target.getTime() - now.getTime();
   const timeStr = formatTime12(`${pad2(target.getHours())}:${pad2(target.getMinutes())}`);
 
+  // Vencida en el pasado
   if (diffMs < 0) {
-    const overdueDays = Math.abs(diffDays);
+    if (calendarDayDiff === 0) {
+      return {
+        text: `Atrasada hoy (${timeStr})`,
+        isUrgent: true,
+        isSoon: false
+      };
+    }
+    const overdueDays = Math.abs(calendarDayDiff);
     return {
-      text: overdueDays <= 1 ? `Atrasada hoy (${timeStr})` : `Atrasada (${overdueDays}d)`,
+      text: overdueDays === 1 ? `Atrasada ayer (${timeStr})` : `Atrasada (${overdueDays}d)`,
       isUrgent: true,
       isSoon: false
     };
   }
 
-  if (diffHours <= 24) {
+  // Vence en el mismo día calendario (HOY)
+  if (calendarDayDiff === 0) {
+    const isVerySoon = diffMs <= 60 * 60 * 1000; // 1 hora o menos
     return {
-      text: diffHours <= 1 ? `Vence pronto (${timeStr})` : `Hoy a las ${timeStr}`,
+      text: isVerySoon ? `Vence pronto (${timeStr})` : `Hoy a las ${timeStr}`,
       isUrgent: true,
-      isSoon: false
+      isSoon: isVerySoon
     };
   }
 
-  if (diffDays === 1) {
+  // Vence en el día calendario siguiente (MAÑANA)
+  if (calendarDayDiff === 1) {
     return {
-      text: `Mañana (${timeStr})`,
+      text: `Mañana a las ${timeStr}`,
       isUrgent: false,
       isSoon: true
     };
   }
 
-  if (diffDays <= 7) {
+  // Próximos 7 días
+  if (calendarDayDiff <= 7) {
     const dayName = target.toLocaleDateString("es-ES", { weekday: "short" });
     return {
-      text: `En ${diffDays}d (${dayName} ${timeStr})`,
+      text: `En ${calendarDayDiff}d (${dayName} ${timeStr})`,
       isUrgent: false,
       isSoon: false
     };
@@ -2910,12 +2926,14 @@ const MAPA_PASTEL_A_SWATCH = {
   "#F1F5F9": "#94A3B8"
 };
 
-async function actualizarDisponibilidadColores(pickerEl, colorActualPermitido = null, idEntidadActual = null) {
+async function actualizarDisponibilidadColores(pickerEl, colorActualPermitido = null, idEntidadActual = null, tituloActividadActual = null) {
   if (!pickerEl) return;
   const [cursos, clases] = await Promise.all([
     db.cursos.toArray(),
     db.clases.where("tipo").equals("actividad").toArray()
   ]);
+
+  const normTitulo = (tituloActividadActual || "").trim().toLowerCase();
 
   const coloresEnUso = new Set();
   for (const c of cursos) {
@@ -2928,12 +2946,20 @@ async function actualizarDisponibilidadColores(pickerEl, colorActualPermitido = 
     }
   }
   for (const act of clases) {
-    if (act.id !== idEntidadActual && act.color) {
+    const esMismaActividad = Boolean(normTitulo && act.titulo && act.titulo.trim().toLowerCase() === normTitulo);
+    if (act.id !== idEntidadActual && !esMismaActividad && act.color) {
       const up = act.color.toUpperCase();
       coloresEnUso.add(up);
       if (MAPA_PASTEL_A_SWATCH[up]) coloresEnUso.add(MAPA_PASTEL_A_SWATCH[up]);
       const norm = normalizarColorPastel(up);
       if (norm) coloresEnUso.add(norm.toUpperCase());
+    }
+  }
+
+  if (!colorActualPermitido && normTitulo) {
+    const misma = clases.find(a => a.titulo && a.titulo.trim().toLowerCase() === normTitulo);
+    if (misma && misma.color) {
+      colorActualPermitido = misma.color;
     }
   }
 
@@ -3421,7 +3447,98 @@ function sincronizar24hDesde12(prefix) {
   if (hintEl) hintEl.textContent = `${pad2(h12)}:${pad2(m)} ${ampm}`;
 }
 
-function setClassTypeMode(mode) {
+function getSelectedDays() {
+  const chips = $$("#class-day-chips .day-chip.active");
+  const days = Array.from(chips).map(c => c.dataset.day);
+  if (days.length === 0) {
+    const fallback = $("#class-dia") ? $("#class-dia").value : "LUNES";
+    return [fallback || "LUNES"];
+  }
+  return days;
+}
+
+function setSelectedDays(days) {
+  const daysArr = Array.isArray(days) ? days : [days];
+  const daysSet = new Set(daysArr);
+  $$("#class-day-chips .day-chip").forEach(chip => {
+    chip.classList.toggle("active", daysSet.has(chip.dataset.day));
+  });
+  const fallback = daysArr[0] || "LUNES";
+  const diaInput = $("#class-dia");
+  if (diaInput) diaInput.value = fallback;
+}
+
+function initDayChips() {
+  const container = $("#class-day-chips");
+  if (!container) return;
+  container.addEventListener("click", (e) => {
+    const chip = e.target.closest(".day-chip");
+    if (!chip) return;
+    const isEdit = Boolean($("#class-id").value);
+    const day = chip.dataset.day;
+
+    if (isEdit) {
+      $$(".day-chip", container).forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      $("#class-dia").value = day;
+    } else {
+      const wasActive = chip.classList.contains("active");
+      const activeCount = $$(".day-chip.active", container).length;
+      if (wasActive && activeCount <= 1) {
+        return;
+      }
+      chip.classList.toggle("active");
+      const currentDays = getSelectedDays();
+      if (currentDays.length > 0) {
+        $("#class-dia").value = currentDays[0];
+      }
+    }
+  });
+
+  const btnWeekdays = $("#btn-quick-weekdays");
+  if (btnWeekdays) {
+    btnWeekdays.addEventListener("click", () => {
+      const isEdit = Boolean($("#class-id").value);
+      if (isEdit) return;
+      const weekdays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES"];
+      const current = getSelectedDays();
+      const allWeekdaysActive = weekdays.every(d => current.includes(d)) && current.length === 5;
+      if (allWeekdaysActive) {
+        setSelectedDays(["LUNES"]);
+      } else {
+        setSelectedDays(weekdays);
+      }
+    });
+  }
+}
+
+async function populateActividadesSelect(selectedTitulo = "") {
+  const sel = $("#select-actividad-existente");
+  if (!sel) return;
+  const clasesAct = await db.clases.where("tipo").equals("actividad").toArray();
+  const mapa = new Map();
+  for (const c of clasesAct) {
+    if (c.titulo && !mapa.has(c.titulo.trim().toLowerCase())) {
+      mapa.set(c.titulo.trim().toLowerCase(), {
+        titulo: c.titulo.trim(),
+        categoria: c.categoria || "practicas",
+        color: c.color || "#38BDF8"
+      });
+    }
+  }
+
+  const list = Array.from(mapa.values());
+  let html = `<option value="__nueva__">+ Crear nueva actividad…</option>`;
+  for (const act of list) {
+    const catLabel = CATEGORIAS_ACTIVIDAD[act.categoria] || act.categoria;
+    const isSel = Boolean(selectedTitulo && act.titulo.toLowerCase() === selectedTitulo.trim().toLowerCase());
+    html += `<option value="${escapeHtml(act.titulo)}" data-categoria="${escapeHtml(act.categoria)}" data-color="${escapeHtml(act.color)}" ${isSel ? "selected" : ""}>${escapeHtml(act.titulo)} (${escapeHtml(catLabel)})</option>`;
+  }
+  sel.innerHTML = html;
+  if (!selectedTitulo) sel.value = "__nueva__";
+}
+
+async function setClassTypeMode(mode) {
   const isActividad = mode === "actividad";
   const hiddenTipo = $("#class-tipo");
   if (hiddenTipo) hiddenTipo.value = isActividad ? "actividad" : "curso";
@@ -3447,7 +3564,11 @@ function setClassTypeMode(mode) {
   if (isActividad) {
     const curId = $("#class-id").value || null;
     const curColor = $("#class-actividad-color").value || null;
-    actualizarDisponibilidadColores($("#class-actividad-color-picker"), curColor, curId);
+    const curTitulo = $("#class-actividad-titulo").value || null;
+    if (!curId) {
+      await populateActividadesSelect(curTitulo || "");
+    }
+    actualizarDisponibilidadColores($("#class-actividad-color-picker"), curColor, curId, curTitulo);
   }
 }
 
@@ -3475,25 +3596,38 @@ async function openNewClassModal(preselectedDay, preselectedCursoId) {
 
   $("#modal-class-title").textContent = "Añadir al Horario";
   $("#class-id").value = "";
-  $("#class-dia").value = dia;
+  setSelectedDays([dia]);
   $("#class-hora-inicio").value = "08:00";
   $("#class-hora-fin").value = "10:00";
   $("#class-aula").value = "";
   $("#class-actividad-titulo").value = "";
   $("#class-actividad-categoria").value = "practicas";
   setActividadColor("#38BDF8");
+
+  const hintCol = $("#actividad-color-sync-hint");
+  if (hintCol) hintCol.textContent = "";
+
+  const grpSelector = $("#group-actividad-selector");
+  if (grpSelector) grpSelector.classList.remove("hidden");
+  await populateActividadesSelect("");
+
+  const btnWeekdays = $("#btn-quick-weekdays");
+  if (btnWeekdays) btnWeekdays.style.display = "";
+  const diasHint = $("#class-dias-hint");
+  if (diasHint) diasHint.textContent = "Selecciona uno o varios días para repetir este horario.";
+
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.add("hidden");
 
   actualizarSelector12hDesde24("inicio", "08:00");
   actualizarSelector12hDesde24("fin", "10:00");
 
-  await actualizarDisponibilidadColores($("#class-actividad-color-picker"), null, null);
+  await actualizarDisponibilidadColores($("#class-actividad-color-picker"), null, null, null);
 
   if (count === 0) {
-    setClassTypeMode("actividad");
+    await setClassTypeMode("actividad");
   } else {
-    setClassTypeMode("curso");
+    await setClassTypeMode("curso");
     await populateClassCursoSelect(preselectedCursoId || "");
   }
   $("#modal-class-backdrop").classList.remove("hidden");
@@ -3504,7 +3638,7 @@ async function openEditClassModal(id) {
   if (!c) return;
 
   $("#class-id").value = c.id;
-  $("#class-dia").value = c.dia_semana || "LUNES";
+  setSelectedDays([c.dia_semana || "LUNES"]);
   const hIni24 = to24Hour(c.hora_inicio || "08:00");
   const hFin24 = to24Hour(c.hora_fin || "10:00");
   $("#class-hora-inicio").value = hIni24;
@@ -3513,17 +3647,27 @@ async function openEditClassModal(id) {
   $("#class-form-error").classList.add("hidden");
   $("#btn-delete-class").classList.remove("hidden");
 
+  const btnWeekdays = $("#btn-quick-weekdays");
+  if (btnWeekdays) btnWeekdays.style.display = "none";
+  const diasHint = $("#class-dias-hint");
+  if (diasHint) diasHint.textContent = "Modificando el día de esta sesión.";
+
+  const grpSelector = $("#group-actividad-selector");
+  if (grpSelector) grpSelector.classList.add("hidden");
+  const hintCol = $("#actividad-color-sync-hint");
+  if (hintCol) hintCol.textContent = "";
+
   actualizarSelector12hDesde24("inicio", hIni24);
   actualizarSelector12hDesde24("fin", hFin24);
 
   if (c.tipo === "actividad") {
-    setClassTypeMode("actividad");
+    await setClassTypeMode("actividad");
     $("#class-actividad-titulo").value = c.titulo || "";
     $("#class-actividad-categoria").value = c.categoria || "practicas";
     setActividadColor(c.color || "#38BDF8");
-    await actualizarDisponibilidadColores($("#class-actividad-color-picker"), c.color, c.id);
+    await actualizarDisponibilidadColores($("#class-actividad-color-picker"), c.color, c.id, c.titulo);
   } else {
-    setClassTypeMode("curso");
+    await setClassTypeMode("curso");
     await populateClassCursoSelect(c.curso_id);
   }
   $("#modal-class-backdrop").classList.remove("hidden");
@@ -5347,9 +5491,9 @@ async function clearAllData() {
 
 async function guardarClase(e) {
   e.preventDefault();
-  const id = $("#class-id").value || uuid();
+  const editId = $("#class-id").value || null;
+  const isEdit = Boolean(editId);
   const tipo = $("#class-tipo")?.value || "curso";
-  const dia_semana = $("#class-dia").value;
   const hora_inicio = $("#class-hora-inicio").value;
   const hora_fin = $("#class-hora-fin").value;
   const aula = $("#class-aula").value.trim();
@@ -5386,34 +5530,74 @@ async function guardarClase(e) {
     return;
   }
 
-  const [sameDayClasses, { map: cursosMap }] = await Promise.all([
-    db.clases.where("dia_semana").equals(dia_semana).toArray(),
-    cargarCursos()
-  ]);
   const startM = timeToMinutes(hora_inicio);
   const endM = timeToMinutes(hora_fin);
 
-  const conflict = sameDayClasses.find(c => c.id !== id &&
-    overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
-
-  if (conflict) {
-    const nombreConflicto = conflict.tipo === "actividad"
-      ? (conflict.titulo || "otra actividad")
-      : ((cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase");
-    errorEl.textContent = `Conflicto de horario con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}, ${DIAS_LABEL[conflict.dia_semana]}).`;
+  // Obtener días seleccionados (en edición sólo 1 día, en creación uno o varios)
+  const dias = isEdit ? [$("#class-dia").value || "LUNES"] : getSelectedDays();
+  if (dias.length === 0) {
+    errorEl.textContent = "Selecciona al menos un día de la semana.";
     errorEl.classList.remove("hidden");
     return;
+  }
+
+  const [todasClases, { map: cursosMap }] = await Promise.all([
+    db.clases.toArray(),
+    cargarCursos()
+  ]);
+
+  // Validar conflictos en TODOS los días seleccionados
+  for (const d of dias) {
+    const clasesDelDia = todasClases.filter(c => c.dia_semana === d && c.id !== editId);
+    const conflict = clasesDelDia.find(c => overlaps(startM, endM, timeToMinutes(c.hora_inicio), timeToMinutes(c.hora_fin)));
+    if (conflict) {
+      const nombreConflicto = conflict.tipo === "actividad"
+        ? (conflict.titulo || "otra actividad")
+        : ((cursosMap[conflict.curso_id] && cursosMap[conflict.curso_id].nombre) || "otra clase");
+      const diaTxt = DIAS_LABEL[d] || d;
+      errorEl.textContent = `Conflicto el ${diaTxt} con "${nombreConflicto}" (${formatTimeRange12(conflict.hora_inicio, conflict.hora_fin)}).`;
+      errorEl.classList.remove("hidden");
+      return;
+    }
   }
 
   const cicloActivo = await obtenerCicloActivo();
   const ciclo_id = cicloActivo?.id || "";
 
-  if (tipo === "actividad") {
-    await db.clases.put({ id, tipo: "actividad", titulo, categoria, color, curso_id: "", dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
-    showToast("Actividad guardada en el horario.");
+  if (isEdit) {
+    // Modo edición de una sola sesión
+    const dia_semana = dias[0];
+    if (tipo === "actividad") {
+      const original = await db.clases.get(editId);
+      await db.clases.put({ id: editId, tipo: "actividad", titulo, categoria, color, curso_id: "", dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
+      // Si cambió el color, título o categoría, sincronizar en todas las sesiones de esta misma actividad
+      if (original && (original.titulo !== titulo || original.color !== color || original.categoria !== categoria)) {
+        const otras = todasClases.filter(c => c.tipo === "actividad" && c.id !== editId && c.titulo === original.titulo);
+        for (const o of otras) {
+          await db.clases.update(o.id, { titulo, categoria, color });
+        }
+      }
+      showToast("Actividad actualizada en el horario.");
+    } else {
+      await db.clases.put({ id: editId, tipo: "curso", curso_id, dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
+      showToast("Clase actualizada en el horario.");
+    }
   } else {
-    await db.clases.put({ id, tipo: "curso", curso_id, dia_semana, hora_inicio, hora_fin, aula, ciclo_id });
-    showToast("Clase guardada en el horario.");
+    // Modo creación (uno o varios días)
+    const nuevas = dias.map(d => {
+      const newId = uuid();
+      if (tipo === "actividad") {
+        return { id: newId, tipo: "actividad", titulo, categoria, color, curso_id: "", dia_semana: d, hora_inicio, hora_fin, aula, ciclo_id };
+      } else {
+        return { id: newId, tipo: "curso", curso_id, dia_semana: d, hora_inicio, hora_fin, aula, ciclo_id };
+      }
+    });
+
+    await db.clases.bulkPut(nuevas);
+    const msg = dias.length > 1
+      ? (tipo === "actividad" ? `Actividad guardada para ${dias.length} días.` : `Clases guardadas para ${dias.length} días.`)
+      : (tipo === "actividad" ? "Actividad guardada en el horario." : "Clase guardada en el horario.");
+    showToast(msg);
   }
 
   closeClassModal();
@@ -6149,6 +6333,65 @@ function wireGlobalEvents() {
   $("#form-notas").addEventListener("submit", guardarNotas);
 
   // Eventos del modal de Clase (asignación al horario)
+  initDayChips();
+
+  const selActExistente = $("#select-actividad-existente");
+  if (selActExistente) {
+    selActExistente.addEventListener("change", async (e) => {
+      const val = e.target.value;
+      const hintEl = $("#actividad-color-sync-hint");
+      if (val === "__nueva__") {
+        $("#class-actividad-titulo").value = "";
+        $("#class-actividad-categoria").value = "practicas";
+        if (hintEl) hintEl.textContent = "";
+        await actualizarDisponibilidadColores($("#class-actividad-color-picker"), null, null, "");
+      } else {
+        const opt = e.target.selectedOptions[0];
+        if (opt) {
+          const titulo = opt.value;
+          const cat = opt.dataset.categoria || "practicas";
+          const col = opt.dataset.color || "#38BDF8";
+          $("#class-actividad-titulo").value = titulo;
+          $("#class-actividad-categoria").value = cat;
+          setActividadColor(col);
+          if (hintEl) hintEl.textContent = "(Mismo color que sesiones anteriores)";
+          await actualizarDisponibilidadColores($("#class-actividad-color-picker"), col, null, titulo);
+        }
+      }
+    });
+  }
+
+  const inputActTitulo = $("#class-actividad-titulo");
+  if (inputActTitulo) {
+    inputActTitulo.addEventListener("input", async (e) => {
+      const typed = e.target.value.trim().toLowerCase();
+      const sel = $("#select-actividad-existente");
+      const hintEl = $("#actividad-color-sync-hint");
+      if (!sel) return;
+      let found = false;
+      for (let i = 0; i < sel.options.length; i++) {
+        const opt = sel.options[i];
+        if (opt.value !== "__nueva__" && opt.value.trim().toLowerCase() === typed) {
+          sel.selectedIndex = i;
+          const cat = opt.dataset.categoria;
+          const col = opt.dataset.color;
+          if (cat) $("#class-actividad-categoria").value = cat;
+          if (col) {
+            setActividadColor(col);
+            await actualizarDisponibilidadColores($("#class-actividad-color-picker"), col, null, opt.value);
+          }
+          if (hintEl) hintEl.textContent = "(Actividad existente detectada: mismo color)";
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        if (sel.value !== "__nueva__") sel.value = "__nueva__";
+        if (hintEl) hintEl.textContent = "";
+      }
+    });
+  }
+
   $("#class-curso").addEventListener("change", actualizarPreviewCursoClase);
   $("#class-hora-inicio").addEventListener("input", actualizarHintsHoraClase);
   $("#class-hora-fin").addEventListener("input", actualizarHintsHoraClase);

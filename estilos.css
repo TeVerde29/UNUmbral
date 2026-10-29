@@ -2190,6 +2190,53 @@ button:active, .btn-primary:active, .btn-secondary:active {
   transform: scale(1.08);
 }
 
+/* Selector interactivo de días de la semana */
+.day-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.day-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+  user-select: none;
+}
+
+.day-chip:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.day-chip.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 360px) {
+  .day-chips-grid {
+    gap: 3px;
+  }
+  .day-chip {
+    padding: 7px 1px;
+    font-size: 11px;
+  }
+}
+
 /* =====================================================================
    ACTION SHEET & CONFIRM BOX
    ===================================================================== */
