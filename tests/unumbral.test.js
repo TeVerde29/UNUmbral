@@ -191,9 +191,10 @@ test("formatRelativeDue formats calendar days accurately avoiding premature 'Hoy
 
 test("formatRelativeDue formats today deadline as 'Hasta las HH:MM AM/PM'", () => {
   const { sandbox } = loadAppContext();
-  const now = new Date();
-  const todayTarget = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
-  const due = sandbox.formatRelativeDue(todayTarget.toISOString());
+  // Simulate morning at 09:00 AM so 12:00 PM is later today
+  const morningRef = new Date(2026, 9, 30, 9, 0, 0);
+  const todayTarget = new Date(2026, 9, 30, 12, 0, 0);
+  const due = sandbox.formatRelativeDue(todayTarget.toISOString(), morningRef);
   assert.equal(due.text, "Hasta las 12:00 PM");
   assert.equal(due.isUrgent, true);
 });
@@ -231,8 +232,9 @@ test("formatearCuentaRegresivaEntrega formats 'Restan Xh Ymin Zseg' and handles 
 
 test("renderTaskCardHTML includes countdown badge and 'Hasta las' badge for today's tasks", () => {
   const { sandbox } = loadAppContext();
-  const now = new Date();
-  const todayDue = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).toISOString();
+  // Reference at 09:00 AM on 2026-10-30, target at 12:00 PM (3 hours remaining)
+  const morningRef = new Date(2026, 9, 30, 9, 0, 0);
+  const todayDue = new Date(2026, 9, 30, 12, 0, 0).toISOString();
 
   const task = {
     id: "task-1",
@@ -244,7 +246,7 @@ test("renderTaskCardHTML includes countdown badge and 'Hasta las' badge for toda
     completada: false
   };
 
-  const html = sandbox.renderTaskCardHTML(task);
+  const html = sandbox.renderTaskCardHTML(task, morningRef);
   assert.match(html, /task-countdown-badge/);
   assert.match(html, /Restan /);
   assert.match(html, /Hasta las 12:00 PM/);
@@ -253,4 +255,35 @@ test("renderTaskCardHTML includes countdown badge and 'Hasta las' badge for toda
   const completedTask = { ...task, completada: true };
   const completedHtml = sandbox.renderTaskCardHTML(completedTask);
   assert.doesNotMatch(completedHtml, /task-countdown-badge/);
+});
+
+
+test("safeHtml auto-escapes dynamic values and preserves rawHtml safely", () => {
+  const { sandbox } = loadAppContext();
+  const dangerousString = '<script>alert("xss")</script>';
+  const safeBadge = sandbox.rawHtml('<span>Badge Seguro</span>');
+
+  const result = sandbox.safeHtml`<div class="card">${dangerousString} - ${safeBadge}</div>`.toString();
+  assert.match(result, /&lt;script&gt;alert\(&quot;xss&quot;\)&lt;\/script&gt;/);
+  assert.match(result, /<span>Badge Seguro<\/span>/);
+  assert.doesNotMatch(result, /<script>/);
+});
+
+test("renderTaskCardHTML utilizes safeHtml for automatic defense against malicious input", () => {
+  const { sandbox } = loadAppContext();
+  const maliciousTask = {
+    id: "task-evil",
+    titulo: 'Título Malicioso <img src=x onerror=alert(1)>',
+    notas: 'Nota con <iframe src="evil.com"></iframe>',
+    materia: 'Materia & <bold>',
+    importancia: 4,
+    fecha_limite: "2026-11-01T10:00:00.000Z",
+    completada: false
+  };
+
+  const html = sandbox.renderTaskCardHTML(maliciousTask);
+  assert.doesNotMatch(html, /<img src=x/);
+  assert.doesNotMatch(html, /<iframe/);
+  assert.match(html, /&lt;img src=x/);
+  assert.match(html, /&lt;iframe/);
 });

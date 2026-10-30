@@ -612,7 +612,88 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+/**
+ * Envuelve una cadena de HTML de confianza para que safeHtml la inserte sin re-escapar.
+ */
+function rawHtml(rawStr) {
+  if (rawStr && typeof rawStr === "object" && rawStr.__isSafeHtml) return rawStr;
+  return {
+    __isSafeHtml: true,
+    toString: () => (rawStr === null || rawStr === undefined ? "" : String(rawStr))
+  };
+}
+
+/**
+ * Tagged template literal para construir HTML con seguridad por diseño:
+ * Todas las variables interpoladas se escapan automáticamente contra XSS
+ * salvo que hayan sido marcadas como seguras con rawHtml().
+ */
+function safeHtml(strings, ...values) {
+  let result = strings[0];
+  for (let i = 0; i < values.length; i++) {
+    const val = values[i];
+    let sanitized = "";
+    if (val === null || val === undefined) {
+      sanitized = "";
+    } else if (typeof val === "object" && val.__isSafeHtml) {
+      sanitized = val.toString();
+    } else {
+      sanitized = escapeHtml(String(val));
+    }
+    result += sanitized + strings[i + 1];
+  }
+  return rawHtml(result);
+}
+
 function pad2(n) { return String(n).padStart(2, "0"); }
+
+/**
+ * Convierte un objeto Date a string YYYY-MM-DD en hora local de manera 100% segura,
+ * con fallback integrado para evitar dependencias frágiles de orden de carga de scripts.
+ */
+function formatFechaISO(d = new Date()) {
+  if (typeof fechaAString === "function") return fechaAString(d);
+  if (typeof window !== "undefined" && typeof window.fechaAString === "function") return window.fechaAString(d);
+  const dateObj = d instanceof Date ? d : new Date(d);
+  if (isNaN(dateObj.getTime())) return "";
+  const anio = dateObj.getFullYear();
+  const mes = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const dia = String(dateObj.getDate()).padStart(2, "0");
+  return `${anio}-${mes}-${dia}`;
+}
+
+function verificarEsDiaFeriado(fechaStr, excepciones = []) {
+  if (typeof esDiaFeriado === "function") return esDiaFeriado(fechaStr, excepciones);
+  if (typeof window !== "undefined" && typeof window.esDiaFeriado === "function") return window.esDiaFeriado(fechaStr, excepciones);
+  if (!fechaStr || !Array.isArray(excepciones)) return false;
+  return excepciones.some(ex => ex && ex.fecha === fechaStr && ex.tipo === "feriado");
+}
+
+function agruparTareasSemana(pool = [], refDate = new Date()) {
+  if (typeof agruparSemana === "function") return agruparSemana(pool, refDate);
+  if (typeof window !== "undefined" && typeof window.agruparSemana === "function") return window.agruparSemana(pool, refDate);
+  if (typeof Views !== "undefined" && Views.Tareas && typeof Views.Tareas.clasificarPorPlazo === "function") {
+    const c = Views.Tareas.clasificarPorPlazo(pool);
+    return {
+      vencidas: [],
+      hoy: c.hoy || [],
+      manana: [],
+      resto: c.semana || [],
+      masAdelante: c.adelante || [],
+      sinFecha: c.sinFecha || [],
+      totalPendientes: pool.length
+    };
+  }
+  return {
+    vencidas: [],
+    hoy: [],
+    manana: [],
+    resto: pool,
+    masAdelante: [],
+    sinFecha: [],
+    totalPendientes: pool.length
+  };
+}
 
 /**
  * Sanitiza una URL asegurando que use protocolos web seguros (http / https)
@@ -702,11 +783,11 @@ function formatReadableDate(d) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function formatRelativeDue(isoDateStr) {
+function formatRelativeDue(isoDateStr, refDate = new Date()) {
   if (!isoDateStr) return { text: "Sin fecha", isUrgent: false, isSoon: false };
   const target = new Date(isoDateStr);
   if (isNaN(target.getTime())) return { text: "Fecha inválida", isUrgent: false, isSoon: false };
-  const now = new Date();
+  const now = refDate instanceof Date ? refDate : new Date(refDate);
 
   // Comparación por día de calendario (medianoche a medianoche local)
   const targetMidnight = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
@@ -954,11 +1035,11 @@ function switchTab(tabId) {
 async function renderHoy() {
   $("#current-date-label").textContent = formatReadableDate();
 
-  const fechaHoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  const fechaHoyStr = formatFechaISO(new Date());
   const excepciones = await db.excepciones.toArray();
   const asistencias = await db.asistencia.toArray();
 
-  const esFeriadoHoy = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fechaHoyStr, excepciones);
+  const esFeriadoHoy = verificarEsDiaFeriado(fechaHoyStr, excepciones);
   const holidayBannerEl = $("#today-holiday-banner");
   if (holidayBannerEl) {
     if (esFeriadoHoy) {
@@ -1553,7 +1634,7 @@ function openNewCicloModal(opts) {
   const diffToMonday = day === 0 ? 1 : (day === 1 ? 0 : 8 - day);
   const monday = new Date(d);
   monday.setDate(d.getDate() + (day <= 3 && day > 0 ? (1 - day) : diffToMonday));
-  const mondayStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(monday);
+  const mondayStr = formatFechaISO(monday);
 
   $("#ciclo-fecha-inicio").value = mondayStr;
   $("#ciclo-form-error").classList.add("hidden");
@@ -1715,7 +1796,7 @@ async function renderCicloRoadmap() {
     return;
   }
 
-  const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  const hoyStr = formatFechaISO(new Date());
   const semanas = typeof proyectarSemanasCiclo === "function"
     ? proyectarSemanasCiclo(ciclo.fecha_inicio, hoyStr)
     : [];
@@ -2368,7 +2449,7 @@ async function renderTareas() {
       pool = pool.filter(t => (t.titulo || "").toLowerCase().includes(q) || (t.materia || "").toLowerCase().includes(q));
     }
 
-    const grupos = (typeof agruparSemana === "function" ? agruparSemana : window.agruparSemana)(pool, new Date());
+    const grupos = agruparTareasSemana(pool, new Date());
 
     if (grupos.totalPendientes === 0) {
       listEl.innerHTML = `
@@ -2504,7 +2585,7 @@ async function renderCalendarioMensual() {
     const esDelMes = celda.esDelMes;
     const isSelected = state.selectedCalDate === fecha;
 
-    const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fecha, excepciones);
+    const feriado = verificarEsDiaFeriado(fecha, excepciones);
     const dentroDelCiclo = (!fechaIniCiclo || fecha >= fechaIniCiclo) && (!fechaFinCiclo || fecha <= fechaFinCiclo);
     const dayKey = DIAS_SEMANA[celda.diaSemana - 1];
     // Clases, tareas y eventos académicos solo existen dentro de las fechas del ciclo activo
@@ -2567,7 +2648,7 @@ async function renderCalendarioMensual() {
     });
   });
 
-  const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(hoy);
+  const hoyStr = formatFechaISO(hoy);
   const fechaTarget = state.selectedCalDate || hoyStr;
   state.selectedCalDate = fechaTarget;
   const targetCell = $(`[data-date="${fechaTarget}"]`, gridEl);
@@ -2625,7 +2706,7 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
     return;
   }
 
-  const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fechaStr, excepciones);
+  const feriado = verificarEsDiaFeriado(fechaStr, excepciones);
   const ferObj = excepciones.find(e => e.fecha === fechaStr && e.tipo === "feriado");
 
   const clasesDelDia = feriado ? [] : clases.filter(c => c.dia_semana === dayKey);
@@ -2701,25 +2782,30 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
   panel.classList.remove("hidden");
 }
 
-function renderTaskCardHTML(t) {
+function renderTaskCardHTML(t, refDate = new Date()) {
   const imp = IMPORTANCIA_INFO[t.importancia] || IMPORTANCIA_INFO[3];
-  const due = formatRelativeDue(t.fecha_limite);
+  const due = formatRelativeDue(t.fecha_limite, refDate);
   const dueClass = due.isUrgent ? "urgent" : (due.isSoon ? "soon" : "");
 
-  let countdownHTML = "";
+  let countdownHTML = rawHtml("");
   if (!t.completada && t.fecha_limite) {
     const target = new Date(t.fecha_limite).getTime();
     if (!isNaN(target)) {
-      const now = Date.now();
+      const now = refDate instanceof Date ? refDate.getTime() : new Date(refDate).getTime();
       const diffSec = Math.floor((target - now) / 1000);
       const data = formatearCuentaRegresivaEntrega(diffSec);
       if (data) {
-        countdownHTML = `<span class="task-countdown-badge ${data.urgencyClass}" data-due="${escapeHtml(t.fecha_limite)}" title="Tiempo restante para entrega"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="task-countdown-text">${data.text}</span></span>`;
+        countdownHTML = safeHtml`<span class="task-countdown-badge ${data.urgencyClass}" data-due="${t.fecha_limite}" title="Tiempo restante para entrega"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="task-countdown-text">${data.text}</span></span>`;
       }
     }
   }
 
-  return `
+  const safeEnlace = sanitizarUrlSegura(t.enlace);
+  const enlaceBadge = safeEnlace ? safeHtml`<a href="${safeEnlace}" target="_blank" rel="noopener noreferrer" class="task-enlace-badge" onclick="event.stopPropagation();" title="Abrir enlace"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Enlace</a>` : rawHtml("");
+
+  const descHTML = t.notas ? safeHtml`<div class="task-card-desc">${t.notas}</div>` : rawHtml("");
+
+  return safeHtml`
     <div class="task-card ${t.completada ? "completed" : ""}" data-id="${t.id}">
       <div class="task-check-circle" data-action="toggle" title="Alternar estado de finalización">
         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -2728,18 +2814,18 @@ function renderTaskCardHTML(t) {
       </div>
       <div class="task-card-content" data-action="edit">
         <div class="task-card-header">
-          <div class="task-card-title">${escapeHtml(t.titulo)}</div>
+          <div class="task-card-title">${t.titulo}</div>
           ${countdownHTML}
         </div>
-        ${t.notas ? `<div class="task-card-desc">${escapeHtml(t.notas)}</div>` : ""}
+        ${descHTML}
         <div class="task-card-meta">
-          <span class="subject-pill">${escapeHtml(t.materia || "General")}</span>
+          <span class="subject-pill">${t.materia || "General"}</span>
           <span class="importance-gauge ${imp.class}">${imp.badge}</span>
-          <span class="due-badge ${dueClass}">${ICONS.clock} ${due.text}</span>
-          ${sanitizarUrlSegura(t.enlace) ? `<a href="${escapeHtml(sanitizarUrlSegura(t.enlace))}" target="_blank" rel="noopener noreferrer" class="task-enlace-badge" onclick="event.stopPropagation();" title="Abrir enlace"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Enlace</a>` : ""}
+          <span class="due-badge ${dueClass}">${rawHtml(ICONS.clock)} ${due.text}</span>
+          ${enlaceBadge}
         </div>
       </div>
-    </div>`;
+    </div>`.toString();
 }
 
 function wireTaskCardEvents(containerEl) {
@@ -4210,7 +4296,7 @@ async function openModalExcepcion(opts = {}) {
   selCurso.innerHTML = `<option value="">Aplica a todas las clases</option>` +
     cursos.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join("");
 
-  $("#excepcion-fecha").value = opts.fecha || (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+  $("#excepcion-fecha").value = opts.fecha || formatFechaISO(new Date());
   $("#excepcion-tipo").value = opts.tipo || "feriado";
   $("#excepcion-motivo").value = opts.motivo || "";
   if (opts.cursoId) selCurso.value = opts.cursoId;
@@ -4325,7 +4411,7 @@ async function openAsistenciaModal(cursoId) {
   if (sesiones.length === 0) {
     listEl.innerHTML = `<p class="practicas-empty">No hay sesiones calculadas. Asigna un horario semanal a este curso en Horario o verifica las fechas del ciclo académico.</p>`;
   } else {
-    const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+    const hoyStr = formatFechaISO(new Date());
     listEl.innerHTML = sesiones.map(s => {
       const asist = asistencias.find(a => (s.claseId && a.clase_id === s.claseId && a.fecha === s.fecha) || a.fecha === s.fecha);
       let est = "pendiente";
@@ -4438,7 +4524,7 @@ async function openModalEvento(eventoId = null, defaultCursoId = null) {
     $("#evento-titulo").value = "";
     $("#evento-tipo").value = "parcial";
     if (defaultCursoId) sel.value = defaultCursoId;
-    $("#evento-fecha").value = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+    $("#evento-fecha").value = formatFechaISO(new Date());
     $("#evento-hora").value = "";
     $("#evento-aula").value = "";
     $("#evento-notas").value = "";
@@ -6516,7 +6602,7 @@ function wireTaskEvents() {
       const now = new Date();
       state.calendarYear = now.getFullYear();
       state.calendarMonth = now.getMonth() + 1;
-      state.selectedCalDate = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(now);
+      state.selectedCalDate = formatFechaISO(now);
       renderCalendarioMensual();
     });
   }
@@ -6590,7 +6676,7 @@ function wireAttendanceAndModalEvents() {
   if (btnMarcarFeriado) {
     btnMarcarFeriado.addEventListener("click", () => {
       openModalExcepcion({
-        fecha: (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date()),
+        fecha: formatFechaISO(new Date()),
         tipo: "feriado"
       });
     });
@@ -6599,7 +6685,7 @@ function wireAttendanceAndModalEvents() {
   const btnDesmarcarFeriado = $("#btn-desmarcar-feriado-hoy");
   if (btnDesmarcarFeriado) {
     btnDesmarcarFeriado.addEventListener("click", async () => {
-      const hoyStr = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(new Date());
+      const hoyStr = formatFechaISO(new Date());
       const fer = await db.excepciones.where("fecha").equals(hoyStr).filter(e => e.tipo === "feriado").first();
       if (fer) {
         await db.excepciones.delete(fer.id);
