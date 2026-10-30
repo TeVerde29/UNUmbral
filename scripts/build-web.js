@@ -26,11 +26,12 @@ function copyRecursive(src, dest) {
 }
 
 const filesToCopy = [
+  ".nojekyll",
   "index.html",
   "app.js",
   "estilos.css",
   "manifest.json",
-  "icon.svg",
+  "icon-64.png",
   "icon-192.png",
   "icon-512.png",
   "icon.png",

@@ -10,16 +10,16 @@
   <meta name="author" content="Té Verde">
   <meta name="description" content="UNUmbral es tu organizador universitario 100% offline: horario semanal en formato de 12 horas, control de calificaciones y agenda de entregas críticas.">
   <title>UNUmbral · Horario, Cursos y Notas Universitarias</title>
-  <link rel="canonical" href="https://teverde29.github.io/unumbral/">
+  <link rel="canonical" href="https://teverde29.github.io/UNUmbral/">
   <meta property="og:type" content="website">
   <meta property="og:title" content="UNUmbral · Horario, Cursos y Notas Universitarias">
   <meta property="og:description" content="Organizador universitario 100% offline con horario semanal en 12 horas AM/PM, colores pasteles, calculadora de notas y entregas priorizadas.">
-  <meta property="og:url" content="https://teverde29.github.io/unumbral/">
-  <meta property="og:image" content="https://teverde29.github.io/unumbral/icon-512.png">
+  <meta property="og:url" content="https://teverde29.github.io/UNUmbral/">
+  <meta property="og:image" content="https://teverde29.github.io/UNUmbral/icon-512.png">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="UNUmbral · Horario, Cursos y Notas Universitarias">
   <meta name="twitter:description" content="Organizador universitario 100% offline con horario semanal en 12 horas AM/PM, colores pasteles, calculadora de notas y entregas priorizadas.">
-  <meta name="twitter:image" content="https://teverde29.github.io/unumbral/icon-512.png">
+  <meta name="twitter:image" content="https://teverde29.github.io/UNUmbral/icon-512.png">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
@@ -50,7 +50,7 @@
   <header class="top-header">
     <div class="brand">
       <div class="brand-badge" aria-hidden="true">
-        <img src="icon-192.png" alt="" width="30" height="30" class="brand-logo-img">
+        <img src="icon-64.png" alt="UNUmbral logo" width="30" height="30" class="brand-logo-img">
       </div>
       <div>
         <h1 class="brand-title">UNUmbral</h1>
@@ -233,7 +233,7 @@
       <!-- Contenedor de gráficos SVG de rendimiento -->
       <div id="contenedor-graficos-svg" class="svg-chart-container hidden" style="margin-top: 12px; background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-          <h4 style="font-size:13px; font-weight:700; margin:0;">Comparativa de Rendimiento por Curso</h4>
+          <h3 style="font-size:13px; font-weight:700; margin:0;">Comparativa de Rendimiento por Curso</h3>
           <span style="font-size:11px; color:var(--text-secondary);">Escala vigesimal 0–20</span>
         </div>
         <div id="grafico-barras-svg-wrap"></div>
@@ -429,33 +429,33 @@
           <div class="form-row">
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-nombre">Nombre Completo *</label>
-              <input type="text" id="perfil-nombre" class="field" placeholder="Ej. Juan Carlos Pérez Gómez">
+              <input type="text" id="perfil-nombre" class="field" placeholder="Ej. Juan Carlos Pérez Gómez" autocomplete="name" enterkeyhint="next">
             </div>
             <div class="form-group" style="width: 160px;">
               <label class="form-label" for="perfil-codigo">Código UNU</label>
-              <input type="text" id="perfil-codigo" class="field" placeholder="0002120456" maxlength="15">
+              <input type="text" id="perfil-codigo" class="field" placeholder="0002120456" maxlength="15" autocomplete="off" enterkeyhint="next">
             </div>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-telefono">Teléfono / Celular</label>
-              <input type="tel" id="perfil-telefono" class="field" placeholder="961234567">
+              <input type="tel" id="perfil-telefono" class="field" placeholder="961234567" autocomplete="tel" enterkeyhint="next">
             </div>
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-correo">Correo Electrónico</label>
-              <input type="email" id="perfil-correo" class="field" placeholder="usuario@unu.edu.pe">
+              <input type="email" id="perfil-correo" class="field" placeholder="usuario@unu.edu.pe" autocomplete="email" enterkeyhint="next">
             </div>
           </div>
 
           <div class="form-row" style="margin-top: 10px;">
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-facultad">Facultad</label>
-              <input type="text" id="perfil-facultad" class="field" placeholder="Ej. Fac. de Ingeniería de Sistemas e Ing. Civil">
+              <input type="text" id="perfil-facultad" class="field" placeholder="Ej. Fac. de Ingeniería de Sistemas e Ing. Civil" autocomplete="organization" enterkeyhint="next">
             </div>
             <div class="form-group flex-1">
               <label class="form-label" for="perfil-escuela">Escuela Profesional</label>
-              <input type="text" id="perfil-escuela" class="field" placeholder="Ej. Ingeniería de Sistemas">
+              <input type="text" id="perfil-escuela" class="field" placeholder="Ej. Ingeniería de Sistemas" autocomplete="organization-title" enterkeyhint="done">
             </div>
           </div>
 
@@ -639,7 +639,7 @@
           <span id="db-indicator-text">Almacenamiento persistente activo en el dispositivo</span>
         </div>
         <p style="margin-top:8px;font-size:12px;color:var(--text-tertiary);">
-          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-29">29 de octubre de 2026</time> · <button type="button" id="btn-ver-privacidad" style="background:none;border:none;padding:0;color:var(--text-secondary);font:inherit;text-decoration:underline;cursor:pointer;">Política de Privacidad</button>
+          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-30">30 de octubre de 2026</time> · <a href="PRIVACY.md" id="btn-ver-privacidad" style="color:var(--text-secondary);text-decoration:underline;">Política de Privacidad</a>
         </p>
       </div>
     </section>
@@ -758,34 +758,34 @@
             <span id="actividad-color-sync-hint" class="form-hint" style="font-size:11px; color:var(--text-muted);"></span>
           </div>
           <div class="color-palette-picker" id="class-actividad-color-picker">
-            <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Cielo" title="Azul Cielo"></button>
-            <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
-            <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Cálido"></button>
-            <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Rojizo"></button>
-            <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Lavanda" title="Lavanda Púrpura"></button>
-            <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Vivo"></button>
-            <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Verde Menta"></button>
-            <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Fucsia" title="Fucsia Orquídea"></button>
-            <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Índigo" title="Índigo Suave"></button>
-            <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Carmín"></button>
-            <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
-            <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
-            <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
-            <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
-            <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
-            <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
-            <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
-            <button type="button" class="color-swatch" data-color="#60A5FA" style="background:#60A5FA" aria-label="Azul Rey" title="Azul Rey"></button>
-            <button type="button" class="color-swatch" data-color="#10B981" style="background:#10B981" aria-label="Jade" title="Verde Jade"></button>
-            <button type="button" class="color-swatch" data-color="#94A3B8" style="background:#94A3B8" aria-label="Pizarra" title="Gris Pizarra"></button>
-          </div>
+          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Índigo" title="Añil Índigo"></button>
+          <button type="button" class="color-swatch" data-color="#60A5FA" style="background:#60A5FA" aria-label="Azul Rey" title="Azul Rey"></button>
+          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Celeste" title="Azul Cielo"></button>
+          <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
+          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
+          <button type="button" class="color-swatch" data-color="#10B981" style="background:#10B981" aria-label="Jade" title="Verde Jade"></button>
+          <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
+          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Verde Menta"></button>
+          <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
+          <button type="button" class="color-swatch" data-color="#94A3B8" style="background:#94A3B8" aria-label="Pizarra" title="Gris Pizarra"></button>
+          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
+          <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Dorado"></button>
+          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Cálido"></button>
+          <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
+          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Intenso"></button>
+          <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
+          <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Frutal"></button>
+          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Orquídea" title="Orquídea Magenta"></button>
+          <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
+          <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Violeta" title="Violeta Real"></button>
+        </div>
           <input type="hidden" id="class-actividad-color" value="#38BDF8">
         </div>
       </div>
 
       <div class="form-group" id="group-class-dias">
         <div class="form-label-row">
-          <label class="form-label" id="label-class-dias">Día(s) de la semana *</label>
+          <label class="form-label" id="label-class-dias" for="class-dia">Día(s) de la semana *</label>
           <button type="button" class="btn-text-action" id="btn-quick-weekdays">Lun a Vie</button>
         </div>
         <div class="day-chips-grid" id="class-day-chips" role="group" aria-label="Seleccionar días">
@@ -797,7 +797,7 @@
           <button type="button" class="day-chip" data-day="SABADO">Sáb</button>
           <button type="button" class="day-chip" data-day="DOMINGO">Dom</button>
         </div>
-        <select id="class-dia" class="field hidden" required aria-label="Día principal">
+        <select id="class-dia" class="field hidden" required aria-labelledby="label-class-dias">
           <option value="LUNES">Lunes</option>
           <option value="MARTES">Martes</option>
           <option value="MIERCOLES">Miércoles</option>
@@ -931,28 +931,28 @@
       </div>
 
       <div class="form-group">
-        <span class="form-label">Color Pastel del Curso</span>
+        <span class="form-label">Paleta de Colores</span>
         <div class="color-palette-picker" id="curso-color-picker">
-          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Celeste" title="Celeste Océano"></button>
-          <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
-          <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Dorado"></button>
-          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Intenso"></button>
-          <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Violeta" title="Violeta Real"></button>
-          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Cálido"></button>
-          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Menta Viva"></button>
-          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Orquídea" title="Orquídea Magenta"></button>
-          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Añil" title="Añil Índigo"></button>
-          <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Frutal"></button>
-          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
-          <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
-          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
-          <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
-          <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
-          <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
-          <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
+          <button type="button" class="color-swatch" data-color="#818CF8" style="background:#818CF8" aria-label="Índigo" title="Añil Índigo"></button>
           <button type="button" class="color-swatch" data-color="#60A5FA" style="background:#60A5FA" aria-label="Azul Rey" title="Azul Rey"></button>
+          <button type="button" class="color-swatch selected" data-color="#38BDF8" style="background:#38BDF8" aria-label="Celeste" title="Azul Cielo"></button>
+          <button type="button" class="color-swatch" data-color="#06B6D4" style="background:#06B6D4" aria-label="Cian" title="Cian Profundo"></button>
+          <button type="button" class="color-swatch" data-color="#2DD4BF" style="background:#2DD4BF" aria-label="Turquesa" title="Turquesa Marina"></button>
           <button type="button" class="color-swatch" data-color="#10B981" style="background:#10B981" aria-label="Jade" title="Verde Jade"></button>
+          <button type="button" class="color-swatch" data-color="#34D399" style="background:#34D399" aria-label="Esmeralda" title="Verde Esmeralda"></button>
+          <button type="button" class="color-swatch" data-color="#4ADE80" style="background:#4ADE80" aria-label="Menta" title="Verde Menta"></button>
+          <button type="button" class="color-swatch" data-color="#A3E635" style="background:#A3E635" aria-label="Lima" title="Lima Eléctrica"></button>
           <button type="button" class="color-swatch" data-color="#94A3B8" style="background:#94A3B8" aria-label="Pizarra" title="Gris Pizarra"></button>
+          <button type="button" class="color-swatch" data-color="#FACC15" style="background:#FACC15" aria-label="Amarillo" title="Amarillo Brillante"></button>
+          <button type="button" class="color-swatch" data-color="#FBBF24" style="background:#FBBF24" aria-label="Ámbar" title="Ámbar Dorado"></button>
+          <button type="button" class="color-swatch" data-color="#FB923C" style="background:#FB923C" aria-label="Naranja" title="Naranja Cálido"></button>
+          <button type="button" class="color-swatch" data-color="#EA580C" style="background:#EA580C" aria-label="Terracota" title="Terracota"></button>
+          <button type="button" class="color-swatch" data-color="#F87171" style="background:#F87171" aria-label="Coral" title="Coral Intenso"></button>
+          <button type="button" class="color-swatch" data-color="#FDA4AF" style="background:#FDA4AF" aria-label="Melocotón" title="Melocotón Suave"></button>
+          <button type="button" class="color-swatch" data-color="#FB7185" style="background:#FB7185" aria-label="Rosa" title="Rosa Frutal"></button>
+          <button type="button" class="color-swatch" data-color="#E879F9" style="background:#E879F9" aria-label="Orquídea" title="Orquídea Magenta"></button>
+          <button type="button" class="color-swatch" data-color="#C084FC" style="background:#C084FC" aria-label="Lavanda" title="Lavanda Amatista"></button>
+          <button type="button" class="color-swatch" data-color="#A78BFA" style="background:#A78BFA" aria-label="Violeta" title="Violeta Real"></button>
         </div>
         <input type="hidden" id="curso-color" value="#38BDF8">
       </div>
@@ -1263,7 +1263,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="excepcion-fecha">Fecha *</label>
-          <input type="date" id="excepcion-fecha" class="field" required>
+          <input type="date" id="excepcion-fecha" class="field" required enterkeyhint="next">
         </div>
         <div class="form-group" id="excepcion-curso-group">
           <label class="form-label" for="excepcion-curso">Curso Afectado</label>
@@ -1275,7 +1275,7 @@
 
       <div class="form-group">
         <label class="form-label" for="excepcion-motivo">Motivo o Descripción *</label>
-        <input type="text" id="excepcion-motivo" class="field" placeholder="Ej: Feriado Nacional, Docente en congreso, Huelga…" required>
+        <input type="text" id="excepcion-motivo" class="field" placeholder="Ej: Feriado Nacional, Docente en congreso, Huelga…" required enterkeyhint="done">
       </div>
 
       <div class="modal-actions" style="margin-top: 14px; display:flex; justify-content:flex-end; gap:8px;">
@@ -1303,7 +1303,7 @@
       <input type="hidden" id="evento-id">
       <div class="form-group">
         <label class="form-label" for="evento-titulo">Título del Evento *</label>
-        <input type="text" id="evento-titulo" class="field" placeholder="Ej: Examen Parcial, Presentación Proyecto Final…" required>
+        <input type="text" id="evento-titulo" class="field" placeholder="Ej: Examen Parcial, Presentación Proyecto Final…" required enterkeyhint="next">
       </div>
 
       <div class="form-row">
@@ -1326,17 +1326,17 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="evento-fecha">Fecha *</label>
-          <input type="date" id="evento-fecha" class="field" required>
+          <input type="date" id="evento-fecha" class="field" required enterkeyhint="next">
         </div>
         <div class="form-group">
           <label class="form-label" for="evento-hora">Hora (opcional)</label>
-          <input type="time" id="evento-hora" class="field">
+          <input type="time" id="evento-hora" class="field" enterkeyhint="next">
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="evento-aula">Aula o Lugar (opcional)</label>
-        <input type="text" id="evento-aula" class="field" placeholder="Ej: Pabellón B - Aula 204">
+        <input type="text" id="evento-aula" class="field" placeholder="Ej: Pabellón B - Aula 204" enterkeyhint="done">
       </div>
 
       <div class="form-group">
@@ -1512,21 +1512,21 @@
 <div id="toast" class="toast hidden"></div>
 
 <!-- LIBRERÍAS LOCALES OFFLINE -->
-<script src="lib/dexie.min.js"></script>
-<script src="lib/plataforma.js"></script>
-<script src="lib/ajustes.js"></script>
-<script src="lib/planificador.js"></script>
-<script src="lib/notificaciones.js"></script>
-<script src="lib/asistencia.js"></script>
-<script src="lib/prioridad.js"></script>
-<script src="lib/rendimiento.js"></script>
-<script src="lib/huecos.js"></script>
-<script src="lib/qrcode.min.js"></script>
-<script src="lib/jsqr.min.js"></script>
-<script src="lib/pako.min.js"></script>
-<script src="lib/qr.js"></script>
-<script src="lib/deeplink.js"></script>
-<script src="app.js"></script>
+<script defer src="lib/dexie.min.js"></script>
+<script defer src="lib/plataforma.js"></script>
+<script defer src="lib/ajustes.js"></script>
+<script defer src="lib/planificador.js"></script>
+<script defer src="lib/notificaciones.js"></script>
+<script defer src="lib/asistencia.js"></script>
+<script defer src="lib/prioridad.js"></script>
+<script defer src="lib/rendimiento.js"></script>
+<script defer src="lib/huecos.js"></script>
+<script defer src="lib/qrcode.min.js"></script>
+<script defer src="lib/jsqr.min.js"></script>
+<script defer src="lib/pako.min.js"></script>
+<script defer src="lib/qr.js"></script>
+<script defer src="lib/deeplink.js"></script>
+<script defer src="app.js"></script>
 
 <!-- MODAL DE POLÍTICA DE PRIVACIDAD LOCAL -->
 <div id="modal-privacidad-backdrop" class="modal-backdrop hidden">

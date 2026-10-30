@@ -4,8 +4,8 @@
   "description": "Horario universitario, calculadora de notas vigesimal (0 a 20) y organizador de tareas académicas 100% offline.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0D140F",
-  "theme_color": "#0D140F",
+  "background_color": "#F4F6EE",
+  "theme_color": "#F4F6EE",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -18,12 +18,6 @@
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

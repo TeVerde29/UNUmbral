@@ -410,6 +410,7 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
   });
 
   const tareas = (tareasPlanas || []).map(t => {
+    if (t && t.enlace) t.enlace = sanitizarUrlSegura(t.enlace);
     if (Object.prototype.hasOwnProperty.call(t, "curso_id")) return t;
     const { materia, ...resto } = t;
     const esGeneral = !materia || normalizarNombre(materia) === "general";
@@ -614,6 +615,19 @@ function escapeHtml(str) {
 function pad2(n) { return String(n).padStart(2, "0"); }
 
 /**
+ * Sanitiza una URL asegurando que use protocolos web seguros (http / https)
+ * y neutralizando esquemas potencialmente maliciosos como javascript: o data:
+ */
+function sanitizarUrlSegura(url) {
+  if (!url || typeof url !== "string") return "";
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return "";
+}
+
+/**
  * Convierte cualquier hora ("14:30" o "02:30 PM" o "8:00 am") al formato 24h "HH:MM"
  * requerido por <input type="time"> y el cálculo interno de minutos.
  */
@@ -723,7 +737,7 @@ function formatRelativeDue(isoDateStr) {
   if (calendarDayDiff === 0) {
     const isVerySoon = diffMs <= 60 * 60 * 1000; // 1 hora o menos
     return {
-      text: isVerySoon ? `Vence pronto (${timeStr})` : `Hoy a las ${timeStr}`,
+      text: `Hasta las ${timeStr}`,
       isUrgent: true,
       isSoon: isVerySoon
     };
@@ -753,6 +767,80 @@ function formatRelativeDue(isoDateStr) {
     isUrgent: false,
     isSoon: false
   };
+}
+
+/**
+ * Calcula y formatea la cuenta regresiva en tiempo real para la culminación de la entrega de una tarea.
+ * Formato: "Restan Xh Ymin Zseg" (o con días "Restan Xd Yh Zmin Wseg").
+ */
+function formatearCuentaRegresivaEntrega(diffSec) {
+  if (diffSec <= 0) {
+    return {
+      text: "Plazo culminado",
+      isOverdue: true,
+      urgencyClass: "overdue"
+    };
+  }
+
+  const d = Math.floor(diffSec / 86400);
+  const remDay = diffSec % 86400;
+  const h = Math.floor(remDay / 3600);
+  const m = Math.floor((remDay % 3600) / 60);
+  const s = diffSec % 60;
+
+  const parts = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (h > 0 || d > 0) parts.push(`${h}h`);
+  if (m > 0 || h > 0 || d > 0) parts.push(`${m}min`);
+  parts.push(`${s}seg`);
+
+  let urgencyClass = "normal";
+  if (diffSec <= 3 * 3600) {
+    urgencyClass = "urgent";
+  } else if (diffSec <= 24 * 3600) {
+    urgencyClass = "soon";
+  }
+
+  return {
+    text: `Restan ${parts.join(" ")}`,
+    isOverdue: false,
+    urgencyClass
+  };
+}
+
+/**
+ * Ticker de actualización en tiempo real (cada 1s) para los badges de cuenta regresiva de tareas.
+ */
+function tickTaskCountdowns() {
+  if (typeof document === "undefined" || !document.querySelectorAll) return;
+  const elements = document.querySelectorAll(".task-countdown-badge[data-due]");
+  if (!elements || elements.length === 0) return;
+  const now = Date.now();
+  elements.forEach(badge => {
+    const iso = badge.getAttribute("data-due");
+    if (!iso) return;
+    const target = new Date(iso).getTime();
+    if (isNaN(target)) return;
+    const diffSec = Math.floor((target - now) / 1000);
+    const data = formatearCuentaRegresivaEntrega(diffSec);
+    if (!data) return;
+
+    const textEl = badge.querySelector(".task-countdown-text");
+    if (textEl) {
+      if (textEl.textContent !== data.text) {
+        textEl.textContent = data.text;
+      }
+    } else {
+      if (badge.textContent !== data.text) {
+        badge.textContent = data.text;
+      }
+    }
+
+    const expectedClass = `task-countdown-badge ${data.urgencyClass}`;
+    if (badge.className !== expectedClass) {
+      badge.className = expectedClass;
+    }
+  });
 }
 
 let toastTimer = null;
@@ -2049,8 +2137,7 @@ function renderMatrixTableHTML(classes) {
           </div>
         </div>
       </div>
-    </div>
-    <p class="form-hint" style="margin-top:10px;text-align:center">Toca cualquier clase para ver o editar sus detalles. Desliza horizontalmente para navegar entre días.</p>`;
+    </div>`;
 }
 
 function wireMatrixJumpBar(container) {
@@ -2619,6 +2706,19 @@ function renderTaskCardHTML(t) {
   const due = formatRelativeDue(t.fecha_limite);
   const dueClass = due.isUrgent ? "urgent" : (due.isSoon ? "soon" : "");
 
+  let countdownHTML = "";
+  if (!t.completada && t.fecha_limite) {
+    const target = new Date(t.fecha_limite).getTime();
+    if (!isNaN(target)) {
+      const now = Date.now();
+      const diffSec = Math.floor((target - now) / 1000);
+      const data = formatearCuentaRegresivaEntrega(diffSec);
+      if (data) {
+        countdownHTML = `<span class="task-countdown-badge ${data.urgencyClass}" data-due="${escapeHtml(t.fecha_limite)}" title="Tiempo restante para entrega"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="task-countdown-text">${data.text}</span></span>`;
+      }
+    }
+  }
+
   return `
     <div class="task-card ${t.completada ? "completed" : ""}" data-id="${t.id}">
       <div class="task-check-circle" data-action="toggle" title="Alternar estado de finalización">
@@ -2629,13 +2729,14 @@ function renderTaskCardHTML(t) {
       <div class="task-card-content" data-action="edit">
         <div class="task-card-header">
           <div class="task-card-title">${escapeHtml(t.titulo)}</div>
+          ${countdownHTML}
         </div>
         ${t.notas ? `<div class="task-card-desc">${escapeHtml(t.notas)}</div>` : ""}
         <div class="task-card-meta">
           <span class="subject-pill">${escapeHtml(t.materia || "General")}</span>
           <span class="importance-gauge ${imp.class}">${imp.badge}</span>
           <span class="due-badge ${dueClass}">${ICONS.clock} ${due.text}</span>
-          ${t.enlace ? `<a href="${escapeHtml(t.enlace)}" target="_blank" rel="noopener noreferrer" class="task-enlace-badge" onclick="event.stopPropagation();" title="Abrir enlace"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Enlace</a>` : ""}
+          ${sanitizarUrlSegura(t.enlace) ? `<a href="${escapeHtml(sanitizarUrlSegura(t.enlace))}" target="_blank" rel="noopener noreferrer" class="task-enlace-badge" onclick="event.stopPropagation();" title="Abrir enlace"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> Enlace</a>` : ""}
         </div>
       </div>
     </div>`;
@@ -2980,7 +3081,9 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
   const sesionesTxt = ses.count
     ? `${ses.count} ${ses.count === 1 ? "sesión" : "sesiones"}${horas ? " · " + horas : ""}`
     : "Sin horario";
-  const ppLabel = r.practicasTotal ? `Prácticas ${r.practicasCalificadas}/${r.practicasTotal}` : "Prácticas";
+  const ppLabel = r.practicasTotal
+    ? (r.practicasTotal === 1 ? "Prom. de 1 Práctica" : `Prom. de ${r.practicasTotal} Prácticas`)
+    : "Prom. Prácticas";
   const tienePromedio = r.promedio !== null;
   const valorCentral = tienePromedio ? r.promedio : (r.estado === "sin-notas" ? null : r.acumulado);
   const nombre = escapeHtml(c.nombre);
@@ -3276,11 +3379,12 @@ async function eliminarCurso() {
    ===================================================================== */
 function practicaRowHTML(p, idx) {
   const titulo = p.titulo || `Práctica ${idx + 1}`;
-  const nota = p.nota === null || p.nota === undefined ? "" : p.nota;
+  const rawNota = p.nota;
+  const nota = (rawNota === null || rawNota === undefined || rawNota === "") ? "00" : (rawNota === 0 ? "00" : rawNota);
   return `
     <div class="practica-row" data-id="${escapeHtml(p.id || uuid())}">
       <input type="text" class="field practica-titulo" value="${escapeHtml(titulo)}" maxlength="40" aria-label="Nombre de la evaluación ${idx + 1}">
-      <input type="number" class="field grade-input practica-nota" value="${escapeHtml(nota)}" min="0" max="20" step="0.01" inputmode="decimal" placeholder="—" aria-label="Nota de la evaluación ${idx + 1}">
+      <input type="number" class="field grade-input practica-nota" value="${escapeHtml(nota)}" min="0" max="20" step="0.01" inputmode="decimal" placeholder="00" aria-label="Nota de la evaluación ${idx + 1}" required onfocus="this.select()">
       <button type="button" class="icon-btn practica-remove" aria-label="Quitar evaluación ${idx + 1}" title="Quitar">${ICONS.close}</button>
     </div>`;
 }
@@ -3295,7 +3399,7 @@ function renderPracticasRows(practicas) {
 /** Lee y valida el formulario de notas. Las notas fuera de 0–20 se marcan y no se cuentan. */
 function leerEvaluacionDelFormulario() {
   const errores = [];
-  const validar = (input, nombre) => {
+  const validar = (input, nombre, obligatorio = false) => {
     input.classList.remove("invalid");
     if (input.validity && input.validity.badInput) {
       input.classList.add("invalid");
@@ -3303,7 +3407,13 @@ function leerEvaluacionDelFormulario() {
       return null;
     }
     const raw = input.value.trim();
-    if (raw === "") return null;
+    if (raw === "") {
+      if (obligatorio) {
+        input.classList.add("invalid");
+        errores.push(`${nombre}: debes ingresar la nota (0 a ${NOTA_MAX}).`);
+      }
+      return null;
+    }
     const n = Number(raw);
     if (!Number.isFinite(n) || n < 0 || n > NOTA_MAX) {
       input.classList.add("invalid");
@@ -3317,7 +3427,7 @@ function leerEvaluacionDelFormulario() {
   const final = validar($("#nota-final"), "Examen final");
   const practicas = $$(".practica-row", $("#practicas-list")).map((row, i) => {
     const titulo = $(".practica-titulo", row).value.trim() || `Práctica ${i + 1}`;
-    return { id: row.dataset.id || uuid(), titulo, nota: validar($(".practica-nota", row), titulo) };
+    return { id: row.dataset.id || uuid(), titulo, nota: validar($(".practica-nota", row), titulo, true) };
   });
 
   return { evaluacion: { parcial, final, practicas }, errores };
@@ -3358,7 +3468,7 @@ function actualizarResumenNotas() {
   const ppEl = $("#practicas-promedio");
   ppEl.textContent = r.pp === null
     ? "Promedio: —"
-    : `Promedio: ${formatNota(r.pp)}${r.ppProvisional ? ` (${r.practicasCalificadas} de ${r.practicasTotal})` : ""}`;
+    : `Promedio: ${formatNota(r.pp)} (${r.practicasTotal === 1 ? "1 Práctica" : `${r.practicasTotal} Prácticas`})`;
 
   const evoWrap = $("#notas-evolucion-svg-wrap");
   if (evoWrap && typeof generarSvgEvolucionCurso === "function") {
@@ -3398,8 +3508,12 @@ function agregarPractica() {
   const empty = $(".practicas-empty", list);
   if (empty) empty.remove();
   const idx = $$(".practica-row", list).length;
-  list.insertAdjacentHTML("beforeend", practicaRowHTML({ id: uuid(), titulo: `Práctica ${idx + 1}`, nota: null }, idx));
-  $(".practica-nota", list.lastElementChild).focus();
+  list.insertAdjacentHTML("beforeend", practicaRowHTML({ id: uuid(), titulo: `Práctica ${idx + 1}`, nota: "00" }, idx));
+  const inp = $(".practica-nota", list.lastElementChild);
+  if (inp) {
+    inp.focus();
+    inp.select();
+  }
   actualizarResumenNotas();
 }
 
@@ -5641,7 +5755,13 @@ async function guardarTarea(e) {
   const fecha_limite = $("#task-fecha").value;
   const importancia = parseInt($("#task-importancia").value) || 3;
   const estimado_min = null;
-  const enlace = ($("#task-enlace")?.value || "").trim();
+  const rawEnlace = ($("#task-enlace")?.value || "").trim();
+  const enlace = rawEnlace ? sanitizarUrlSegura(rawEnlace) : "";
+  if (rawEnlace && !enlace) {
+    errorEl.textContent = "El enlace debe ser una URL válida (http:// o https://).";
+    errorEl.classList.remove("hidden");
+    return;
+  }
   const notas = $("#task-descripcion").value.trim();
   const completada = $("#task-completada").checked;
   const errorEl = $("#task-form-error");
@@ -6098,7 +6218,7 @@ function descargarReporteComoImagen(reporte) {
   link.click();
 }
 
-function wireGlobalEvents() {
+function wireNavigationEvents() {
   $$(".nav-tab").forEach(tab => {
     tab.addEventListener("click", () => switchTab(tab.dataset.view));
   });
@@ -6127,7 +6247,7 @@ function wireGlobalEvents() {
     openNewClassModal();
   });
 
-    const btnGestionarCicloCursos = $("#btn-gestionar-ciclo-cursos");
+  const btnGestionarCicloCursos = $("#btn-gestionar-ciclo-cursos");
   if (btnGestionarCicloCursos) {
     btnGestionarCicloCursos.addEventListener("click", async () => {
       const cicloActivo = await obtenerCicloActivo();
@@ -6143,22 +6263,13 @@ function wireGlobalEvents() {
   $("#btn-add-class").addEventListener("click", () => openNewClassModal());
   $("#btn-ver-todas-tareas").addEventListener("click", () => switchTab("view-tareas"));
 
-  $("#btn-mode-agenda").addEventListener("click", () => { state.scheduleMode = "agenda"; renderHorario(); });
-  $("#btn-mode-matrix").addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
-  const btnModeCycle = $("#btn-mode-cycle");
-  if (btnModeCycle) {
-    btnModeCycle.addEventListener("click", () => { state.scheduleMode = "cycle"; renderHorario(); });
-  }
-
-  // Eventos del modal de Ciclo Académico
-
   // Perfil del Estudiante
   const formPerfil = $("#form-perfil-estudiante");
   if (formPerfil) formPerfil.addEventListener("submit", guardarPerfilEstudiante);
 
   // Modal Política de Privacidad
   const btnVerPriv = $("#btn-ver-privacidad");
-  if (btnVerPriv) btnVerPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.remove("hidden"));
+  if (btnVerPriv) btnVerPriv.addEventListener("click", (e) => { e.preventDefault(); $("#modal-privacidad-backdrop").classList.remove("hidden"); });
   const btnCerrarPriv = $("#modal-privacidad-close");
   if (btnCerrarPriv) btnCerrarPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.add("hidden"));
   const btnEntendidoPriv = $("#btn-privacidad-entendido");
@@ -6194,6 +6305,15 @@ function wireGlobalEvents() {
   });
   $("#form-ciclo").addEventListener("submit", guardarCiclo);
   $("#ciclo-fecha-inicio").addEventListener("input", actualizarPreviewCiclo);
+}
+
+function wireScheduleAndCourseEvents() {
+  $("#btn-mode-agenda").addEventListener("click", () => { state.scheduleMode = "agenda"; renderHorario(); });
+  $("#btn-mode-matrix").addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
+  const btnModeCycle = $("#btn-mode-cycle");
+  if (btnModeCycle) {
+    btnModeCycle.addEventListener("click", () => { state.scheduleMode = "cycle"; renderHorario(); });
+  }
 
   // Inicializar selector 12h y paleta de actividades
   init12HourSelectors();
@@ -6212,82 +6332,6 @@ function wireGlobalEvents() {
       renderHorario();
     });
   });
-
-  $$(".chip", $("#tasks-filter-chips")).forEach(chip => {
-    chip.addEventListener("click", () => {
-      $$(".chip", $("#tasks-filter-chips")).forEach(c => c.classList.remove("active"));
-      chip.classList.add("active");
-      state.tasksFilter = chip.dataset.filter;
-      renderTareas();
-    });
-  });
-
-  const btnTasksList = $("#btn-tasks-mode-list");
-  if (btnTasksList) {
-    btnTasksList.addEventListener("click", () => {
-      state.tasksViewMode = "list";
-      renderTareas();
-    });
-  }
-
-  const btnTasksCal = $("#btn-tasks-mode-cal");
-  if (btnTasksCal) {
-    btnTasksCal.addEventListener("click", () => {
-      state.tasksViewMode = "calendar";
-      renderTareas();
-    });
-  }
-
-  const btnCalPrev = $("#btn-cal-prev");
-  if (btnCalPrev) {
-    btnCalPrev.addEventListener("click", () => {
-      state.calendarMonth--;
-      if (state.calendarMonth < 1) {
-        state.calendarMonth = 12;
-        state.calendarYear--;
-      }
-      renderCalendarioMensual();
-    });
-  }
-
-  const btnCalNext = $("#btn-cal-next");
-  if (btnCalNext) {
-    btnCalNext.addEventListener("click", () => {
-      state.calendarMonth++;
-      if (state.calendarMonth > 12) {
-        state.calendarMonth = 1;
-        state.calendarYear++;
-      }
-      renderCalendarioMensual();
-    });
-  }
-
-  const btnCalToday = $("#btn-cal-today");
-  if (btnCalToday) {
-    btnCalToday.addEventListener("click", () => {
-      const now = new Date();
-      state.calendarYear = now.getFullYear();
-      state.calendarMonth = now.getMonth() + 1;
-      state.selectedCalDate = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(now);
-      renderCalendarioMensual();
-    });
-  }
-
-  const btnCalAddEv = $("#btn-cal-add-event");
-  if (btnCalAddEv) {
-    btnCalAddEv.addEventListener("click", () => {
-      openModalEvento(null, null);
-      if (state.selectedCalDate) $("#evento-fecha").value = state.selectedCalDate;
-    });
-  }
-
-  const btnCalAddTask = $("#btn-cal-add-task");
-  if (btnCalAddTask) {
-    btnCalAddTask.addEventListener("click", () => {
-      openNewTaskModal();
-      if (state.selectedCalDate) $("#task-fecha").value = state.selectedCalDate + "T23:59";
-    });
-  }
 
   const btnSubjectDropdown = $("#btn-subject-dropdown-toggle");
   const menuSubjectDropdown = $("#subject-dropdown-menu");
@@ -6309,11 +6353,6 @@ function wireGlobalEvents() {
       }
     });
   }
-
-  $("#input-search-tasks").addEventListener("input", (e) => {
-    state.tasksSearchQuery = e.target.value;
-    renderTareas();
-  });
 
   // Eventos del modal de Curso (catálogo)
   $$(".color-swatch", $("#curso-color-picker")).forEach(s => {
@@ -6419,6 +6458,89 @@ function wireGlobalEvents() {
   });
   $("#form-class").addEventListener("submit", guardarClase);
   $("#btn-delete-class").addEventListener("click", eliminarClase);
+}
+
+function wireTaskEvents() {
+  $$(".chip", $("#tasks-filter-chips")).forEach(chip => {
+    chip.addEventListener("click", () => {
+      $$(".chip", $("#tasks-filter-chips")).forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      state.tasksFilter = chip.dataset.filter;
+      renderTareas();
+    });
+  });
+
+  const btnTasksList = $("#btn-tasks-mode-list");
+  if (btnTasksList) {
+    btnTasksList.addEventListener("click", () => {
+      state.tasksViewMode = "list";
+      renderTareas();
+    });
+  }
+
+  const btnTasksCal = $("#btn-tasks-mode-cal");
+  if (btnTasksCal) {
+    btnTasksCal.addEventListener("click", () => {
+      state.tasksViewMode = "calendar";
+      renderTareas();
+    });
+  }
+
+  const btnCalPrev = $("#btn-cal-prev");
+  if (btnCalPrev) {
+    btnCalPrev.addEventListener("click", () => {
+      state.calendarMonth--;
+      if (state.calendarMonth < 1) {
+        state.calendarMonth = 12;
+        state.calendarYear--;
+      }
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalNext = $("#btn-cal-next");
+  if (btnCalNext) {
+    btnCalNext.addEventListener("click", () => {
+      state.calendarMonth++;
+      if (state.calendarMonth > 12) {
+        state.calendarMonth = 1;
+        state.calendarYear++;
+      }
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalToday = $("#btn-cal-today");
+  if (btnCalToday) {
+    btnCalToday.addEventListener("click", () => {
+      const now = new Date();
+      state.calendarYear = now.getFullYear();
+      state.calendarMonth = now.getMonth() + 1;
+      state.selectedCalDate = (typeof fechaAString === "function" ? fechaAString : window.fechaAString)(now);
+      renderCalendarioMensual();
+    });
+  }
+
+  const btnCalAddEv = $("#btn-cal-add-event");
+  if (btnCalAddEv) {
+    btnCalAddEv.addEventListener("click", () => {
+      openModalEvento(null, null);
+      if (state.selectedCalDate) $("#evento-fecha").value = state.selectedCalDate;
+    });
+  }
+
+  const btnCalAddTask = $("#btn-cal-add-task");
+  if (btnCalAddTask) {
+    btnCalAddTask.addEventListener("click", () => {
+      openNewTaskModal();
+      if (state.selectedCalDate) $("#task-fecha").value = state.selectedCalDate + "T23:59";
+    });
+  }
+
+  $("#input-search-tasks").addEventListener("input", (e) => {
+    state.tasksSearchQuery = e.target.value;
+    renderTareas();
+  });
 
   // Eventos del modal de Tarea
   $$(".imp-star-btn", $("#task-importance-selector")).forEach(btn => {
@@ -6432,7 +6554,9 @@ function wireGlobalEvents() {
   });
   $("#form-task").addEventListener("submit", guardarTarea);
   $("#btn-delete-task").addEventListener("click", eliminarTarea);
+}
 
+function wireSettingsEvents() {
   // Eventos de Ajustes y Backups
   // Actualización en tiempo real de badges en formato 12 horas
   [
@@ -6454,13 +6578,13 @@ function wireGlobalEvents() {
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
-
-
   const btnSaveAjustes = $("#btn-save-ajustes");
   if (btnSaveAjustes) {
     btnSaveAjustes.addEventListener("click", guardarAjustesUI);
   }
+}
 
+function wireAttendanceAndModalEvents() {
   // Eventos de Asistencia y Feriados (Fase 3)
   const btnMarcarFeriado = $("#btn-marcar-feriado-hoy");
   if (btnMarcarFeriado) {
@@ -6529,7 +6653,9 @@ function wireGlobalEvents() {
       if (e.target.id === "modal-evento-backdrop") closeModalEvento();
     });
   }
+}
 
+function wirePerformanceAndQrEvents() {
   // Rendimiento y Simulador (Fase 5)
   const btnToggleGraf = $("#btn-toggle-graficos");
   if (btnToggleGraf) {
@@ -6626,6 +6752,16 @@ function wireGlobalEvents() {
     }
   });
 }
+
+function wireGlobalEvents() {
+  wireNavigationEvents();
+  wireScheduleAndCourseEvents();
+  wireTaskEvents();
+  wireSettingsEvents();
+  wireAttendanceAndModalEvents();
+  wirePerformanceAndQrEvents();
+}
+
 
 /* =====================================================================
    MIGRACIÓN DE COMPATIBILIDAD DESDE UNIFLOW A UNUMBRAL
@@ -6728,6 +6864,11 @@ async function init() {
     await deduplicarClasesEnBd();
   } catch (err) {
     console.warn("Aviso abriendo IndexedDB:", err);
+    const indDot = $("#db-indicator-dot");
+    const indTxt = $("#db-indicator-text");
+    if (indDot) { indDot.className = "db-indicator error"; }
+    if (indTxt) { indTxt.textContent = "Almacenamiento local restringido o no disponible"; }
+    showToast("Advertencia: Almacenamiento local restringido en esta sesión.", true);
   }
 
   try {
@@ -6746,6 +6887,10 @@ async function init() {
   setInterval(() => {
     if (state.currentTab === "view-hoy") renderHoy();
   }, 60000);
+
+  setInterval(() => {
+    tickTaskCountdowns();
+  }, 1000);
 }
 
 if (typeof window !== "undefined" && typeof document !== "undefined" && typeof document.getElementById === "function") {

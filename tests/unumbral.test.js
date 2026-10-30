@@ -187,3 +187,70 @@ test("formatRelativeDue formats calendar days accurately avoiding premature 'Hoy
   assert.equal(dueYesterday.text, "Atrasada ayer (10:00 AM)");
   assert.equal(dueYesterday.isUrgent, true);
 });
+
+
+test("formatRelativeDue formats today deadline as 'Hasta las HH:MM AM/PM'", () => {
+  const { sandbox } = loadAppContext();
+  const now = new Date();
+  const todayTarget = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  const due = sandbox.formatRelativeDue(todayTarget.toISOString());
+  assert.equal(due.text, "Hasta las 12:00 PM");
+  assert.equal(due.isUrgent, true);
+});
+
+test("formatearCuentaRegresivaEntrega formats 'Restan Xh Ymin Zseg' and handles deadlines correctly", () => {
+  const { sandbox } = loadAppContext();
+
+  // 2h 15min 8seg
+  const res1 = sandbox.formatearCuentaRegresivaEntrega(2 * 3600 + 15 * 60 + 8);
+  assert.equal(res1.text, "Restan 2h 15min 8seg");
+  assert.equal(res1.urgencyClass, "urgent");
+  assert.equal(res1.isOverdue, false);
+
+  // 45min 12seg
+  const res2 = sandbox.formatearCuentaRegresivaEntrega(45 * 60 + 12);
+  assert.equal(res2.text, "Restan 45min 12seg");
+  assert.equal(res2.urgencyClass, "urgent");
+
+  // 30seg
+  const res3 = sandbox.formatearCuentaRegresivaEntrega(30);
+  assert.equal(res3.text, "Restan 30seg");
+  assert.equal(res3.urgencyClass, "urgent");
+
+  // 2d 3h 10min 5seg
+  const res4 = sandbox.formatearCuentaRegresivaEntrega(2 * 86400 + 3 * 3600 + 10 * 60 + 5);
+  assert.equal(res4.text, "Restan 2d 3h 10min 5seg");
+  assert.equal(res4.urgencyClass, "normal");
+
+  // Overdue
+  const resOverdue = sandbox.formatearCuentaRegresivaEntrega(0);
+  assert.equal(resOverdue.text, "Plazo culminado");
+  assert.equal(resOverdue.isOverdue, true);
+  assert.equal(resOverdue.urgencyClass, "overdue");
+});
+
+test("renderTaskCardHTML includes countdown badge and 'Hasta las' badge for today's tasks", () => {
+  const { sandbox } = loadAppContext();
+  const now = new Date();
+  const todayDue = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).toISOString();
+
+  const task = {
+    id: "task-1",
+    titulo: "Entrega de Carta de Aceptación",
+    notas: "Entregar 3 juegos",
+    materia: "Prácticas pre Profesionales 2",
+    importancia: 5,
+    fecha_limite: todayDue,
+    completada: false
+  };
+
+  const html = sandbox.renderTaskCardHTML(task);
+  assert.match(html, /task-countdown-badge/);
+  assert.match(html, /Restan /);
+  assert.match(html, /Hasta las 12:00 PM/);
+
+  // When completed, countdown badge is not rendered
+  const completedTask = { ...task, completada: true };
+  const completedHtml = sandbox.renderTaskCardHTML(completedTask);
+  assert.doesNotMatch(completedHtml, /task-countdown-badge/);
+});
