@@ -1454,6 +1454,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   padding: 0 14px;
   height: 38px;
   color: var(--text-tertiary);
+  margin-bottom: 14px;
 }
 
 .search-box input {
@@ -1472,7 +1473,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   gap: 6px;
   overflow-x: auto;
   padding-bottom: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
   scrollbar-width: none;
 }
 
@@ -3869,4 +3870,18 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 .task-enlace-badge:hover {
   background: var(--deep-leaf);
   color: #FFFFFF;
+}
+
+
+/* =====================================================================
+   ESPACIADO DE RENDIMIENTO Y GRÁFICAS DE CURSOS (DESIGN RICRA)
+   ===================================================================== */
+.rendimiento-toolbar-wrap {
+  margin-top: 12px;
+  margin-bottom: 14px;
+}
+
+.svg-chart-container {
+  margin-top: 12px;
+  margin-bottom: 16px;
 }

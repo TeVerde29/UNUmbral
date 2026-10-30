@@ -1868,7 +1868,7 @@ async function renderCicloRoadmap() {
           <span class="cycle-week-dates">${s.inicio} — ${s.fin}</span>
         </div>
         <div class="cycle-week-content">
-          ${isExamenParcial ? `<div class="cycle-week-highlight">Semana 8: Evaluaciones Parciales Universitarias. Dedicada a exámenes según rol institucional.</div>` : ""}
+          ${isExamenParcial ? `<div class="cycle-week-highlight">Semana 8: Evaluaciones Parciales Universitarias.</div>` : ""}
           ${isExamenFinal ? `<div class="cycle-week-highlight">Semana 17: Evaluaciones Finales y Cierre de Actas Académicas.</div>` : ""}
           ${evSemana.length > 0 || tarSemana.length > 0 ? `
             <div class="cycle-week-items">
