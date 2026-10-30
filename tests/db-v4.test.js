@@ -105,9 +105,6 @@ test("DOM IDs in app.js for ajustes and creditos exist in index.html", () => {
   const { code, html } = loadAppContext();
   const allDefinedIds = new Set([...(html + code).matchAll(/id="([^"]+)"/g)].map(m => m[1]));
   const requiredIds = [
-    "ajuste-ciclo-inicio",
-    "ajuste-ciclo-fin",
-    "ajuste-limite-faltas",
     "ajuste-notif-clases",
     "ajuste-notif-tareas",
     "ajuste-notif-urgentes",

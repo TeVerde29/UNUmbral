@@ -1,99 +1,82 @@
 # Política de Privacidad de UNUmbral
 
-> **Última actualización:** 29 de octubre de 2026  
-> **Compromiso principal:** UNUmbral es una aplicación 100% offline y *Local-First*. Tus datos académicos y personales nunca salen de tu dispositivo.
+> **Última actualización:** 30 de octubre de 2026  
+> **En resumen:** UNUmbral funciona 100% en tu dispositivo y sin conexión a internet. Tus notas, horarios, tareas y datos personales nunca salen de tu teléfono o computadora.
 
 ---
 
-## 1. Introducción y Filosofía del Proyecto
+## 1. ¿Cómo funciona UNUmbral y por qué es privada?
 
-**UNUmbral** es una herramienta de organización académica y personal diseñada para estudiantes universitarios. A diferencia de las plataformas tradicionales basadas en la nube, UNUmbral se rige por el principio de **cero recolección de datos (*Zero-Knowledge / Zero-Tracking*)**. No tenemos servidores externos, no requerimos la creación de cuentas en línea y no recopilamos información personal, académica ni de telemetría.
+**UNUmbral** es una aplicación diseñada para que los estudiantes universitarios organicen sus clases, horarios, asistencias, calificaciones y tareas pendientes.
 
----
-
-## 2. Información Procesada y Almacenamiento Local
-
-Todos los datos introducidos o generados en UNUmbral se almacenan exclusivamente en la base de datos local **IndexedDB** (`UmbralDB`, esquema versión 5) de tu navegador web o dentro del contenedor de la aplicación nativa en Android.
-
-Los datos gestionados son:
-- **Ciclos Académicos:** Fechas de inicio y fin del semestre (proyección reglamentaria de 17 semanas) y estado del ciclo.
-- **Asignaturas y Cursos:** Nombre, créditos, profesor, aula habitual, código de curso, grupo/sección, notas de comentarios y color asignado.
-- **Horario y Actividades:** Sesiones semanales de clase y actividades no académicas (prácticas pre-profesionales, empleo, talleres, deporte).
-- **Calificaciones y Evaluaciones:** Exámenes parciales, exámenes finales y prácticas en escala vigesimal (0 a 20).
-- **Control de Asistencia:** Historial de sesiones asistidas, faltas y justificaciones.
-- **Tareas y Entregas:** Títulos, fechas límite, nivel de importancia (1 a 5), enlaces y estado de culminación.
-- **Perfil Estudiantil Local:** Nombre completo, código universitario, DNI, facultad, escuela profesional, teléfono y correo electrónico ingresados voluntariamente en la sección de Ajustes para personalizar la ficha académica.
-- **Preferencias de la Aplicación:** Horas de silencio, ventana de detección de huecos libres y configuración de alertas.
-
-> **Importante:** Ninguno de estos registros se transmite, sincroniza ni almacena en servidores externos o de terceros.
+A diferencia de otras aplicaciones que guardan tu información en internet, UNUmbral funciona de manera totalmente local:
+* **No usamos servidores en la nube:** No guardamos tus datos en computadoras externas.
+* **No te pedimos registrarte:** No necesitas crear usuarios, correos ni contraseñas.
+* **Funciona sin internet:** Puedes usar todas las funciones de la aplicación sin conexión de datos o Wi-Fi.
 
 ---
 
-## 3. Uso de Permisos del Dispositivo
+## 2. ¿Dónde se guarda tu información?
 
-UNUmbral solicita únicamente los permisos estrictamente indispensables para su funcionamiento local:
+Todo lo que ingresas en la aplicación se almacena únicamente en la memoria interna de tu propio celular o navegador web:
+* Tus asignaturas, profesores, salones, créditos y ciclo de estudio.
+* Tus horarios semanales y actividades personales.
+* Tus notas y calificaciones de exámenes o prácticas.
+* Tu registro de asistencias y faltas.
+* Tus tareas y recordatorios pendientes.
+* Los datos de perfil que decidas colocar de forma voluntaria en los ajustes.
 
-### 3.1. Cámara (Escaneo de Horario por QR)
-* **Propósito:** Permitir al usuario apuntar la cámara a la pantalla de un compañero o a una imagen para importar un horario.
-* **Procesamiento:** Los fotogramas son analizados **en tiempo real y en la memoria RAM del dispositivo** mediante el motor cliente de código abierto `jsQR`.
-* **Garantía:** No se toman fotografías permanentes, no se graban vídeos ni se envían imágenes a ningún servidor. Una vez detectado el código QR, el acceso a la cámara se cierra de inmediato.
-
-### 3.2. Notificaciones Locales (Alertas de Clases y Tareas)
-* **Propósito:** Recordar el inicio de clases (30 y 10 minutos antes), entregas de tareas y resumen matutino diario.
-* **Procesamiento:** En Android (vía Capacitor LocalNotifications) y en navegadores compatibles (Notification API), las alertas se programan en el temporizador o gestor de alarmas nativo del sistema operativo del dispositivo.
-* **Garantía:** No se utilizan servicios de mensajería push remota en la nube (sin Firebase Cloud Messaging, sin Apple Push Notification service, sin intermediarios). Las alertas se generan de forma autónoma aun cuando el dispositivo se encuentre en Modo Avión o sin conexión a internet.
+**Nadie más tiene acceso a estos datos**, salvo tú mismo desde tu propio dispositivo.
 
 ---
 
-## 4. Compartir Información y Códigos QR
+## 3. Permisos y uso del dispositivo
 
-UNUmbral incluye funciones para compartir el horario entre compañeros sin intermediarios de red:
+UNUmbral no solicita accesos invasivos a tu equipo:
 
-1. **Transferencia Física P2P mediante Código QR:**  
-   Al presionar "Compartir Horario", la aplicación comprime el catálogo de cursos y sus horas semanales mediante el algoritmo estándar Deflate (Zlib) y genera un código QR en pantalla. La transferencia ocurre ópticamente (pantalla a cámara).
-2. **Privacidad por Diseño en el Horario:**  
-   El código QR y el archivo `UNUmbral_Horario_YYYY-MM-DD.json` **únicamente contienen nombres de asignaturas, profesor, aula y bloques horarios**. Tus calificaciones, promedio ponderado, registro de inasistencias, tareas pendientes y datos de perfil personal **nunca se incluyen** al compartir el horario.
-3. **Copias de Seguridad Completas:**  
-   La opción "Crear Backup Completo" genera un archivo `UNUmbral_Backup_YYYY-MM-DD.json` que contiene tu base de datos integral. Este archivo se descarga directamente en tu carpeta local de descargas bajo tu custodia.
+### Sin acceso a la cámara
+Para importar el horario de un amigo o compañero mediante código QR, **no se utiliza la cámara**. Simplemente seleccionas una imagen o captura de pantalla que tengas guardada en tu galería o archivos. La aplicación procesa la imagen en ese mismo instante en la memoria de tu teléfono y no almacena copias de tus fotos.
 
----
-
-## 5. Cero Telemetría, Analítica y Publicidad
-
-* **Sin rastreo:** No utilizamos Google Analytics, Mixpanel, Sentry ni ninguna otra librería de seguimiento.
-* **Sin cookies de terceros:** El almacenamiento se limita a las bases de datos locales del usuario (`IndexedDB` y `localStorage` para la clave de tema claro/oscuro).
-* **Sin publicidad:** La aplicación no incluye anuncios publicitarios, redes de afiliados ni SDKs de monetización.
+### Recordatorios y notificaciones sin conexión
+Las alertas que te avisan antes de que empiece una clase o venza una tarea son programadas directamente por el reloj interno de tu celular o navegador. No dependen de servidores externos ni consumen datos de internet, y funcionan incluso si tienes el celular en modo avión.
 
 ---
 
-## 6. Control, Portabilidad y Supresión de Datos (Derechos del Usuario)
+## 4. Compartir horarios con total tranquilidad
 
-En virtud de la arquitectura *Local-First*, tú eres el único propietario y custodio de tu información:
-
-* **Acceso y Portabilidad:** Puedes inspeccionar todos tus datos en la aplicación y descargarlos íntegramente en formato abierto `.json` desde la pestaña **Compartir**.
-* **Modificación:** Puedes editar cualquier curso, nota, asistencia o tarea directamente desde sus respectivos paneles.
-* **Supresión Definitiva (Borrado Total):** En cualquier momento puedes eliminar toda la información almacenada presionando el botón **"Vaciar Base de Datos"** dentro de la pestaña de **Ajustes**. Esta acción destruye irreversiblemente todas las tablas locales de `IndexedDB` en tu dispositivo.
+Cuando usas la opción de compartir tu horario mediante código QR o imagen:
+* **Solo se comparte lo académico común:** Únicamente los nombres de los cursos, salones, profesores, ciclo y los horarios semanales de clase.
+* **Tus notas y vida personal están protegidas:** Tus calificaciones, asistencias acumuladas, tareas y datos personales **jamás se incluyen** en el código QR.
 
 ---
 
-## 7. Seguridad de los Datos
+## 5. Sin publicidad ni seguimiento
 
-Dado que la información se almacena localmente en tu navegador o dispositivo móvil, la seguridad depende de las medidas de protección de tu propio equipo (código de bloqueo, huella dactilar, cifrado de disco del sistema operativo). Te recomendamos no compartir copias de seguridad completas `.json` con personas no autorizadas si has registrado información confidencial en tus notas personales.
-
----
-
-## 8. Código Abierto y Auditoría
-
-UNUmbral es un proyecto de código abierto publicado bajo la licencia **MIT**. Cualquier usuario o desarrollador puede auditar el código fuente completo, verificar la ausencia de llamadas a red y confirmar la veracidad de esta política de privacidad en nuestro repositorio público:
-
-👉 [https://github.com/TeVerde29/unumbral](https://github.com/TeVerde29/unumbral)
+* **Cero anuncios:** No mostramos publicidad ni trabajamos con agencias comerciales.
+* **Cero rastreo:** No grabamos lo que haces, no medimos clics ni registramos estadísticas de uso.
+* **Sin venta de datos:** Al no recopilar información, es imposible que se venda o comparta con empresas terceras.
 
 ---
 
-## 9. Contacto
+## 6. Tú tienes el control total de tus datos
 
-Si tienes preguntas sobre la arquitectura de privacidad o deseas reportar una observación técnica, puedes abrir una incidencia (*Issue*) en el repositorio de GitHub o escribir al desarrollador:
+Tú decides qué hacer con tu información en todo momento:
+* **Guardar una copia de seguridad:** Puedes descargar un archivo con todos tus datos desde la sección *Compartir* para respaldarlo en tu computadora o pasarlo a otro teléfono.
+* **Borrar todo:** Si decides no usar más la app o deseas empezar desde cero, puedes entrar a la pestaña *Ajustes* y presionar **"Vaciar Base de Datos"**. Toda tu información se borrará de forma permanente e inmediata de tu dispositivo.
 
-* **Autor:** Té Verde  
-* **GitHub:** [@TeVerde29](https://github.com/TeVerde29)  
-* **Correo:** [hikih020@gmail.com](mailto:hikih020@gmail.com)
+---
+
+## 7. Código Abierto y Transparencia
+
+UNUmbral es un proyecto transparente y de código abierto bajo la licencia **MIT**. Cualquier persona puede revisar el código de la aplicación y comprobar que no realiza conexiones ocultas a internet ni envía información a servidores externos:
+
+👉 Repositorio oficial: [https://github.com/TeVerde29/unumbral](https://github.com/TeVerde29/unumbral)
+
+---
+
+## 8. Dudas o Contacto
+
+Si tienes alguna pregunta sobre el funcionamiento de la aplicación o sugerencias para mejorarla:
+* **Autor:** Té Verde
+* **GitHub:** [@TeVerde29](https://github.com/TeVerde29)
+* **Correo de contacto:** [hikih020@gmail.com](mailto:hikih020@gmail.com)

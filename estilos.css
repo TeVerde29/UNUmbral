@@ -7,79 +7,85 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
-/* --- TOKENS TEMA CLARO (APPLE FROSTED TEA GREEN) --- */
+/* --- TOKENS TEMA CLARO (DESIGN RICRA · TEA GREEN + APPLE PHYSICS) --- */
 :root {
-  /* Marca Ricra */
+  /* Marca Ricra Oficial */
   --tea-green:       #AFC49A;
   --forest-green:    #294635;
+  --primary:         #294635;
   --forest-shadow:   #294635;
   --deep-leaf:       #4F7256;
   --sage-green:      #829B78;
   --light-matcha:    #DDE8C8;
-  --accent-teal:     #2D6A4F;
+  --accent-teal:     #337652;
 
-  /* Superficies Apple Glass */
-  --bg:              #F4F6EE;
-  --bg-gradient:     linear-gradient(180deg, #F8F9F3 0%, #EEF2E6 100%);
-  --surface:         rgba(255, 255, 255, 0.88);
-  --surface-card:    rgba(255, 255, 255, 0.94);
+  /* Superficies Planas y Limpias (Estilo Ricra) */
+  --bg:              #F7F8F1;
+  --bg-gradient:     none;
+  --surface:         #FFFFFF;
+  --surface-card:    #FFFFFF;
   --surface-solid:   #FFFFFF;
-  --surface-subtle:  rgba(238, 242, 232, 0.78);
-  --surface-hover:   #EBF0E3;
-  --surface-active:  #E4EAD9;
-  --chrome-bg:       rgba(247, 248, 241, 0.82);
+  --surface-subtle:  #EEF2E8;
+  --surface-hover:   #E8ECE2;
+  --surface-active:  #E0E7D8;
+  --chrome-bg:       rgba(247, 248, 241, 0.94);
 
   /* Superficies Parrilla Horario */
-  --matrix-header-bg:   #E8ECE3;
+  --matrix-header-bg:   #EEF2E8;
   --matrix-header-text: #1E2A21;
-  --matrix-corner-bg:   #DEE3D7;
-  --matrix-hour-bg:     #F4F6EE;
-  --matrix-hour-border: rgba(30, 42, 33, 0.14);
+  --matrix-corner-bg:   #E2E8DC;
+  --matrix-hour-bg:     #F7F8F1;
+  --matrix-hour-border: #D9E2D5;
 
-  /* Texto y jerarquía Apple */
-  --text-primary:    #152018;
-  --text-secondary:  #526253;
-  --text-tertiary:   #869687;
+  /* Texto y jerarquía Ricra */
+  --text-primary:    #1E2A21;
+  --text-secondary:  #5E6E5F;
+  --text-tertiary:   #889886;
   --text-quaternary: #A8B8A9;
 
-  /* Bordes de alta fidelidad */
-  --border-hairline: rgba(30, 42, 33, 0.08);
-  --border-subtle:   rgba(30, 42, 33, 0.12);
-  --border-focus:    #4F7256;
+  /* Bordes nítidos de 1px */
+  --border-hairline: #D9E2D5;
+  --border-subtle:   #D9E2D5;
+  --border-focus:    #567B3B;
 
   /* Acento e interactividad */
   --accent:          #294635;
   --accent-contrast: #FFFFFF;
-  --accent-subtle:   rgba(41, 70, 53, 0.08);
+  --accent-subtle:   #EEF2E8;
   --accent-tint:     #AFC49A;
 
-  /* Estados funcionales Apple */
-  --status-success:     #2D6A4F;
-  --status-success-bg:  rgba(45, 106, 79, 0.12);
-  --status-warning:     #94621A;
-  --status-warning-bg:  rgba(148, 98, 26, 0.12);
-  --status-danger:      #B23B38;
-  --status-danger-bg:   rgba(178, 59, 56, 0.12);
-  --status-info:        #35687A;
-  --status-info-bg:     rgba(53, 104, 122, 0.12);
+  /* Estados funcionales */
+  --status-success:     #337652;
+  --status-success-bg:  #E8F2EC;
+  --status-warning:     #976719;
+  --status-warning-bg:  #FAF2E6;
+  --status-danger:      #B44743;
+  --status-danger-bg:   #FCEEEF;
+  --status-info:        #3F7082;
+  --status-info-bg:     #EBF4F7;
+
+  /* Curvas y físicas suaves estilo Apple iOS */
+  --ease-apple-spring:  cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-apple-bounce:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-apple-press:   cubic-bezier(0.2, 0.9, 0.4, 1);
 
   /* Tipografía */
   --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
   --font-text:    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Radios continuos (Squircle iOS) */
-  --radius-xs:   6px;
-  --radius-sm:   10px;
-  --radius-md:   14px;
-  --radius-lg:   20px;
-  --radius-xl:   26px;
+  /* Radios ergonómicos (iOS Squircle) */
+  --radius-xs:   8px;
+  --radius-sm:   12px;
+  --radius-md:   16px;
+  --radius-lg:   22px;
+  --radius-xl:   28px;
   --radius-pill: 9999px;
 
-  /* Sombras y elevaciones difusas Apple */
-  --shadow-sm:   0 1px 3px rgba(21, 32, 24, 0.04), 0 2px 8px rgba(21, 32, 24, 0.04);
-  --shadow-md:   0 4px 14px rgba(21, 32, 24, 0.07), 0 1px 3px rgba(21, 32, 24, 0.03);
-  --shadow-lg:   0 14px 34px rgba(21, 32, 24, 0.12), 0 2px 6px rgba(21, 32, 24, 0.04);
+  /* Sombras limpias y ligeras */
+  --shadow-sm:   0 1px 3px rgba(30, 42, 33, 0.04), 0 1px 2px rgba(30, 42, 33, 0.02);
+  --shadow-md:   0 4px 14px rgba(30, 42, 33, 0.06), 0 1px 3px rgba(30, 42, 33, 0.03);
+  --shadow-lg:   0 14px 34px rgba(30, 42, 33, 0.09), 0 2px 6px rgba(30, 42, 33, 0.04);
 
   /* Dimensiones */
   --header-height: 58px;
@@ -87,38 +93,39 @@
   --max-width:     640px;
 }
 
-/* --- TOKENS TEMA OSCURO (APPLE OBSIDIAN MATCHA) --- */
+/* --- TOKENS TEMA OSCURO (DESIGN RICRA OBSIDIAN + APPLE PHYSICS) --- */
 [data-theme="dark"] {
-  --forest-shadow:   #24382A;
-  --accent-teal:     #52B788;
-  --bg:              #0D140F;
-  --bg-gradient:     linear-gradient(180deg, #0F1711 0%, #0B100C 100%);
-  --surface:         rgba(22, 33, 25, 0.78);
-  --surface-card:    rgba(22, 33, 25, 0.92);
-  --surface-solid:   #152118;
-  --surface-subtle:  rgba(28, 43, 32, 0.78);
-  --surface-hover:   #1E2E22;
-  --surface-active:  #24382A;
-  --chrome-bg:       rgba(13, 20, 15, 0.82);
+  --forest-shadow:   #19241B;
+  --accent-teal:     #6EE7B7;
+  --bg:              #111A13;
+  --bg-gradient:     none;
+  --surface:         #19241B;
+  --surface-card:    #19241B;
+  --surface-solid:   #19241B;
+  --surface-subtle:  #222F24;
+  --surface-hover:   #263628;
+  --surface-active:  #2E4131;
+  --chrome-bg:       rgba(17, 26, 19, 0.94);
 
-  --matrix-header-bg:   #19271E;
+  --matrix-header-bg:   #19241B;
   --matrix-header-text: #F1F5EB;
-  --matrix-corner-bg:   #203126;
-  --matrix-hour-bg:     #141F16;
-  --matrix-hour-border: #2D3D31;
+  --matrix-corner-bg:   #222F24;
+  --matrix-hour-bg:     #111A13;
+  --matrix-hour-border: #334436;
 
-  --text-primary:    #F2F6ED;
-  --text-secondary:  #AAB8A7;
-  --text-tertiary:   #6C7D6A;
-  --text-quaternary: #465544;
+  --text-primary:    #F1F5EB;
+  --text-secondary:  #B5C0B2;
+  --text-tertiary:   #738571;
+  --text-quaternary: #4C5D4B;
 
-  --border-hairline: rgba(255, 255, 255, 0.08);
-  --border-subtle:   rgba(255, 255, 255, 0.13);
+  --border-hairline: #334436;
+  --border-subtle:   #334436;
   --border-focus:    #C2D7A3;
 
   --accent:          #C2D7A3;
+  --primary:         #C2D7A3;
   --accent-contrast: #111A13;
-  --accent-subtle:   rgba(194, 215, 163, 0.14);
+  --accent-subtle:   #222F24;
   --accent-tint:     #C2D7A3;
 
   --status-success:     #52B788;
@@ -255,14 +262,16 @@ button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), opacity 120ms ease, background-color 120ms ease;
+  transition: transform 0.18s var(--ease-apple-spring), opacity 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
   font-size: 13.5px;
   line-height: 1;
   min-height: 38px;
+  user-select: none;
 }
 
-button:active, .btn-primary:active, .btn-secondary:active {
-  transform: scale(0.965);
+button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
+  transform: scale(0.962);
+  transition-duration: 0.1s;
 }
 
 .btn-primary {
@@ -343,16 +352,23 @@ button:active, .btn-primary:active, .btn-secondary:active {
 
 .view-panel {
   display: none;
-  animation: appleFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
 }
 
 .view-panel.active {
   display: block;
+  animation: iosFadeIn 0.28s var(--ease-apple-spring) forwards;
 }
 
-@keyframes appleFadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes iosFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* =====================================================================
@@ -396,8 +412,6 @@ button:active, .btn-primary:active, .btn-secondary:active {
    ===================================================================== */
 .live-card {
   background: var(--surface);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-lg);
   padding: 18px 20px;
@@ -405,6 +419,11 @@ button:active, .btn-primary:active, .btn-secondary:active {
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
+  transition: transform 0.2s var(--ease-apple-spring), box-shadow 0.2s ease;
+}
+
+.live-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .live-card::before {
@@ -599,25 +618,29 @@ button:active, .btn-primary:active, .btn-secondary:active {
 /* Tarjeta de Asignatura / Clase */
 .class-card {
   background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 13px 16px;
+  padding: 14px 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease;
+  transition: transform 0.18s var(--ease-apple-spring), background-color 0.15s ease, box-shadow 0.18s ease;
   position: relative;
   overflow: hidden;
   min-height: 56px;
 }
 
+.class-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
+}
+
 .class-card:active {
-  transform: scale(0.975);
+  transform: scale(0.982);
   background: var(--surface-active);
+  transition-duration: 0.1s;
 }
 
 .class-card-stripe {
@@ -674,20 +697,25 @@ button:active, .btn-primary:active, .btn-secondary:active {
    ===================================================================== */
 .task-card {
   background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 13px 15px;
   box-shadow: var(--shadow-sm);
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  transition: transform 120ms cubic-bezier(0.16, 1, 0.3, 1), background-color 120ms ease, opacity 140ms ease;
+  transition: transform 0.18s var(--ease-apple-spring), background-color 0.15s ease, box-shadow 0.18s ease, opacity 0.15s ease;
+}
+
+.task-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
 }
 
 .task-card:active {
+  transform: scale(0.982);
   background: var(--surface-active);
+  transition-duration: 0.1s;
 }
 
 .task-card.completed {
@@ -846,17 +874,22 @@ button:active, .btn-primary:active, .btn-secondary:active {
   color: var(--text-secondary);
   border: none;
   border-radius: var(--radius-pill);
-  padding: 5px 13px;
+  padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
   min-height: unset;
-  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s var(--ease-apple-spring);
+  user-select: none;
+}
+
+.seg-btn:active {
+  transform: scale(0.96);
 }
 
 .seg-btn.active {
   background: var(--surface-solid);
   color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 4px rgba(30, 42, 33, 0.08);
 }
 
 .day-tabs-scroll {
@@ -1698,13 +1731,16 @@ button:active, .btn-primary:active, .btn-secondary:active {
    ===================================================================== */
 .settings-card {
   background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 16px;
+  padding: 16px 18px;
   box-shadow: var(--shadow-sm);
   margin-bottom: 12px;
+  transition: transform 0.18s var(--ease-apple-spring), box-shadow 0.18s ease;
+}
+
+.settings-card:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .settings-card.highlight-card {
@@ -1899,8 +1935,13 @@ button:active, .btn-primary:active, .btn-secondary:active {
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
-  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.16s ease, transform 0.16s var(--ease-apple-spring);
   min-height: unset;
+  user-select: none;
+}
+
+.nav-tab:active {
+  transform: scale(0.92);
 }
 
 .nav-tab.active {
@@ -1912,7 +1953,8 @@ button:active, .btn-primary:active, .btn-secondary:active {
 }
 
 .nav-tab.active svg {
-  transform: translateY(-1px);
+  transform: scale(1.14) translateY(-1px);
+  transition: transform 0.28s var(--ease-apple-bounce);
 }
 
 .nav-tab-icon-wrap {
@@ -1941,13 +1983,19 @@ button:active, .btn-primary:active, .btn-secondary:active {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(17, 26, 19, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 100;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  animation: iosBackdropFadeIn 0.25s var(--ease-apple-spring) forwards;
+}
+
+@keyframes iosBackdropFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 @media (min-width: 600px) {
@@ -1960,29 +2008,55 @@ button:active, .btn-primary:active, .btn-secondary:active {
 .modal,
 .modal-sheet {
   width: 100%;
-  max-width: 500px;
+  max-width: 520px;
   background: var(--surface-solid);
   color: var(--text-primary);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-lg);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border: 1px solid var(--border-hairline);
+  box-shadow: 0 -8px 32px rgba(17, 26, 19, 0.12);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  animation: appleSheetUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: iosSheetUp 0.34s var(--ease-apple-spring) forwards;
+  position: relative;
+}
+
+/* Grabber handle de estilo Apple bottom sheet */
+.modal::before,
+.modal-sheet::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 38px;
+  height: 4.5px;
+  border-radius: 9999px;
+  background: var(--border-hairline);
+  pointer-events: none;
 }
 
 @media (min-width: 600px) {
   .modal,
   .modal-sheet {
-    border-radius: var(--radius-lg);
+    border-radius: 22px;
+    animation: iosModalPop 0.28s var(--ease-apple-spring) forwards;
+  }
+  .modal::before,
+  .modal-sheet::before {
+    display: none;
   }
 }
 
-@keyframes appleSheetUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+@keyframes iosSheetUp {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes iosModalPop {
+  0% { transform: scale(0.94); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .modal-header {
@@ -2333,25 +2407,31 @@ button:active, .btn-primary:active, .btn-secondary:active {
   position: fixed;
   bottom: calc(var(--nav-height) + 16px);
   left: 50%;
-  transform: translateX(-50%) translateY(16px);
-  background: var(--text-primary);
-  color: var(--bg);
-  padding: 8px 18px;
+  transform: translateX(-50%) translateY(20px) scale(0.9);
+  background: var(--forest-green);
+  color: #FFFFFF;
+  padding: 9px 20px;
   border-radius: var(--radius-pill);
   font-size: 13px;
   font-weight: 600;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 24px rgba(41, 70, 53, 0.22);
   z-index: 200;
   opacity: 0;
   pointer-events: none;
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.32s var(--ease-apple-bounce), opacity 0.22s ease;
   white-space: nowrap;
   letter-spacing: -0.01em;
 }
 
 .toast.show {
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%) translateY(0) scale(1);
   opacity: 1;
+}
+
+[data-theme="dark"] .toast {
+  background: #24382A;
+  color: var(--text-primary);
+  border: 1px solid var(--border-hairline);
 }
 
 .toast.error {
@@ -2409,11 +2489,9 @@ button:active, .btn-primary:active, .btn-secondary:active {
 
 .course-card {
   background: var(--surface);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 13px 14px 13px 16px;
+  padding: 14px 16px;
   box-shadow: var(--shadow-sm);
   display: flex;
   align-items: flex-start;
@@ -2421,6 +2499,17 @@ button:active, .btn-primary:active, .btn-secondary:active {
   gap: 10px;
   position: relative;
   overflow: hidden;
+  transition: transform 0.18s var(--ease-apple-spring), box-shadow 0.18s ease;
+}
+
+.course-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-md);
+}
+
+.course-card:active {
+  transform: scale(0.985);
+  transition-duration: 0.1s;
 }
 
 .course-card-main {
@@ -3312,21 +3401,22 @@ button:active, .btn-primary:active, .btn-secondary:active {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--surface-subtle);
-  color: var(--primary);
+  color: var(--accent);
   cursor: pointer;
   transition: all 0.15s ease;
   min-width: 44px;
+  text-align: center;
 }
 
 .btn-ampm-toggle:hover {
   background: var(--surface-card);
-  border-color: var(--primary);
+  border-color: var(--accent);
 }
 
 .btn-ampm-toggle.is-pm {
-  background: var(--primary);
-  color: #ffffff;
-  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
 }
 
 /* =====================================================================

@@ -303,6 +303,9 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
       curso = {
         id: uuid(),
         ciclo_id: cicloId || (d && d.ciclo_id) || null,
+        ciclo_curso: (d && d.ciclo_curso) || "",
+        tipo_condicion: (d && d.tipo_condicion) || "obligatorio",
+        grupo_seccion: (d && d.grupo_seccion) || "",
         nombre: limpio,
         profesor: d.profesor || "",
         aula: d.aula || "",
@@ -907,7 +910,7 @@ async function renderHoy() {
     const ajustesListHoy = await db.ajustes.toArray();
     const mapAjHoy = {};
     for (const a of ajustesListHoy) mapAjHoy[a.clave] = a.valor;
-    const huecos = huecosDelDia(classesToday, {
+    const todosHuecos = huecosDelDia(classesToday, {
       fecha: fechaHoyStr,
       excepciones,
       ventanaDesde: mapAjHoy.huecos_ventana_desde || "07:00",
@@ -916,20 +919,63 @@ async function renderHoy() {
       soloEntreClases: true
     });
 
+    // Filtro de hora actual en adelante (Punto 2: no mostrar huecos que ya pasaron hoy)
+    const ahora = new Date();
+    const ahoraMinutos = ahora.getHours() * 60 + ahora.getMinutes();
+
+    const huecos = todosHuecos.map(h => {
+      const iniMin = timeToMinutes(h.inicio);
+      const finMin = timeToMinutes(h.fin);
+      if (finMin <= ahoraMinutos) return null; // El hueco ya terminó antes de la hora actual
+
+      // Si el hueco está transcurriendo en este momento, calcular tiempo restante
+      if (iniMin < ahoraMinutos) {
+        const durRestante = finMin - ahoraMinutos;
+        const minConfig = parseInt(mapAjHoy.huecos_min || 30, 10);
+        if (durRestante < Math.min(15, minConfig)) return null;
+        return {
+          ...h,
+          enCurso: true,
+          inicioMinutos: ahoraMinutos,
+          finMinutos: finMin,
+          duracionMinutos: durRestante
+        };
+      }
+      return {
+        ...h,
+        enCurso: false,
+        inicioMinutos: iniMin,
+        finMinutos: finMin
+      };
+    }).filter(Boolean);
+
     if (huecos.length > 0) {
       if (badgeHuecos) {
         badgeHuecos.textContent = `${huecos.length} ${huecos.length === 1 ? "hueco" : "huecos"}`;
       }
 
+      // Ordenar tareas pendientes por importancia y vencimiento próximo
+      const tareasDisponibles = [...pendingTasks].sort((a, b) => {
+        const impA = Number(a.importancia) || 1;
+        const impB = Number(b.importancia) || 1;
+        if (impB !== impA) return impB - impA;
+        if (a.fecha_limite && b.fecha_limite) return new Date(a.fecha_limite) - new Date(b.fecha_limite);
+        return a.fecha_limite ? -1 : 1;
+      });
+
+      // Control para NO repetir tareas en múltiples huecos libres (Punto 2)
+      const tareasAsignadas = new Set();
+
       listHuecos.innerHTML = huecos.map(h => {
-        let tareasSug = typeof sugerirTareas === "function" ? sugerirTareas(h, pendingTasks) : [];
-        if (tareasSug.length === 0 && pendingTasks.length > 0) {
-          // Siempre sugerir tareas universitarias pendientes si hay un hueco libre
-          tareasSug = [...pendingTasks]
-            .sort((a, b) => (b.importancia || 1) - (a.importancia || 1))
-            .slice(0, 3);
-        }
-        const rangoTexto = `${formatTime12(h.inicio)} – ${formatTime12(h.fin)}`;
+        const noAsignadas = tareasDisponibles.filter(t => !tareasAsignadas.has(t.id));
+        // Sugerir tareas distintas para cada hueco sin repetirlas
+        const cantSugerir = h.duracionMinutos >= 90 ? 2 : 1;
+        const tareasSug = noAsignadas.slice(0, cantSugerir);
+        tareasSug.forEach(t => tareasAsignadas.add(t.id));
+
+        const rangoTexto = h.enCurso
+          ? `Ahora (${formatMinutes12(h.inicioMinutos)}) – ${formatTime12(h.fin)}`
+          : `${formatTime12(h.inicio)} – ${formatTime12(h.fin)}`;
         const durTexto = typeof formatearDuracion === "function" ? formatearDuracion(h.duracionMinutos) : `${h.duracionMinutos} min`;
 
         const sugerenciasHtml = tareasSug.length > 0
@@ -937,12 +983,17 @@ async function renderHoy() {
               ${tareasSug.map(t => `
                 <div style="background:var(--surface-hover); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                   <div style="min-width:0; flex:1;">
-                    <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(t.titulo)}</div>
-                    <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
-                      ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:600;">${escapeHtml(t.materia)}</span> · ` : ""}
-                      <span>${ICONS.star} Nivel ${t.importancia || 1}</span>
-                      ${t.fecha_limite ? `<span>· Vence: ${escapeHtml(t.fecha_limite.replace('T', ' '))}</span>` : ""}
+                    <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;">${escapeHtml(t.titulo)}</div>
+                    <!-- Fila 1: Nombre del curso y su nivel de importancia (Punto 5) -->
+                    <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                      ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:700;">${escapeHtml(t.materia)}</span> <span style="opacity:0.5;">·</span> ` : ""}
+                      <span style="display:inline-flex; align-items:center; gap:2px; font-weight:600;">${ICONS.star} Nivel ${t.importancia || 1}</span>
                     </div>
+                    <!-- Fila 2: Fecha de vencimiento abajo (Punto 5) -->
+                    ${t.fecha_limite ? `
+                      <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; display:flex; align-items:center; gap:4px;">
+                        <span>Vence: ${escapeHtml(t.fecha_limite.replace('T', ' '))}</span>
+                      </div>` : ""}
                   </div>
                   <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 8px; flex-shrink:0;">
                     ${ICONS.check} Lista
@@ -950,14 +1001,16 @@ async function renderHoy() {
                 </div>
               `).join("")}
             </div>`
-          : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">No tienes tareas universitarias pendientes. ¡Aprovecha para descansar!</p>`;
+          : (pendingTasks.length > 0 && tareasAsignadas.size >= pendingTasks.length
+              ? `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">Tus tareas pendientes ya fueron programadas en los huecos anteriores. ¡Aprovecha este tiempo para descansar o repasar!</p>`
+              : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">No tienes tareas universitarias pendientes. ¡Aprovecha para descansar!</p>`);
 
         return `
           <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <div>
                 <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${rangoTexto}</span>
-                <span style="margin-left:6px; font-size:11px; background:rgba(35,120,70,0.12); color:var(--deep-leaf); padding:2px 7px; border-radius:var(--radius-pill); font-weight:700;">${durTexto} libres</span>
+                <span style="margin-left:6px; font-size:11px; background:rgba(35,120,70,0.12); color:var(--deep-leaf); padding:2px 7px; border-radius:var(--radius-pill); font-weight:700;">${durTexto} libres${h.enCurso ? ' restantes' : ''}</span>
               </div>
             </div>
             ${sugerenciasHtml}
@@ -2479,14 +2532,24 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
     `;
   });
 
+  const COLORES_IMPORTANCIA_TAREA_MAP = {
+    1: "#FACC15",
+    2: "#FBBF24",
+    3: "#FB923C",
+    4: "#F87171",
+    5: "#EF4444"
+  };
+
   tareasDelDia.forEach(t => {
     const cursoNombre = cursosMap[t.curso_id]?.nombre || "General";
+    const imp = Math.min(5, Math.max(1, Number(t.importancia) || 3));
+    const colorTarea = t.completada ? "#10B981" : (COLORES_IMPORTANCIA_TAREA_MAP[imp] || "#FB923C");
     itemsHtml += `
-      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-subtle);border-radius:var(--radius-sm);font-size:12px;border:1px solid var(--border-hairline);">
-        <span style="color:${t.completada ? '#10b981' : '#f59e0b'};display:inline-flex;align-items:center;">${t.completada ? ICONS.check : '<span style="font-size:10px;">○</span>'}</span>
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface-subtle);border-left:3px solid ${colorTarea};border-radius:var(--radius-sm);font-size:12px;border-top:1px solid var(--border-hairline);border-right:1px solid var(--border-hairline);border-bottom:1px solid var(--border-hairline);">
+        <span style="color:${colorTarea};display:inline-flex;align-items:center;">${t.completada ? ICONS.check : '<span style="font-size:11px;font-weight:700;">●</span>'}</span>
         <div style="flex:1;">
-          <span style="${t.completada ? 'text-decoration:line-through;opacity:0.7;' : ''}">${escapeHtml(t.titulo)}</span>
-          <div style="color:var(--text-secondary);font-size:11px;">${escapeHtml(cursoNombre)} · Nivel ${t.importancia || 3}</div>
+          <span style="font-weight:600;${t.completada ? 'text-decoration:line-through;opacity:0.7;' : ''}">${escapeHtml(t.titulo)}</span>
+          <div style="color:var(--text-secondary);font-size:11px;">${escapeHtml(cursoNombre)} · <span style="color:${colorTarea};font-weight:700;">Nivel ${imp}</span></div>
         </div>
       </div>
     `;
@@ -3802,9 +3865,6 @@ async function cargarAjustesUI() {
   const setVal = (id, val) => { const el = $(id); if (el) el.value = val ?? ""; };
   const setChk = (id, val) => { const el = $(id); if (el) el.checked = Boolean(val); };
 
-  setVal("#ajuste-ciclo-inicio", map.ciclo_inicio);
-  setVal("#ajuste-ciclo-fin", map.ciclo_fin);
-  setVal("#ajuste-limite-faltas", map.limite_faltas_pct ?? 30);
 
   setChk("#ajuste-notif-clases", map.notif_clases);
   setChk("#ajuste-notif-tareas", map.notif_tareas);
@@ -3907,17 +3967,7 @@ async function guardarAjustesUI() {
   const getVal = (id, dflt) => $(id) ? $(id).value : dflt;
   const getChk = (id, dflt) => $(id) ? $(id).checked : dflt;
 
-  const inicio = getVal("#ajuste-ciclo-inicio", "");
-  const fin = getVal("#ajuste-ciclo-fin", "");
-  if (inicio && fin && inicio >= fin) {
-    alert("La fecha de inicio del ciclo debe ser anterior a la fecha de fin.");
-    return;
-  }
-
   const updates = {
-    ciclo_inicio: inicio || null,
-    ciclo_fin: fin || null,
-    limite_faltas_pct: parseInt(getVal("#ajuste-limite-faltas", "30"), 10) || 30,
     notif_clases: getChk("#ajuste-notif-clases", true),
     notif_tareas: getChk("#ajuste-notif-tareas", true),
     notif_urgentes: getChk("#ajuste-notif-urgentes", true),
@@ -4553,7 +4603,14 @@ async function openModalQrSchedule() {
 
   const cicloActivo = await obtenerCicloActivo();
 
-  // QR optimizado: comparte ciclo académico, catálogo de cursos y horario semanal (sin notas ni faltas personales)
+  // Incluir cursos del ciclo activo (o todos si no tienen ciclo asignado)
+  const cursosParaCompartir = cicloActivo
+    ? (cursosUnicos.some(c => c.ciclo_id === cicloActivo.id)
+        ? cursosUnicos.filter(c => !c.ciclo_id || c.ciclo_id === cicloActivo.id)
+        : cursosUnicos)
+    : cursosUnicos;
+
+  // QR unificado: ciclo académico con todos los datos de cada curso y el horario completo del ciclo (todo junto)
   const horarioCompartido = {
     tipo: "unumbral-horario-compartido",
     version: 3,
@@ -4563,27 +4620,30 @@ async function openModalQrSchedule() {
       fecha_inicio: cicloActivo.fecha_inicio,
       fecha_fin: cicloActivo.fecha_fin
     } : null,
-    cursos: cursosUnicos.map(c => ({
+    cursos: cursosParaCompartir.map(c => ({
       id: c.id,
       nombre: c.nombre,
       color: c.color,
-      aula: c.aula,
-      profesor: c.profesor,
-      creditos: c.creditos || 3
+      aula: c.aula || "",
+      profesor: c.profesor || "",
+      creditos: c.creditos || 3,
+      ciclo_curso: c.ciclo_curso || "",
+      tipo_condicion: c.tipo_condicion || "obligatorio",
+      grupo_seccion: c.grupo_seccion || "",
+      notas: c.notas || ""
     })),
     clases: clasesUnicas.map(k => ({
       curso_id: mapaIdANombre.get(k.curso_id) || "",
       dia_semana: k.dia_semana,
       hora_inicio: k.hora_inicio,
       hora_fin: k.hora_fin,
-      aula: k.aula
+      aula: k.aula || ""
     }))
   };
 
   try {
-    // Límite de 600 caracteres: con compresión Deflate interna, hasta 8-9 cursos caben en 1 solo código QR de cuadros grandes (~77x77 módulos)
-    // Si excede ese volumen, el sistema lo divide automáticamente en 2 partes
-    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido, 600);
+    // Código QR unificado (hasta 4000 caracteres, sin dividir en partes)
+    qrPartesActuales = (typeof comprimirHorarioParaQr === "function" ? comprimirHorarioParaQr : window.comprimirHorarioParaQr)(horarioCompartido, 4000);
   } catch (err) {
     showToast("Error generando código QR: " + err.message, true);
     return;
@@ -4768,112 +4828,17 @@ function descargarQrPng() {
   }
 }
 
-async function openModalQrScanner() {
+function openModalQrScanner() {
   partesQrAcumuladas = [];
   const statusEl = $("#qr-scanner-status");
-  if (statusEl) statusEl.textContent = "Abriendo cámara… Apunta al código QR o sube una imagen.";
+  if (statusEl) statusEl.textContent = "Selecciona una foto o captura de pantalla con el código QR para importar.";
   const txtManual = $("#textarea-qr-manual");
   if (txtManual) txtManual.value = "";
-
-  const camWrap = $("#qr-camera-wrap");
-  const video = $("#qr-scanner-video");
-
   $("#modal-qr-scanner-backdrop").classList.remove("hidden");
-
-  if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function" && video && camWrap) {
-    try {
-      qrScannerStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1080 },
-          height: { ideal: 1080 },
-          aspectRatio: { ideal: 1.0 }
-        },
-        audio: false
-      });
-      video.srcObject = qrScannerStream;
-      camWrap.classList.remove("hidden");
-      await video.play().catch(() => {});
-      if (statusEl) statusEl.textContent = "Apunta la cámara al código QR de UNUmbral o carga una foto.";
-      iniciarDeteccionCamara(video);
-    } catch {
-      camWrap.classList.add("hidden");
-      if (statusEl) statusEl.textContent = "Permiso de cámara no otorgado o cámara no disponible. Carga una foto del código QR.";
-    }
-  } else if (camWrap) {
-    camWrap.classList.add("hidden");
-    if (statusEl) statusEl.textContent = "Carga una foto del código QR o pega el código de texto.";
-  }
 }
 
 function closeModalQrScanner() {
-  if (qrScannerStream) {
-    qrScannerStream.getTracks().forEach(t => t.stop());
-    qrScannerStream = null;
-  }
-  const video = $("#qr-scanner-video");
-  if (video) video.srcObject = null;
   $("#modal-qr-scanner-backdrop").classList.add("hidden");
-}
-
-async function iniciarDeteccionCamara(video) {
-  const detector = ("BarcodeDetector" in window) ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
-  const scanCanvas = document.createElement("canvas");
-  const scanCtx = scanCanvas.getContext("2d", { willReadFrequently: true });
-
-  let activa = true;
-
-  async function tick() {
-    if (!activa || !qrScannerStream || $("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
-      return;
-    }
-    try {
-      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        // 1. BarcodeDetector nativo primero (evalúa el stream completo por hardware sin pérdida de nitidez)
-        if (detector) {
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0 && barcodes[0].rawValue) {
-              activa = false;
-              procesarTextoQrEscaneado(barcodes[0].rawValue);
-              return;
-            }
-          } catch {
-            // Seguir con jsQR recortado
-          }
-        }
-
-        // 2. jsQR enfocado en el centro 1:1 del visor (recorte central de alta resolución)
-        if (typeof window.jsQR === "function" && scanCtx) {
-          const vw = video.videoWidth;
-          const vh = video.videoHeight;
-          const cropSize = Math.round(Math.min(vw, vh) * 0.85);
-          const sx = Math.round((vw - cropSize) / 2);
-          const sy = Math.round((vh - cropSize) / 2);
-          const targetDim = Math.min(cropSize, 720);
-
-          scanCanvas.width = targetDim;
-          scanCanvas.height = targetDim;
-          scanCtx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, targetDim, targetDim);
-          const imgData = scanCtx.getImageData(0, 0, targetDim, targetDim);
-          const code = window.jsQR(imgData.data, targetDim, targetDim, { inversionAttempts: "attemptBoth" });
-          if (code && code.data) {
-            activa = false;
-            procesarTextoQrEscaneado(code.data);
-            return;
-          }
-        }
-      }
-    } catch {
-      // Ignorar cuadros en transición
-    }
-
-    if (activa && qrScannerStream && !$("#modal-qr-scanner-backdrop").classList.contains("hidden")) {
-      setTimeout(tick, 140);
-    }
-  }
-
-  tick();
 }
 
 function cargarImagenDesdeArchivo(file) {
@@ -6566,6 +6531,16 @@ function wireGlobalEvents() {
       if (e.target.id === "modal-qr-scanner-backdrop") closeModalQrScanner();
     });
   }
+  const qrDropzone = $("#qr-dropzone");
+  if (qrDropzone) {
+    qrDropzone.addEventListener("click", (e) => {
+      if (e.target.id !== "input-qr-image-file") {
+        const inp = $("#input-qr-image-file");
+        if (inp) inp.click();
+      }
+    });
+  }
+
   const inputQrFile = $("#input-qr-image-file");
   if (inputQrFile) {
     inputQrFile.addEventListener("change", (e) => {
