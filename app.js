@@ -81,6 +81,30 @@ const PASTEL_COLOR_MAP = {
   "#78716C": "#F5F5F4"
 };
 
+function colorPuntoCalendario(hex) {
+  if (!hex) return "#0284C7";
+  const up = String(hex).trim().toUpperCase();
+  const MAPA_VIVOS = {
+    "#BAE6FD": "#0284C7", // Azul cielo
+    "#F5D0FE": "#C026D3", // Fucsia
+    "#FEF08A": "#D97706", // Ámbar / dorado
+    "#BBF7D0": "#16A34A", // Verde
+    "#FED7AA": "#EA580C", // Naranja
+    "#C7D2FE": "#4F46E5", // Índigo
+    "#FECACA": "#DC2626", // Rojo
+    "#99F6E4": "#0D9488", // Teal
+    "#DDE8C8": "#2E7D32", // Verde bosque
+    "#C5D6B8": "#294635", // Bosque oscuro
+    "#ECFCCB": "#65A30D", // Lima vivo
+    "#FAE8FF": "#9333EA", // Púrpura
+    "#EDE9FE": "#7C3AED", // Violeta
+    "#FEE2E2": "#EF4444", // Rojo claro
+    "#E0F2FE": "#0284C7", // Celeste vivo
+    "#F5F5F4": "#4B5563"  // Gris grafito
+  };
+  return MAPA_VIVOS[up] || up;
+}
+
 function normalizarColorPastel(hex) {
   if (!hex) return COLOR_CURSO_DEFECTO;
   const upper = String(hex).trim().toUpperCase();
@@ -2396,20 +2420,20 @@ async function renderCalendarioMensual() {
     const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fecha, excepciones);
     const dentroDelCiclo = (!fechaIniCiclo || fecha >= fechaIniCiclo) && (!fechaFinCiclo || fecha <= fechaFinCiclo);
     const dayKey = DIAS_SEMANA[celda.diaSemana - 1];
-    // Solo proyectar clases si la fecha está dentro de las 17 semanas del ciclo académico activo
+    // Clases, tareas y eventos académicos solo existen dentro de las fechas del ciclo activo
     const clasesDelDia = (!dentroDelCiclo || feriado) ? [] : clases.filter(c => c.dia_semana === dayKey && !(typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fecha, excepciones));
-    const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
-    const eventosDelDia = eventos.filter(e => e.fecha === fecha);
+    const tareasDelDia = (!dentroDelCiclo) ? [] : tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
+    const eventosDelDia = (!dentroDelCiclo) ? [] : eventos.filter(e => e.fecha === fecha);
 
     let indicatorsHtml = "";
-    if (feriado) {
+    if (feriado && dentroDelCiclo) {
       indicatorsHtml += `<span class="cal-dot" style="background:var(--status-warning);" title="Feriado"></span>`;
     }
     eventosDelDia.slice(0, 2).forEach(ev => {
       indicatorsHtml += `<span class="cal-diamond" style="background:#ef4444;" title="Evento: ${escapeHtml(ev.titulo)}"></span>`;
     });
     clasesDelDia.slice(0, 3).forEach(c => {
-      const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+      const color = (typeof colorPuntoCalendario === "function" ? colorPuntoCalendario : window.colorPuntoCalendario)(c.color || COLOR_CURSO_DEFECTO);
       indicatorsHtml += `<span class="cal-dot" style="background:${color};" title="Clase: ${escapeHtml(c.materia)}"></span>`;
     });
     tareasDelDia.slice(0, 3).forEach(t => {
@@ -2452,7 +2476,7 @@ async function renderCalendarioMensual() {
       const fecha = cell.dataset.date;
       state.selectedCalDate = fecha;
       $$(".cal-cell", gridEl).forEach(c => c.classList.toggle("is-selected", c.dataset.date === fecha));
-      renderCalDayDetail(fecha, clases, tareas, eventos, excepciones, cursosMap);
+      renderCalDayDetail(fecha, clases, tareas, eventos, excepciones, cursosMap, cicloActivo, fechaIniCiclo, fechaFinCiclo);
     });
   });
 
@@ -2461,22 +2485,34 @@ async function renderCalendarioMensual() {
   state.selectedCalDate = fechaTarget;
   const targetCell = $(`[data-date="${fechaTarget}"]`, gridEl);
   if (targetCell) targetCell.classList.add("is-selected");
-  renderCalDayDetail(fechaTarget, clases, tareas, eventos, excepciones, cursosMap);
+  renderCalDayDetail(fechaTarget, clases, tareas, eventos, excepciones, cursosMap, cicloActivo, fechaIniCiclo, fechaFinCiclo);
 }
 
-async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones, cursosMap) {
+async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones, cursosMap, cicloActivo, fechaIniCiclo, fechaFinCiclo) {
   const panel = $("#cal-day-detail");
   if (!panel) return;
 
   if (!clases || !tareas || !eventos || !excepciones || !cursosMap) {
-    [clases, tareas, eventos, excepciones, { map: cursosMap }] = await Promise.all([
+    [clases, tareas, eventos, excepciones, { map: cursosMap }, cicloActivo] = await Promise.all([
       obtenerClasesEnriquecidas(),
       db.tareas.toArray(),
       db.eventos.toArray(),
       db.excepciones.toArray(),
-      cargarCursos()
+      cargarCursos(),
+      obtenerCicloActivo()
     ]);
   }
+
+  if (!fechaIniCiclo) {
+    const ajustes = await db.ajustes.toArray();
+    const mapAjustes = {};
+    for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+    const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+    fechaIniCiclo = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || null;
+    fechaFinCiclo = cicloActivo?.fecha_fin || cfg.ciclo_fin || (fechaIniCiclo && typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(fechaIniCiclo) : null);
+  }
+
+  const dentroDelCiclo = (!fechaIniCiclo || fechaStr >= fechaIniCiclo) && (!fechaFinCiclo || fechaStr <= fechaFinCiclo);
 
   const partes = fechaStr.split("-").map(Number);
   const d = new Date(partes[0], partes[1] - 1, partes[2]);
@@ -2485,6 +2521,22 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
   const dayKey = DIAS_SEMANA[diaSemana - 1];
 
   $("#cal-day-detail-title").textContent = `${formatReadableDate(d)}`;
+
+  const listEl = $("#cal-day-items-list");
+
+  // Si la fecha seleccionada está fuera del ciclo académico, no mostrar clases ni tareas del ciclo
+  if (!dentroDelCiclo) {
+    $("#cal-day-detail-sub").textContent = "0 clases · 0 tareas (fuera del ciclo)";
+    listEl.innerHTML = `
+      <div class="empty-card" style="padding:18px 14px; text-align:center;">
+        <strong style="font-size:13.5px; color:var(--text-primary); margin-bottom:4px;">Fecha fuera del ciclo académico</strong>
+        <p style="font-size:12px; color:var(--text-secondary); margin:0; line-height:1.45;">
+          El ciclo actual (${escapeHtml(cicloActivo?.nombre || 'Ciclo Universitario')}) abarca del ${fechaIniCiclo || 'inicio'} al ${fechaFinCiclo || 'fin'}. Las clases y tareas no se proyectan fuera de este período.
+        </p>
+      </div>`;
+    panel.classList.remove("hidden");
+    return;
+  }
 
   const feriado = (typeof esDiaFeriado === "function" ? esDiaFeriado : window.esDiaFeriado)(fechaStr, excepciones);
   const ferObj = excepciones.find(e => e.fecha === fechaStr && e.tipo === "feriado");
@@ -2495,7 +2547,6 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
 
   $("#cal-day-detail-sub").textContent = `${clasesDelDia.length} ${clasesDelDia.length === 1 ? 'clase' : 'clases'} · ${tareasDelDia.length} ${tareasDelDia.length === 1 ? 'tarea' : 'tareas'}${eventosDelDia.length ? ` · ${eventosDelDia.length} evento(s)` : ''}`;
 
-  const listEl = $("#cal-day-items-list");
   let itemsHtml = "";
 
   if (feriado) {
