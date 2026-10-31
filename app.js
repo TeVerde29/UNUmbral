@@ -360,6 +360,22 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
         curso.aula = d.aula;
         mod = true;
       }
+      if (d.ciclo_curso && !curso.ciclo_curso) {
+        curso.ciclo_curso = d.ciclo_curso;
+        mod = true;
+      }
+      if (d.tipo_condicion && d.tipo_condicion !== "obligatorio" && curso.tipo_condicion === "obligatorio") {
+        curso.tipo_condicion = d.tipo_condicion;
+        mod = true;
+      }
+      if (d.grupo_seccion && !curso.grupo_seccion) {
+        curso.grupo_seccion = d.grupo_seccion;
+        mod = true;
+      }
+      if (d.notas && !curso.notas) {
+        curso.notas = d.notas;
+        mod = true;
+      }
       if (mod && !cursosNuevos.some(cn => cn.id === curso.id)) {
         cursosNuevos.push(curso);
       }
@@ -601,7 +617,7 @@ function mensajeRendimiento(r) {
    ===================================================================== */
 const state = {
   currentTab: "view-hoy",
-  scheduleMode: "agenda", // "agenda" o "matrix"
+  scheduleMode: "matrix", // "matrix" o "cycle"
   selectedDay: getTodayDayKey(),
   tasksViewMode: "list", // "list" o "calendar"
   tasksFilter: "semana", // semana, pendientes, urgentes, proximas, todas, completadas
@@ -1080,7 +1096,7 @@ async function renderHoy() {
   const badgeEl = $("#badge-clases-hoy");
   badgeEl.textContent = `${classesToday.length} ${classesToday.length === 1 ? "clase" : "clases"}`;
 
-  renderLiveStatusCard(classesToday);
+  renderLiveStatusCard(classesToday, excepciones, fechaHoyStr, esFeriadoHoy);
 
   // Lista de clases de hoy
   const listEl = $("#today-classes-list");
@@ -1305,10 +1321,15 @@ function formatearCuentaAtrasHMS(diffSeconds) {
   return parts.join(" ");
 }
 
-function renderLiveStatusCard(classesToday) {
+function renderLiveStatusCard(classesToday, excepciones = [], fechaHoyStr = "", esFeriadoHoy = false) {
   const container = $("#live-status-card");
   const now = new Date();
   const currentMin = now.getHours() * 60 + now.getMinutes();
+
+  if (state.liveCountdownInterval) {
+    clearInterval(state.liveCountdownInterval);
+    state.liveCountdownInterval = null;
+  }
 
   if (classesToday.length === 0) {
     container.className = "live-card";
@@ -1324,17 +1345,49 @@ function renderLiveStatusCard(classesToday) {
     return;
   }
 
-  // Buscar clase en curso
-  const currentClass = classesToday.find(c => {
+  if (esFeriadoHoy) {
+    const fer = (Array.isArray(excepciones) ? excepciones : []).find(e => e.fecha === fechaHoyStr && e.tipo === "feriado");
+    container.className = "live-card";
+    container.innerHTML = `
+      <div class="live-card-eyebrow">
+        <span class="live-dot"></span>
+        <span>${DIAS_LABEL[getTodayDayKey()]} · Feriado</span>
+      </div>
+      <div class="live-card-title">Día No Laborable</div>
+      <div class="live-card-meta">
+        <span class="live-meta-item">${escapeHtml(fer?.motivo || "Día Feriado")} · Sin clases programadas para hoy.</span>
+      </div>`;
+    return;
+  }
+
+  const fnCancelada = (typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada);
+  const clasesActivas = classesToday.filter(c => {
+    if (fnCancelada && fechaHoyStr) {
+      return !fnCancelada(c.id, c.curso_id, fechaHoyStr, excepciones);
+    }
+    return true;
+  });
+
+  if (clasesActivas.length === 0) {
+    container.className = "live-card";
+    container.innerHTML = `
+      <div class="live-card-eyebrow">
+        <span class="live-dot"></span>
+        <span>${DIAS_LABEL[getTodayDayKey()]} · Hoy</span>
+      </div>
+      <div class="live-card-title">Sin Clases Pendientes</div>
+      <div class="live-card-meta">
+        <span class="live-meta-item">Las clases programadas para hoy fueron canceladas o suspendidas.</span>
+      </div>`;
+    return;
+  }
+
+  // Buscar clase en curso dentro de las clases activas
+  const currentClass = clasesActivas.find(c => {
     const s = timeToMinutes(c.hora_inicio);
     const e = timeToMinutes(c.hora_fin);
     return currentMin >= s && currentMin < e;
   });
-
-  if (state.liveCountdownInterval) {
-    clearInterval(state.liveCountdownInterval);
-    state.liveCountdownInterval = null;
-  }
 
   if (currentClass) {
     const sSec = timeToMinutes(currentClass.hora_inicio) * 60;
@@ -1391,8 +1444,8 @@ function renderLiveStatusCard(classesToday) {
     return;
   }
 
-  // Buscar próxima clase de hoy
-  const nextClass = classesToday.find(c => timeToMinutes(c.hora_inicio) > currentMin);
+  // Buscar próxima clase de hoy dentro de las clases activas
+  const nextClass = clasesActivas.find(c => timeToMinutes(c.hora_inicio) > currentMin);
 
   if (nextClass) {
     const [hIni, mIni] = nextClass.hora_inicio.split(":").map(Number);
@@ -1447,7 +1500,7 @@ function renderLiveStatusCard(classesToday) {
     </div>
     <div class="live-card-title">Clases del día completadas</div>
     <div class="live-card-meta">
-      <span class="live-meta-item">Has cursado las ${classesToday.length} materias programadas para hoy.</span>
+      <span class="live-meta-item">Has cursado las ${clasesActivas.length} materias programadas para hoy.</span>
     </div>`;
 }
 
@@ -1909,16 +1962,14 @@ async function renderCicloRoadmap() {
 async function renderHorario() {
   const container = $("#schedule-container");
   const cycleContainer = $("#cycle-container");
-  const dayTabsEl = $("#day-tabs-container");
   const matrixToolbarEl = $("#matrix-toolbar");
 
-  $("#btn-mode-agenda").classList.toggle("active", state.scheduleMode === "agenda");
-  $("#btn-mode-matrix").classList.toggle("active", state.scheduleMode === "matrix");
+  const btnMatrix = $("#btn-mode-matrix");
+  if (btnMatrix) btnMatrix.classList.toggle("active", state.scheduleMode === "matrix");
   const btnCycle = $("#btn-mode-cycle");
   if (btnCycle) btnCycle.classList.toggle("active", state.scheduleMode === "cycle");
 
   if (state.scheduleMode === "cycle") {
-    dayTabsEl.classList.add("hidden");
     if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
     container.classList.add("hidden");
     if (cycleContainer) {
@@ -1930,6 +1981,7 @@ async function renderHorario() {
 
   if (cycleContainer) cycleContainer.classList.add("hidden");
   container.classList.remove("hidden");
+  if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
 
   const allClasses = await obtenerClasesEnriquecidas();
   const cursosCount = await db.cursos.count();
@@ -1937,67 +1989,28 @@ async function renderHorario() {
     ? { label: "Registrar mi primer curso", hint: "Primero registra tus cursos (nombre, profesor, aula y color); luego solo eliges el curso y la hora." }
     : null;
 
-  if (state.scheduleMode === "agenda") {
-    dayTabsEl.classList.remove("hidden");
+  if (allClasses.length === 0) {
     if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
-
-    $$(".day-tab", dayTabsEl).forEach(btn => {
-      btn.classList.toggle("active", btn.dataset.day === state.selectedDay);
-    });
-
-    const dayClasses = allClasses.filter(c => c.dia_semana === state.selectedDay);
-    dayClasses.sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio));
-
-    if (dayClasses.length === 0) {
-      container.innerHTML = `
-        <div class="empty-card" style="margin-top:14px;">
-          <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
-          <strong>Sin clases para el ${DIAS_LABEL[state.selectedDay].toLowerCase()}</strong>
-          <p>${emptyAction ? emptyAction.hint : "Elige uno de tus cursos y asígnale la hora en este día."}</p>
-          <button class="btn-primary btn-sm" id="btn-add-class-empty" style="margin-top:10px;">${emptyAction ? emptyAction.label : "Añadir Clase"}</button>
-        </div>`;
-      const btn = $("#btn-add-class-empty", container);
-      if (btn) btn.addEventListener("click", () => openNewClassModal(state.selectedDay));
-      return;
-    }
-
     container.innerHTML = `
-      <div class="cards-list" style="margin-top:8px;">
-        ${dayClasses.map(c => renderClassCardHTML(c)).join("")}
+      <div class="empty-card">
+        <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
+        <strong>Horario no configurado</strong>
+        <p>${emptyAction ? emptyAction.hint : "Asigna día y hora a tus cursos para ver la distribución semanal."}</p>
+        <button class="btn-primary btn-sm" id="btn-add-class-empty-mat" style="margin-top:10px;">${emptyAction ? emptyAction.label : "Añadir Clase"}</button>
       </div>`;
-
-    $$(".class-card", container).forEach(card => {
-      card.addEventListener("click", () => openEditClassModal(card.dataset.id));
-    });
-
-  } else {
-    // MODO MATRIZ SEMANAL (PARRILLA ACADÉMICA)
-    dayTabsEl.classList.add("hidden");
-    if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
-
-    if (allClasses.length === 0) {
-      if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
-      container.innerHTML = `
-        <div class="empty-card">
-          <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
-          <strong>Horario no configurado</strong>
-          <p>${emptyAction ? emptyAction.hint : "Asigna día y hora a tus cursos para ver la distribución semanal."}</p>
-          <button class="btn-primary btn-sm" id="btn-add-class-empty-mat" style="margin-top:10px;">${emptyAction ? emptyAction.label : "Añadir Clase"}</button>
-        </div>`;
-      const btn = $("#btn-add-class-empty-mat", container);
-      if (btn) btn.addEventListener("click", () => openNewClassModal("LUNES"));
-      return;
-    }
-
-    container.innerHTML = renderMatrixTableHTML(allClasses);
-
-    // Eventos para editar al pulsar una celda
-    $$(".matrix-cell-card", container).forEach(card => {
-      card.addEventListener("click", () => openEditClassModal(card.dataset.id));
-    });
-
-    wireMatrixJumpBar(container);
+    const btn = $("#btn-add-class-empty-mat", container);
+    if (btn) btn.addEventListener("click", () => openNewClassModal("LUNES"));
+    return;
   }
+
+  container.innerHTML = renderMatrixTableHTML(allClasses);
+
+  // Eventos para editar al pulsar una celda
+  $$(".matrix-cell-card", container).forEach(card => {
+    card.addEventListener("click", () => openEditClassModal(card.dataset.id));
+  });
+
+  wireMatrixJumpBar(container);
 }
 
 /* =====================================================================
@@ -4927,7 +4940,8 @@ async function openModalQrSchedule() {
   }
 
   qrParteIndiceActual = 0;
-  renderQrEnDisplay(qrPartesActuales[0]);
+  horarioCompartidoActual = horarioCompartido;
+  renderQrResumenCompartir(horarioCompartido);
 
   const multiControls = $("#qr-multipart-controls");
   if (multiControls) {
@@ -4947,36 +4961,111 @@ function closeModalQrSchedule() {
   $("#modal-qr-schedule-backdrop").classList.add("hidden");
 }
 
-function renderQrEnDisplay(textoQr) {
-  const container = $("#qr-display-container");
-  if (!container) return;
+let horarioCompartidoActual = null;
 
-  if (typeof qrcode === "function") {
-    try {
-      const qr = qrcode(0, "L");
-      qr.addData(textoQr);
-      qr.make();
-      container.innerHTML = qr.createSvgTag({ scalable: true, margin: 4 });
-      const svg = container.querySelector("svg");
-      if (svg) {
-        svg.style.width = "100%";
-        svg.style.height = "100%";
-        svg.style.display = "block";
-        svg.style.shapeRendering = "crispEdges";
-      }
-      return;
-    } catch (err) {
-      console.error("Error generando QR:", err);
-    }
+function renderQrResumenCompartir(horario) {
+  const container = $("#qr-display-container");
+  if (!container || !horario) return;
+
+  const totalCursos = Array.isArray(horario.cursos) ? horario.cursos.length : 0;
+  const totalClases = Array.isArray(horario.clases) ? horario.clases.length : 0;
+  const totalCreditos = Array.isArray(horario.cursos)
+    ? horario.cursos.reduce((acc, c) => acc + (Number(c.creditos) || 0), 0)
+    : 0;
+
+  let cicloHtml = "";
+  if (horario.ciclo && horario.ciclo.nombre) {
+    const rangoFechas = (horario.ciclo.fecha_inicio && horario.ciclo.fecha_fin)
+      ? `${horario.ciclo.fecha_inicio} al ${horario.ciclo.fecha_fin}`
+      : "";
+    cicloHtml = `
+      <div style="background:var(--surface-subtle, rgba(0,0,0,0.03)); border:1px solid var(--border-hairline); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:10px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--accent);">Ciclo Académico</span>
+          <span style="font-size:11px; color:var(--text-secondary); font-weight:600;">${totalCreditos} Créditos</span>
+        </div>
+        <div style="font-size:15px; font-weight:700; color:var(--text-primary); margin-top:2px;">${escapeHtml(horario.ciclo.nombre)}</div>
+        ${rangoFechas ? `<div style="font-size:11.5px; color:var(--text-secondary); margin-top:2px;">${escapeHtml(rangoFechas)}</div>` : ""}
+      </div>
+    `;
   }
 
-  container.innerHTML = `<p style="font-size:12px; color:var(--text-secondary); text-align:center;">Librería QR no disponible.</p>`;
+  // Mapa de clases agrupadas por curso
+  const clasesPorCurso = new Map();
+  if (Array.isArray(horario.clases)) {
+    horario.clases.forEach(k => {
+      const cNombre = String(k.curso_id || "");
+      if (!clasesPorCurso.has(cNombre)) clasesPorCurso.set(cNombre, []);
+      clasesPorCurso.get(cNombre).push(k);
+    });
+  }
+
+  const DIAS_CORTO = {
+    LUNES: "Lun", MARTES: "Mar", MIERCOLES: "Mié", JUEVES: "Jue", VIERNES: "Vie", SABADO: "Sáb", DOMINGO: "Dom"
+  };
+
+  const cursosHtml = (horario.cursos || []).map(c => {
+    const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+    const sesiones = clasesPorCurso.get(c.nombre) || [];
+    sesiones.sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio));
+
+    const sesionesHtml = sesiones.length > 0
+      ? sesiones.map(s => {
+          const diaLabel = DIAS_CORTO[s.dia_semana] || s.dia_semana;
+          const rangoH = formatTimeRange12(s.hora_inicio, s.hora_fin);
+          const aulaTxt = s.aula ? ` · ${escapeHtml(s.aula)}` : "";
+          return `<span style="display:inline-block; font-size:11px; background:var(--surface, #fff); border:1px solid var(--border-hairline); border-radius:var(--radius-sm, 6px); padding:2px 6px; margin:2px 4px 2px 0;"><strong>${diaLabel}</strong> ${rangoH}${aulaTxt}</span>`;
+        }).join("")
+      : `<span style="font-size:11px; color:var(--text-secondary); font-style:italic;">Sin sesiones semanales asignadas</span>`;
+
+    return `
+      <div style="background:var(--surface); border:1px solid var(--border-hairline); border-left:4px solid ${color}; border-radius:var(--radius-md); padding:10px 12px; margin-bottom:8px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+          <div style="font-size:13.5px; font-weight:700; color:var(--text-primary); line-height:1.25;">
+            ${escapeHtml(c.nombre)}
+          </div>
+          ${c.creditos ? `<span style="font-size:10.5px; font-weight:700; color:var(--text-secondary); white-space:nowrap; background:var(--surface-subtle, rgba(0,0,0,0.04)); padding:1px 6px; border-radius:4px;">${c.creditos} CR</span>` : ""}
+        </div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:5px;">
+          ${c.ciclo_curso ? `<span style="font-size:10.5px; font-weight:600; color:var(--accent); background:var(--surface-subtle); padding:1px 5px; border-radius:4px;">Ciclo ${escapeHtml(c.ciclo_curso)}</span>` : ""}
+          ${c.tipo_condicion === "electivo" ? `<span style="font-size:10.5px; font-weight:600; color:var(--status-warning, #D97706); background:var(--surface-subtle); padding:1px 5px; border-radius:4px;">Electivo</span>` : ""}
+          ${c.grupo_seccion ? `<span style="font-size:10.5px; font-weight:600; color:var(--text-secondary); background:var(--surface-subtle); padding:1px 5px; border-radius:4px;">Gr. ${escapeHtml(c.grupo_seccion)}</span>` : ""}
+          ${c.aula ? `<span style="font-size:10.5px; color:var(--text-secondary);">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
+          ${c.profesor ? `<span style="font-size:10.5px; color:var(--text-secondary);">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
+        </div>
+
+        ${c.notas ? `<div style="font-size:11px; color:var(--text-secondary); margin-top:4px; font-style:italic;">${escapeHtml(c.notas)}</div>` : ""}
+
+        <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--border-hairline);">
+          ${sesionesHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  container.style.cssText = "width:100%; max-height:50vh; overflow-y:auto; padding:4px 2px; text-align:left;";
+  container.innerHTML = `
+    <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+      <span style="font-size:12px; font-weight:700; color:var(--text-secondary);">Contenido del paquete QR:</span>
+      <span style="font-size:11.5px; font-weight:600; color:var(--text-secondary);">${totalCursos} materias · ${totalClases} clases</span>
+    </div>
+    ${cicloHtml}
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      ${cursosHtml}
+    </div>
+  `;
+}
+
+function renderQrEnDisplay(textoQr) {
+  if (horarioCompartidoActual) {
+    renderQrResumenCompartir(horarioCompartidoActual);
+  }
 }
 
 function mostrarSiguienteParteQr() {
   if (qrPartesActuales.length <= 1) return;
   qrParteIndiceActual = (qrParteIndiceActual + 1) % qrPartesActuales.length;
-  renderQrEnDisplay(qrPartesActuales[qrParteIndiceActual]);
   const indicator = $("#qr-part-indicator");
   if (indicator) indicator.textContent = `Parte ${qrParteIndiceActual + 1} de ${qrPartesActuales.length}`;
 }
@@ -4984,7 +5073,6 @@ function mostrarSiguienteParteQr() {
 function mostrarAnteriorParteQr() {
   if (qrPartesActuales.length <= 1) return;
   qrParteIndiceActual = (qrParteIndiceActual - 1 + qrPartesActuales.length) % qrPartesActuales.length;
-  renderQrEnDisplay(qrPartesActuales[qrParteIndiceActual]);
   const indicator = $("#qr-part-indicator");
   if (indicator) indicator.textContent = `Parte ${qrParteIndiceActual + 1} de ${qrPartesActuales.length}`;
 }
@@ -6435,8 +6523,10 @@ function wireNavigationEvents() {
 }
 
 function wireScheduleAndCourseEvents() {
-  $("#btn-mode-agenda").addEventListener("click", () => { state.scheduleMode = "agenda"; renderHorario(); });
-  $("#btn-mode-matrix").addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
+  const btnModeMatrix = $("#btn-mode-matrix");
+  if (btnModeMatrix) {
+    btnModeMatrix.addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
+  }
   const btnModeCycle = $("#btn-mode-cycle");
   if (btnModeCycle) {
     btnModeCycle.addEventListener("click", () => { state.scheduleMode = "cycle"; renderHorario(); });
@@ -6452,13 +6542,6 @@ function wireScheduleAndCourseEvents() {
   }
   $("#btn-class-type-curso").addEventListener("click", () => setClassTypeMode("curso"));
   $("#btn-class-type-actividad").addEventListener("click", () => setClassTypeMode("actividad"));
-
-  $$(".day-tab", $("#day-tabs-container")).forEach(btn => {
-    btn.addEventListener("click", () => {
-      state.selectedDay = btn.dataset.day;
-      renderHorario();
-    });
-  });
 
   const btnSubjectDropdown = $("#btn-subject-dropdown-toggle");
   const menuSubjectDropdown = $("#subject-dropdown-menu");

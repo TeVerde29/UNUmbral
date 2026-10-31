@@ -75,6 +75,17 @@ test("HoyView determina saludos y clase activa", () => {
   const resHueco = HoyView.determinarClaseActiva(clases, 615);
   assert.equal(resHueco.activa, null);
   assert.equal(resHueco.proxima?.id, "c2");
+
+  // Si c2 fue cancelada para hoy, no debe figurar como próxima clase
+  const excepciones = [{ fecha: "2026-10-31", tipo: "cancelada", clase_id: "c2" }];
+  const esClaseCancelada = (cid, crsId, f, ex) => ex.some(e => e.fecha === f && e.tipo === "cancelada" && e.clase_id === cid);
+  const resCancelada = HoyView.determinarClaseActiva(clases, 615, {
+    fecha: "2026-10-31",
+    excepciones,
+    esClaseCancelada
+  });
+  assert.equal(resCancelada.activa, null);
+  assert.equal(resCancelada.proxima, null);
 });
 
 test("HorarioView calcula límites y porcentajes de posicionamiento", () => {
