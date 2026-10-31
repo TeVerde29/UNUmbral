@@ -148,8 +148,7 @@
     <section id="view-horario" class="view-panel">
       <div class="view-toolbar">
         <div class="segmented-control">
-          <button class="seg-btn active" id="btn-mode-agenda" data-mode="agenda">Día a Día</button>
-          <button class="seg-btn" id="btn-mode-matrix" data-mode="matrix">Parrilla Semanal</button>
+          <button class="seg-btn active" id="btn-mode-matrix" data-mode="matrix">Parrilla Semanal</button>
           <button class="seg-btn" id="btn-mode-cycle" data-mode="cycle">Ciclo Académico</button>
         </div>
         <button id="btn-add-class" class="btn-secondary btn-sm">
@@ -158,19 +157,8 @@
         </button>
       </div>
 
-      <!-- Selector de días para modo agenda -->
-      <div id="day-tabs-container" class="day-tabs-scroll">
-        <button class="day-tab active" data-day="LUNES"><span>Lun</span></button>
-        <button class="day-tab" data-day="MARTES"><span>Mar</span></button>
-        <button class="day-tab" data-day="MIERCOLES"><span>Mié</span></button>
-        <button class="day-tab" data-day="JUEVES"><span>Jue</span></button>
-        <button class="day-tab" data-day="VIERNES"><span>Vie</span></button>
-        <button class="day-tab" data-day="SABADO"><span>Sáb</span></button>
-        <button class="day-tab" data-day="DOMINGO"><span>Dom</span></button>
-      </div>
-
       <!-- Barra de navegación rápida por día para la Parrilla Semanal -->
-      <div id="matrix-toolbar" class="matrix-toolbar hidden">
+      <div id="matrix-toolbar" class="matrix-toolbar">
         <div class="matrix-jump-scroll" id="matrix-jump-bar">
           <button class="matrix-jump-chip active" data-jump="all">Semana</button>
           <button class="matrix-jump-chip" data-jump="LUNES">Lun</button>
@@ -1410,37 +1398,38 @@
 
 <!-- MODAL DE COMPARTIR HORARIO POR QR (FASE 7) -->
 <div id="modal-qr-schedule-backdrop" class="modal-backdrop hidden">
-  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" style="max-height: 90vh; overflow-y: auto; text-align: center;">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="qr-modal-title" style="max-height: 90vh; overflow-y: auto;">
     <div class="modal-header">
       <div>
-        <h3 id="qr-modal-title">Compartir Horario por QR</h3>
-        <p class="modal-subtitle">Tu compañero puede escanear este código desde su pantalla</p>
+        <h3 id="qr-modal-title">Compartir Horario</h3>
+        <p class="modal-subtitle">Revisa el contenido y guarda la imagen QR</p>
       </div>
       <button class="btn-icon-close" id="btn-close-qr-modal" aria-label="Cerrar modal">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
 
-    <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:12px;">
-      <!-- Contenedor del código QR -->
-      <div id="qr-display-container" style="background:#ffffff; padding:12px; border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(0,0,0,0.1); width:100%; max-width:320px; aspect-ratio:1/1; display:flex; justify-content:center; align-items:center;">
-        <!-- SVG del QR generado dinámicamente -->
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+      <!-- Contenedor con la lista y desglose de lo que se va a compartir -->
+      <div id="qr-display-container">
+        <!-- Contenido generado dinámicamente -->
       </div>
 
       <!-- Controles de multiparte (si aplica) -->
-      <div id="qr-multipart-controls" class="hidden" style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:4px;">
+      <div id="qr-multipart-controls" class="hidden" style="display:flex; align-items:center; justify-content:center; gap:10px; margin-top:2px;">
         <button type="button" class="btn-secondary btn-sm" id="btn-prev-qr-part"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px;margin-right:2px;"><polyline points="15 18 9 12 15 6"/></svg> Ant</button>
         <span id="qr-part-indicator" style="font-weight:700; font-size:12px; min-width:80px; text-align:center;">Parte 1 de 1</span>
         <button type="button" class="btn-secondary btn-sm" id="btn-next-qr-part">Sig <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px;margin-left:2px;"><polyline points="9 18 15 12 9 6"/></svg></button>
       </div>
 
-      <p style="font-size:11.5px; color:var(--text-secondary); max-width:320px; margin:4px 0 10px;">
-        Este código contiene tus cursos y horarios. No incluye notas, asistencias ni tareas personales.
+      <p style="font-size:11.5px; color:var(--text-secondary); text-align:center; margin:2px 0;">
+        Este paquete incluye tu ciclo académico, cursos y horarios completos. No incluye notas, asistencias ni tareas personales.
       </p>
 
-      <div style="display:flex; gap:8px; width:100%; justify-content:center;">
-        <button type="button" id="btn-descargar-qr-png" class="btn-secondary btn-sm">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Guardar imagen QR
+      <div style="display:flex; gap:8px; width:100%; justify-content:center; padding-top:4px;">
+        <button type="button" id="btn-descargar-qr-png" class="btn-primary" style="width:100%; justify-content:center; padding:11px 16px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px;margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span>Guardar imagen QR</span>
         </button>
       </div>
       <canvas id="qr-export-canvas" class="hidden"></canvas>
