@@ -156,3 +156,51 @@ test('convertirFormatoPlano asocia ciclo_id al importar cursos y clases', () => 
   assert.equal(resultado.clases.length, 1);
   assert.equal(resultado.clases[0].ciclo_id, 'ciclo-2026-2');
 });
+
+test('convertirFormatoPlano actualiza ciclo_id y evaluacion en cursos existentes al reimportar', () => {
+  const root = path.resolve(__dirname, '..');
+  const code = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+
+  function DummyDexie() {
+    this.version = () => ({ stores: () => ({ upgrade: () => {} }) });
+  }
+
+  const sandbox = {
+    window: { crypto: { randomUUID: () => 'uuid-test' } },
+    crypto: { randomUUID: () => 'uuid-test' },
+    document: { addEventListener: () => {}, querySelector: () => null, querySelectorAll: () => [], documentElement: { setAttribute: () => {} } },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    navigator: {},
+    Dexie: DummyDexie,
+    setInterval: () => {},
+    setTimeout: () => {},
+    clearTimeout: () => {},
+    requestAnimationFrame: (fn) => fn(),
+    console
+  };
+
+  vm.createContext(sandbox);
+  vm.runInContext(code, sandbox);
+
+  const cursoExistente = {
+    id: 'curso-existente-1',
+    nombre: 'Inteligencia Artificial',
+    ciclo_id: 'ciclo-viejo',
+    evaluacion: { parcial: null, final: null, practicas: [] }
+  };
+
+  const cursosSueltos = [
+    {
+      id: '0',
+      nombre: 'Inteligencia Artificial',
+      evaluacion: { parcial: 16, final: 18, practicas: [] }
+    }
+  ];
+
+  const resultado = sandbox.convertirFormatoPlano([], [], [cursoExistente], cursosSueltos, 'ciclo-nuevo-2026');
+
+  assert.equal(cursoExistente.ciclo_id, 'ciclo-nuevo-2026');
+  assert.equal(cursoExistente.evaluacion.parcial, 16);
+  assert.equal(resultado.cursosNuevos.length, 1);
+  assert.equal(resultado.cursosNuevos[0].id, 'curso-existente-1');
+});

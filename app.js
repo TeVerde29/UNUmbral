@@ -341,6 +341,28 @@ function convertirFormatoPlano(clasesPlanas, tareasPlanas, cursosExistentes, cur
       porNombre.set(clave, curso);
       porId.set(String(curso.id), curso);
       cursosNuevos.push(curso);
+    } else {
+      const d = datos || {};
+      let mod = false;
+      if (cicloId && curso.ciclo_id !== cicloId) {
+        curso.ciclo_id = cicloId;
+        mod = true;
+      }
+      if (d.evaluacion && (!curso.evaluacion || (curso.evaluacion.parcial === null && curso.evaluacion.final === null))) {
+        curso.evaluacion = d.evaluacion;
+        mod = true;
+      }
+      if (d.profesor && !curso.profesor) {
+        curso.profesor = d.profesor;
+        mod = true;
+      }
+      if (d.aula && !curso.aula) {
+        curso.aula = d.aula;
+        mod = true;
+      }
+      if (mod && !cursosNuevos.some(cn => cn.id === curso.id)) {
+        cursosNuevos.push(curso);
+      }
     }
     if (idOriginal !== undefined && idOriginal !== null && idOriginal !== "") {
       idOriginalACurso.set(String(idOriginal), curso);
@@ -1607,15 +1629,16 @@ function renderClassCardHTML(c, opts = {}) {
    ===================================================================== */
 async function obtenerCicloActivo() {
   try {
-    const activo = await db.ciclos.where("estado").equals("activo").first();
-    if (activo && activo.id !== "ciclo-inicial") return activo;
-    if (activo && activo.id === "ciclo-inicial") {
-      const tieneCursos = await db.cursos.count();
-      if (tieneCursos > 0) return activo;
+    const activos = await db.ciclos.where("estado").equals("activo").toArray();
+    if (activos.length > 0) {
+      activos.sort((a, b) => (b.fecha_creacion || "").localeCompare(a.fecha_creacion || ""));
+      const noInicial = activos.find(c => c.id !== "ciclo-inicial");
+      if (noInicial) return noInicial;
+      return activos[0];
     }
     const fallback = await db.ciclos.toCollection().first();
     if (fallback && fallback.id !== "ciclo-inicial") return fallback;
-    return null;
+    return fallback || null;
   } catch (err) {
     console.warn("Aviso al obtener ciclo activo:", err);
     return null;
@@ -2590,8 +2613,8 @@ async function renderCalendarioMensual() {
     const dayKey = DIAS_SEMANA[celda.diaSemana - 1];
     // Clases, tareas y eventos académicos solo existen dentro de las fechas del ciclo activo
     const clasesDelDia = (!dentroDelCiclo || feriado) ? [] : clases.filter(c => c.dia_semana === dayKey && !(typeof esClaseCancelada === "function" ? esClaseCancelada : window.esClaseCancelada)(c.id, c.curso_id, fecha, excepciones));
-    const tareasDelDia = (!dentroDelCiclo) ? [] : tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
-    const eventosDelDia = (!dentroDelCiclo) ? [] : eventos.filter(e => e.fecha === fecha);
+    const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fecha));
+    const eventosDelDia = eventos.filter(e => e.fecha === fecha);
 
     let indicatorsHtml = "";
     if (feriado && dentroDelCiclo) {
@@ -2692,26 +2715,28 @@ async function renderCalDayDetail(fechaStr, clases, tareas, eventos, excepciones
 
   const listEl = $("#cal-day-items-list");
 
-  // Si la fecha seleccionada está fuera del ciclo académico, no mostrar clases ni tareas del ciclo
-  if (!dentroDelCiclo) {
+  const feriado = verificarEsDiaFeriado(fechaStr, excepciones);
+  const ferObj = excepciones.find(e => e.fecha === fechaStr && e.tipo === "feriado");
+
+  const clasesDelDia = (!dentroDelCiclo || feriado) ? [] : clases.filter(c => c.dia_semana === dayKey);
+  const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fechaStr));
+  const eventosDelDia = eventos.filter(e => e.fecha === fechaStr);
+
+  const totalActividades = clasesDelDia.length + tareasDelDia.length + eventosDelDia.length;
+
+  // Si la fecha seleccionada está fuera del ciclo académico y no tiene actividades, mostrar aviso
+  if (!dentroDelCiclo && totalActividades === 0) {
     $("#cal-day-detail-sub").textContent = "0 clases · 0 tareas (fuera del ciclo)";
     listEl.innerHTML = `
       <div class="empty-card" style="padding:18px 14px; text-align:center;">
         <strong style="font-size:13.5px; color:var(--text-primary); margin-bottom:4px;">Fecha fuera del ciclo académico</strong>
         <p style="font-size:12px; color:var(--text-secondary); margin:0; line-height:1.45;">
-          El ciclo actual (${escapeHtml(cicloActivo?.nombre || 'Ciclo Universitario')}) abarca del ${fechaIniCiclo || 'inicio'} al ${fechaFinCiclo || 'fin'}. Las clases y tareas no se proyectan fuera de este período.
+          El ciclo actual (${escapeHtml(cicloActivo?.nombre || 'Ciclo Universitario')}) abarca del ${fechaIniCiclo || 'inicio'} al ${fechaFinCiclo || 'fin'}. Las clases regulares no se proyectan fuera de este período.
         </p>
       </div>`;
     panel.classList.remove("hidden");
     return;
   }
-
-  const feriado = verificarEsDiaFeriado(fechaStr, excepciones);
-  const ferObj = excepciones.find(e => e.fecha === fechaStr && e.tipo === "feriado");
-
-  const clasesDelDia = feriado ? [] : clases.filter(c => c.dia_semana === dayKey);
-  const tareasDelDia = tareas.filter(t => t.fecha_limite && t.fecha_limite.startsWith(fechaStr));
-  const eventosDelDia = eventos.filter(e => e.fecha === fechaStr);
 
   $("#cal-day-detail-sub").textContent = `${clasesDelDia.length} ${clasesDelDia.length === 1 ? 'clase' : 'clases'} · ${tareasDelDia.length} ${tareasDelDia.length === 1 ? 'tarea' : 'tareas'}${eventosDelDia.length ? ` · ${eventosDelDia.length} evento(s)` : ''}`;
 
@@ -4881,7 +4906,8 @@ async function openModalQrSchedule() {
       ciclo_curso: c.ciclo_curso || "",
       tipo_condicion: c.tipo_condicion || "obligatorio",
       grupo_seccion: c.grupo_seccion || "",
-      notas: c.notas || ""
+      notas: c.notas || "",
+      evaluacion: c.evaluacion || null
     })),
     clases: clasesUnicas.map(k => ({
       curso_id: mapaIdANombre.get(k.curso_id) || "",
@@ -5247,25 +5273,40 @@ async function ejecutarImportacionHorario(data) {
   // Si el QR contiene ciclo académico, verificar si existe o crearlo y activarlo
   let cicloIdAUsar = cicloActivo?.id || null;
   if (data.ciclo && data.ciclo.nombre && data.ciclo.fecha_inicio) {
+    const finCalculado = data.ciclo.fecha_fin || (typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(data.ciclo.fecha_inicio) : "");
+
+    // Archivar ciclos activos previos para que el ciclo importado sea el único activo
+    await db.ciclos.where("estado").equals("activo").modify({ estado: "archivado" });
+
     const ciclos = await db.ciclos.toArray();
     const coincide = ciclos.find(ci =>
       ci.nombre.toLowerCase().trim() === data.ciclo.nombre.toLowerCase().trim() ||
       ci.fecha_inicio === data.ciclo.fecha_inicio
     );
+
     if (coincide) {
+      coincide.nombre = data.ciclo.nombre;
+      coincide.fecha_inicio = data.ciclo.fecha_inicio;
+      coincide.fecha_fin = finCalculado;
+      coincide.estado = "activo";
+      await db.ciclos.put(coincide);
       cicloIdAUsar = coincide.id;
     } else {
       const nuevoCiclo = {
         id: `ciclo_${Date.now()}`,
         nombre: data.ciclo.nombre,
         fecha_inicio: data.ciclo.fecha_inicio,
-        fecha_fin: data.ciclo.fecha_fin || (typeof calcularFinCiclo17Semanas === "function" ? calcularFinCiclo17Semanas(data.ciclo.fecha_inicio) : ""),
+        fecha_fin: finCalculado,
         estado: "activo",
         fecha_creacion: new Date().toISOString()
       };
       await db.ciclos.put(nuevoCiclo);
       cicloIdAUsar = nuevoCiclo.id;
     }
+
+    // Sincronizar ajustes globales
+    await db.ajustes.put({ clave: "ciclo_inicio", valor: data.ciclo.fecha_inicio });
+    await db.ajustes.put({ clave: "ciclo_fin", valor: finCalculado });
   }
 
   const r = convertirFormatoPlano(data.clases || [], [], existentes, data.cursos || [], cicloIdAUsar);
