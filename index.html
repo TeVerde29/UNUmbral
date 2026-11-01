@@ -100,47 +100,53 @@
         <button id="btn-desmarcar-feriado-hoy" class="btn-secondary btn-sm" style="font-size:11px;padding:3px 8px;">Quitar feriado</button>
       </div>
 
-      <!-- Tarjeta de estado de clase en vivo -->
-      <div id="live-status-card" class="live-card">
-        <!-- Renderizado dinámico -->
-      </div>
-
-      <!-- Resumen de Horario de Hoy -->
-      <div class="section-header">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <h2 class="section-title">Clases de Hoy</h2>
-          <span class="section-badge" id="badge-clases-hoy">0 clases</span>
-        </div>
-        <button class="btn-text-action" id="btn-marcar-feriado-hoy" style="font-size:11.5px;">+ Marcar feriado</button>
-      </div>
-      <div id="today-classes-list" class="cards-list">
-        <!-- Renderizado dinámico -->
-      </div>
-
-      <!-- Huecos Libres de Hoy y Sugerencias de Tareas (Fase 6) -->
-      <div id="section-huecos-libres" class="hidden" style="margin-top: 20px;">
-        <div class="section-header">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <h2 class="section-title">Huecos Libres de Hoy</h2>
-            <span class="section-badge" id="badge-huecos-hoy">0 huecos</span>
+      <div class="hoy-layout-grid">
+        <div class="hoy-col-main">
+          <!-- Tarjeta de estado de clase en vivo -->
+          <div id="live-status-card" class="live-card">
+            <!-- Renderizado dinámico -->
           </div>
-          <span style="font-size:11px;color:var(--text-secondary);">Aprovecha tus tiempos libres</span>
-        </div>
-        <div id="today-huecos-list" class="cards-list" style="gap:10px;">
-          <!-- Renderizado dinámico de huecos y sugerencias -->
-        </div>
-      </div>
 
-      <!-- Radar de Tareas Pendientes Urgentes -->
-      <div class="section-header" style="margin-top: 24px;">
-        <div>
-          <h2 class="section-title">Tareas Próximas y Críticas</h2>
-          <p class="section-subtitle">Ordenadas por urgencia y nivel de importancia</p>
+          <!-- Resumen de Horario de Hoy -->
+          <div class="section-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <h2 class="section-title">Clases de Hoy</h2>
+              <span class="section-badge" id="badge-clases-hoy">0 clases</span>
+            </div>
+            <button class="btn-text-action" id="btn-marcar-feriado-hoy" style="font-size:11.5px;">+ Marcar feriado</button>
+          </div>
+          <div id="today-classes-list" class="cards-list">
+            <!-- Renderizado dinámico -->
+          </div>
+
+          <!-- Huecos Libres de Hoy y Sugerencias de Tareas (Fase 6) -->
+          <div id="section-huecos-libres" class="hidden" style="margin-top: 20px;">
+            <div class="section-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <h2 class="section-title">Huecos Libres de Hoy</h2>
+                <span class="section-badge" id="badge-huecos-hoy">0 huecos</span>
+              </div>
+              <span style="font-size:11px;color:var(--text-secondary);">Aprovecha tus tiempos libres</span>
+            </div>
+            <div id="today-huecos-list" class="cards-list" style="gap:10px;">
+              <!-- Renderizado dinámico de huecos y sugerencias -->
+            </div>
+          </div>
         </div>
-        <button class="btn-text-action" id="btn-ver-todas-tareas">Ver todas</button>
-      </div>
-      <div id="urgent-tasks-list" class="cards-list">
-        <!-- Renderizado dinámico -->
+
+        <div class="hoy-col-side">
+          <!-- Radar de Tareas Pendientes Urgentes -->
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Tareas Próximas y Críticas</h2>
+              <p class="section-subtitle">Ordenadas por urgencia y nivel de importancia</p>
+            </div>
+            <button class="btn-text-action" id="btn-ver-todas-tareas">Ver todas</button>
+          </div>
+          <div id="urgent-tasks-list" class="cards-list">
+            <!-- Renderizado dinámico -->
+          </div>
+        </div>
       </div>
     </section>
 
@@ -636,6 +642,15 @@
 
   <!-- BARRA DE NAVEGACIÓN INFERIOR (APPLE DOCKED BAR) -->
   <nav class="bottom-nav" aria-label="Navegación principal">
+    <div class="sidebar-brand-desktop" aria-hidden="true">
+      <div class="brand-badge" style="width:34px;height:34px;">
+        <img src="icon-64.png" alt="UNUmbral logo" width="26" height="26" class="brand-logo-img">
+      </div>
+      <div>
+        <div class="sidebar-brand-title">UNUmbral</div>
+        <div class="sidebar-brand-sub">Universitario</div>
+      </div>
+    </div>
     <button class="nav-tab active" data-view="view-hoy">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="10"></circle>
