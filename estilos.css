@@ -70,23 +70,25 @@
   --ease-apple-press:   cubic-bezier(0.2, 0.9, 0.4, 1);
   --ease-apple-smooth:  cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Tipografía */
-  --font-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  --font-text:    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  --font-mono:    ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Radios ergonómicos (iOS Squircle) */
-  --radius-xs:   8px;
-  --radius-sm:   12px;
-  --radius-md:   16px;
-  --radius-lg:   22px;
-  --radius-xl:   28px;
+
+  /* Tipografía nativa del sistema Apple */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, -system-ui, "Inter", sans-serif;
+  --font-text:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro", system-ui, -system-ui, "Inter", sans-serif;
+  --font-mono:    ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+
+  /* Sistema uniforme de radios (10, 14, 16 y 20 px) */
+  --radius-xs:   6px;
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
   --radius-pill: 9999px;
 
-  /* Sombras limpias y ligeras */
-  --shadow-sm:   0 1px 3px rgba(30, 42, 33, 0.04), 0 1px 2px rgba(30, 42, 33, 0.02);
-  --shadow-md:   0 4px 14px rgba(30, 42, 33, 0.06), 0 1px 3px rgba(30, 42, 33, 0.03);
-  --shadow-lg:   0 14px 34px rgba(30, 42, 33, 0.09), 0 2px 6px rgba(30, 42, 33, 0.04);
+  /* Sombras limpias de profundidad sutil (sin manchas oscuras de plantilla) */
+  --shadow-sm:   0 1px 2px rgba(25, 38, 28, 0.04), 0 1px 1px rgba(25, 38, 28, 0.02);
+  --shadow-md:   0 4px 12px rgba(25, 38, 28, 0.05), 0 1px 3px rgba(25, 38, 28, 0.03);
+  --shadow-lg:   0 12px 28px rgba(25, 38, 28, 0.08), 0 2px 6px rgba(25, 38, 28, 0.04);
 
   /* Dimensiones */
   --header-height: 58px;
@@ -138,9 +140,9 @@
   --status-info:        #65A9C0;
   --status-info-bg:     rgba(101, 169, 192, 0.16);
 
-  --shadow-sm:   0 1px 4px rgba(0, 0, 0, 0.45);
-  --shadow-md:   0 6px 18px rgba(0, 0, 0, 0.55);
-  --shadow-lg:   0 18px 42px rgba(0, 0, 0, 0.7);
+  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.28);
+  --shadow-md:   0 4px 14px rgba(0, 0, 0, 0.36);
+  --shadow-lg:   0 12px 30px rgba(0, 0, 0, 0.48);
 }
 
 /* =====================================================================
@@ -258,19 +260,28 @@ button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline {
   font-family: var(--font-text);
   cursor: pointer;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  transition: transform 0.14s var(--ease-apple-press), opacity 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  gap: 7px;
+  transition: transform 0.12s var(--ease-apple-press), opacity 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
   font-size: 13.5px;
   line-height: 1;
   min-height: 38px;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+button:hover, .btn-primary:hover, .btn-secondary:hover, .btn-danger:hover {
+  transform: translateY(-0.5px);
+}
+
+button:focus-visible, .btn-primary:focus-visible, .btn-secondary:focus-visible, .btn-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(41, 70, 53, 0.18);
 }
 
 button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
@@ -295,9 +306,9 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 
 .btn-sm {
   min-height: 32px;
-  padding: 6px 13px;
+  padding: 6px 12px;
   font-size: 12.5px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
 }
 
 .btn-danger {
@@ -452,9 +463,9 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 }
 
 .live-card.in-class {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--surface-card) 100%);
-  border-color: rgba(245, 158, 11, 0.35);
-  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.1);
+  background: var(--surface);
+  border-color: rgba(217, 119, 6, 0.45);
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.08);
 }
 
 .live-card.in-class::before {
@@ -489,7 +500,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 }
 
 .live-card.in-class .live-progress-fill {
-  background: linear-gradient(90deg, #f59e0b, #d97706);
+  background: #d97706;
 }
 
 [data-theme="dark"] .live-card.in-class {
@@ -796,8 +807,8 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 .task-countdown-badge {
   font-size: 11px;
   font-weight: 700;
-  padding: 2.5px 8px;
-  border-radius: var(--radius-pill);
+  padding: 2.5px 7px;
+  border-radius: var(--radius-xs);
   display: inline-flex;
   align-items: center;
   gap: 4.5px;
@@ -842,97 +853,23 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   display: none;
 }
 
-.task-card-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.4;
-}
-
-.task-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  margin-top: 5px;
-}
-
-/* Badges e Indicadores de Prioridad Apple */
-.subject-pill {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--surface-subtle);
-  color: var(--text-primary);
-  border: 1px solid var(--border-hairline);
-  letter-spacing: -0.01em;
-}
-
-/* Indicador de Nivel de Importancia Apple (Dots Gauge) */
-.importance-gauge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  letter-spacing: 0.02em;
-}
-
-.importance-gauge.lvl-1 { background: var(--surface-subtle); color: var(--text-secondary); }
-.importance-gauge.lvl-2 { background: var(--status-info-bg); color: var(--status-info); }
-.importance-gauge.lvl-3 { background: var(--status-warning-bg); color: var(--status-warning); }
-.importance-gauge.lvl-4 { background: rgba(178, 59, 56, 0.12); color: var(--status-danger); }
-.importance-gauge.lvl-5 { background: var(--status-danger); color: #FFFFFF; }
-
-.due-badge {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: var(--surface-subtle);
-  color: var(--text-secondary);
-}
-
-.due-badge.urgent {
-  background: var(--status-danger-bg);
-  color: var(--status-danger);
-  font-weight: 700;
-}
-
-.due-badge.soon {
-  background: var(--status-warning-bg);
-  color: var(--status-warning);
-}
-
 /* =====================================================================
-   SEGMENTED CONTROLS & HORARIO
+   TOOLBARS Y CONTROL SEGMENTADO (APPLE SEGMENTED CONTROLS)
    ===================================================================== */
 .view-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
-  gap: 10px;
+  margin-bottom: 14px;
+  gap: 12px;
 }
 
 .segmented-control {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
   background: var(--surface-subtle);
   border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   padding: 3px;
   gap: 2px;
 }
@@ -941,13 +878,14 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   background: transparent;
   color: var(--text-secondary);
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: 8px;
   padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   min-height: unset;
-  transition: all 0.2s var(--ease-apple-spring);
+  transition: all 0.16s var(--ease-apple-spring);
   user-select: none;
+  cursor: pointer;
 }
 
 .seg-btn:active {
@@ -957,7 +895,8 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 .seg-btn.active {
   background: var(--surface-solid);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(30, 42, 33, 0.08);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(30, 42, 33, 0.08);
 }
 
 .day-tabs-scroll {
@@ -1498,8 +1437,8 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   border: 1px solid var(--border-hairline);
   color: var(--text-secondary);
   padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
   font-weight: 600;
   min-height: 30px;
   display: inline-flex;
@@ -1814,7 +1753,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 
 .settings-card.highlight-card {
   border-color: var(--tea-green);
-  background: linear-gradient(180deg, var(--surface), var(--surface-subtle));
+  background: var(--surface);
 }
 
 .settings-card-header {
@@ -3973,5 +3912,213 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   .task-card,
   .curso-card {
     animation: none !important;
+  }
+}
+
+
+/* =====================================================================
+   LAYOUT DE ESCRITORIO CON SIDEBAR (APPLE HUMAN INTERFACE GUIDELINES)
+   Pantallas grandes (>= 960px): Sidebar izquierda fija, navegación en filas,
+   área de trabajo amplia y distribución a dos columnas.
+   ===================================================================== */
+.sidebar-brand-desktop {
+  display: none;
+}
+
+.hoy-layout-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.task-card:has(.urgent),
+.task-card:has(.task-countdown-badge.urgent),
+.task-card:has(.task-countdown-badge.overdue) {
+  border-left: 3.5px solid var(--status-danger);
+}
+
+@media (min-width: 960px) {
+  :root {
+    --max-width: 1440px;
+    --sidebar-width: 250px;
+  }
+
+  body {
+    background: var(--bg);
+  }
+
+  .app-container {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* SIDEBAR DE ESCRITORIO (sustituye a la barra inferior flotante) */
+  .bottom-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    height: 100vh;
+    max-width: var(--sidebar-width);
+    margin: 0;
+    padding: 20px 14px 20px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: stretch;
+    gap: 4px;
+    border-top: none;
+    border-right: 1px solid var(--border-hairline);
+    background: var(--chrome-bg);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    box-shadow: 1px 0 10px rgba(17, 26, 19, 0.02);
+    z-index: 40;
+  }
+
+  /* Cabecera de marca en la barra lateral */
+  .sidebar-brand-desktop {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px 18px 10px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-hairline);
+  }
+
+  .sidebar-brand-title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  .sidebar-brand-sub {
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+  }
+
+  /* Elementos de navegación del sidebar */
+  .nav-tab {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    height: 42px;
+    min-height: 42px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: left;
+    transition: all 0.16s var(--ease-apple-spring);
+  }
+
+  .nav-tab svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .nav-tab span {
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1;
+    transform: none;
+  }
+
+  .nav-tab:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+
+  .nav-tab.active {
+    background: var(--surface-subtle);
+    color: var(--primary);
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 1px 3px rgba(17, 26, 19, 0.04);
+  }
+
+  [data-theme="dark"] .nav-tab.active {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .nav-tab.active svg {
+    transform: none;
+    color: var(--primary);
+  }
+
+  /* Posicionamiento del Header superior en escritorio */
+  .top-header {
+    position: fixed;
+    top: 0;
+    left: var(--sidebar-width);
+    right: 0;
+    width: calc(100% - var(--sidebar-width));
+    max-width: 1180px;
+    height: var(--header-height);
+    padding: 0 40px;
+    margin: 0 auto;
+    z-index: 30;
+  }
+
+  .top-header .brand .brand-badge {
+    display: none;
+  }
+
+  /* Área principal desplazable en escritorio */
+  .main-content {
+    margin-left: var(--sidebar-width);
+    margin-top: var(--header-height);
+    width: calc(100% - var(--sidebar-width));
+    max-width: 1180px;
+    height: calc(100vh - var(--header-height));
+    padding: 32px 40px 60px 40px;
+    padding-bottom: 60px;
+    overflow-y: auto;
+  }
+
+  /* DISTRIBUCIÓN EN 2 COLUMNAS EN ESCRITORIO */
+  .hoy-layout-grid {
+    display: grid;
+    grid-template-columns: 1.18fr 0.82fr;
+    gap: 32px;
+    align-items: start;
+  }
+
+  #cursos-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 18px;
+  }
+
+  #all-tasks-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+  }
+
+  #view-ajustes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    gap: 20px;
+    align-items: start;
+  }
+
+  #view-ajustes .section-header {
+    grid-column: 1 / -1;
   }
 }
