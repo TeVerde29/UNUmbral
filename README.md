@@ -6,7 +6,7 @@
 [![PWA: Offline-First](https://img.shields.io/badge/PWA-Offline--First-AFC49A?style=flat-square&logo=pwa&logoColor=111A13)](https://teverde29.github.io/UNUmbral/)
 [![Dexie.js: 4.4.4](https://img.shields.io/badge/Dexie.js-v4.4.4-4F7256?style=flat-square)](https://dexie.org/)
 [![Capacitor: 8.5.3](https://img.shields.io/badge/Capacitor-8.5.3-2D5A3C?style=flat-square)](https://capacitorjs.com/)
-[![Pruebas: 67 pass](https://img.shields.io/badge/Pruebas-67%20pass-829B78?style=flat-square)](tests/)
+[![Pruebas: 67 pass](https://img.shields.io/badge/Pruebas-68%20pass-829B78?style=flat-square)](tests/)
 [![Licencia: MIT](https://img.shields.io/badge/Licencia-MIT-829B78?style=flat-square)](LICENSE)
 
 ---
@@ -99,7 +99,7 @@ El sistema no delega la lógica de negocio a un backend: la proyección del seme
 | **Notificaciones Locales** | `@capacitor/local-notifications` | 8.3.1 | Alarmas y recordatorios programados en el gestor del sistema operativo. |
 | **Diseño y Estilos** | CSS3 Nativo (Design Ricra) | Estándar | Tokens Tea Green, efecto acrílico (`backdrop-filter`) y modos claro/oscuro. |
 | **Caché Offline** | Service Worker API | Cache API v5 | Descarga anticipada y ejecución autónoma sin conexión. |
-| **Testing Unitario** | Node.js Test Runner | Nativo (`node:test`) | Suite automatizada de 67 pruebas unitarias sin dependencias externas. |
+| **Testing Unitario** | Node.js Test Runner | Nativo (`node:test`) | Suite automatizada de 68 pruebas unitarias sin dependencias externas. |
 | **Testing E2E y Capturas** | Playwright | 1.64.1 | Automatización de navegador y captura de imágenes del sistema. |
 
 ---
@@ -304,7 +304,7 @@ La exportación de horarios produce una cadena comprimida con prefijo `UNU1:Z:`.
 
 ## Pruebas Automatizadas
 
-El proyecto cuenta con 67 pruebas unitarias sin dependencias externas:
+El proyecto cuenta con 68 pruebas unitarias sin dependencias externas:
 
 ```bash
 npm test

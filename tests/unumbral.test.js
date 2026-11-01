@@ -287,3 +287,54 @@ test("renderTaskCardHTML utilizes safeHtml for automatic defense against malicio
   assert.match(html, /&lt;img src=x/);
   assert.match(html, /&lt;iframe/);
 });
+
+
+test("descargarReporteComoImagen utiliza el puente nativo UNUmbralNative en Android o fallback web", () => {
+  const root = path.resolve(__dirname, "..");
+  const code = fs.readFileSync(path.join(root, "app.js"), "utf8");
+
+  let guardadoNativo = false;
+  let nombreArchivoNativo = "";
+
+  const dummyCanvas = {
+    getContext: () => ({
+      fillStyle: "", strokeStyle: "", lineWidth: 0, font: "",
+      fillRect: () => {}, strokeRect: () => {}, beginPath: () => {}, roundRect: () => {},
+      fill: () => {}, stroke: () => {}, fillText: () => {}
+    }),
+    toDataURL: () => "data:image/png;base64,mockReporteData"
+  };
+
+  const sandbox = {
+    window: {
+      crypto: { randomUUID: () => "uuid-123" },
+      UNUmbralNative: {
+        saveImage: (data, name) => {
+          guardadoNativo = true;
+          nombreArchivoNativo = name;
+          return true;
+        }
+      }
+    },
+    document: {
+      addEventListener: () => {},
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      documentElement: { setAttribute: () => {} },
+      createElement: (tag) => (tag === "canvas" ? dummyCanvas : {})
+    },
+    localStorage: { getItem: () => null, setItem: () => {} },
+    navigator: {},
+    Dexie: function() { this.version = () => ({ stores: () => ({ upgrade: () => {} }) }); },
+    setInterval: () => {}, setTimeout: () => {}, clearTimeout: () => {}, requestAnimationFrame: (fn) => fn(),
+    console
+  };
+
+  vm.createContext(sandbox);
+  vm.runInContext(code, sandbox);
+
+  const mockReporte = { cicloNombre: "2026-II", diagnostico: "Excelente", cursos: [] };
+  sandbox.descargarReporteComoImagen(mockReporte);
+  assert.equal(guardadoNativo, true);
+  assert.match(nombreArchivoNativo, /UNUmbral-Reporte-2026-II.png/);
+});

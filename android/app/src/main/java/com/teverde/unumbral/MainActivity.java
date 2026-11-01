@@ -24,6 +24,11 @@ public class MainActivity extends BridgeActivity {
 
     public class UNUmbralAndroidBridge {
         @JavascriptInterface
+        public boolean saveImage(String base64Data, String fileName) {
+            return saveQrImage(base64Data, fileName);
+        }
+
+        @JavascriptInterface
         public boolean saveQrImage(String base64Data, String fileName) {
             try {
                 if (base64Data == null || base64Data.isEmpty()) return false;

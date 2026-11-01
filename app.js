@@ -965,6 +965,7 @@ function tickTaskCountdowns() {
 let toastTimer = null;
 function showToast(msg, isError) {
   const el = $("#toast");
+  if (!el) return;
   el.textContent = msg;
   el.classList.toggle("error", !!isError);
   el.classList.remove("hidden");
@@ -6427,10 +6428,35 @@ function descargarReporteComoImagen(reporte) {
   ctx.fillText(`Generado localmente por UNUmbral · 100% Offline · Fecha de emisión: ${fechaHoy}`, 60, H - 40);
 
   // Descarga como archivo de imagen
-  const link = document.createElement("a");
-  link.download = `UNUmbral-Reporte-${(reporte.cicloNombre || "Ciclo").replace(/\s+/g, "_")}.png`;
-  link.href = canvas.toDataURL("image/png");
-  link.click();
+  const fileName = `UNUmbral-Reporte-${(reporte.cicloNombre || "Ciclo").replace(/\s+/g, "_")}.png`;
+  const dataUrl = canvas.toDataURL("image/png");
+
+  // 1. APK Android nativo con UNUmbralNative: guardar directo en Galería (álbum UNUmbral)
+  if (window.UNUmbralNative && (typeof window.UNUmbralNative.saveImage === "function" || typeof window.UNUmbralNative.saveQrImage === "function")) {
+    try {
+      const fnGuardar = window.UNUmbralNative.saveImage || window.UNUmbralNative.saveQrImage;
+      const guardado = fnGuardar.call(window.UNUmbralNative, dataUrl, fileName);
+      if (guardado) {
+        showToast("Reporte guardado en tu Galería (álbum UNUmbral).");
+        return;
+      }
+    } catch (e) {
+      console.warn("Fallo puente nativo al guardar reporte en imagen:", e);
+    }
+  }
+
+  // 2. Fallback para navegador web / PWA
+  try {
+    const link = document.createElement("a");
+    link.download = fileName;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Reporte descargado correctamente.");
+  } catch (err) {
+    showToast("Error al descargar reporte: " + err.message, true);
+  }
 }
 
 function wireNavigationEvents() {
