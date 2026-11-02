@@ -189,7 +189,8 @@ html, body {
    HEADER SUPERIOR (FROSTED GLASS CHROME)
    ===================================================================== */
 .top-header {
-  height: var(--header-height);
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   padding: 0 18px;
   display: flex;
   align-items: center;
@@ -244,8 +245,7 @@ html, body {
   display: block;
   font-weight: 500;
   letter-spacing: -0.01em;
-  text-transform: capitalize;
-}
+  }
 
 .header-actions {
   display: flex;
@@ -602,17 +602,17 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 }
 
 .empty-card {
-  background: var(--surface);
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 30px 20px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 38px 20px;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 13.5px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .empty-card-icon-wrap {
@@ -1915,7 +1915,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   right: 0;
   max-width: var(--max-width);
   margin: 0 auto;
-  height: var(--nav-height);
+  height: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
   background: var(--chrome-bg);
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
@@ -2906,7 +2906,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   font-size: 12px;
   color: var(--text-secondary);
   background: var(--surface-subtle);
-  border: 1px dashed var(--border-subtle);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   padding: 12px;
   text-align: center;
@@ -2963,7 +2963,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 
 .class-card.is-cancelled {
   opacity: 0.65;
-  border-style: dashed;
+  border-style: solid;
 }
 
 .class-card.is-cancelled .class-card-title {
@@ -2976,7 +2976,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   gap: 6px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px dashed var(--border-hairline);
+  border-top: 1px solid var(--border-hairline);
   flex-wrap: wrap;
 }
 
@@ -4159,4 +4159,1003 @@ textarea,
 
 .nav-tab {
   min-height: 48px;
+}
+
+
+/* =====================================================================
+   APPLE ATTENDANCE SEGMENTED CONTROLS & CONFIRMED STATUSES
+   ===================================================================== */
+.asist-apple-segmented {
+  display: flex;
+  align-items: center;
+  background: var(--surface-subtle);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 3px;
+  margin-top: 10px;
+  border: 1px solid var(--border-hairline);
+}
+
+.asist-seg-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.16s var(--ease-apple-spring);
+  min-height: unset;
+  cursor: pointer;
+}
+
+.asist-seg-btn:active {
+  transform: scale(0.95);
+}
+
+.asist-seg-btn.btn-presente:hover,
+.asist-seg-btn.btn-presente:focus {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.asist-seg-btn.btn-falta:hover,
+.asist-seg-btn.btn-falta:focus {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.asist-seg-btn.btn-justif:hover,
+.asist-seg-btn.btn-justif:focus {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.asist-seg-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  padding: 5px 8px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: unset;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.asist-seg-icon-btn:hover {
+  background: var(--surface-active);
+  color: var(--text-secondary);
+}
+
+.asist-status-confirmed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  animation: iosStatusPop 0.22s var(--ease-apple-bounce) forwards;
+}
+
+@keyframes iosStatusPop {
+  0% { transform: scale(0.96); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.asist-status-confirmed.presente {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+  border: 1px solid rgba(51, 118, 82, 0.25);
+}
+
+.asist-status-confirmed.falta {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+  border: 1px solid rgba(180, 71, 67, 0.25);
+}
+
+.asist-status-confirmed.justificada {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+  border: 1px solid rgba(151, 103, 25, 0.25);
+}
+
+.asist-status-confirmed.cancelada {
+  background: rgba(220, 50, 50, 0.1);
+  color: var(--status-danger);
+  border: 1px solid rgba(220, 50, 50, 0.25);
+}
+
+.asist-action-mini {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+  color: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+  padding: 2px 6px;
+  min-height: unset;
+}
+
+.asist-action-mini:hover {
+  opacity: 1;
+}
+
+/* =====================================================================
+   METADATOS DE TAREAS ESTILO APPLE REMINDERS
+   ===================================================================== */
+.task-card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11.5px;
+}
+
+.subject-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-hairline);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.importance-gauge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.importance-gauge.imp-5 {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+  border: 1px solid rgba(180, 71, 67, 0.3);
+}
+
+.importance-gauge.imp-4 {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+.importance-gauge.imp-3,
+.importance-gauge.imp-2,
+.importance-gauge.imp-1 {
+  background: var(--surface-subtle);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-hairline);
+}
+
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.due-badge.urgent {
+  color: var(--status-danger);
+  font-weight: 600;
+}
+
+.due-badge.soon {
+  color: #b45309;
+  font-weight: 600;
+}
+
+/* En móvil, ocultar la cabecera dropdown redundante de asignatura para dejar espacio a los chips */
+@media (max-width: 599px) {
+  .subject-filter-header {
+    display: none !important;
+  }
+}
+
+/* Ajustes de formularios en 1 columna en móvil */
+@media (max-width: 599px) {
+  .form-row {
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+  .form-row .form-group {
+    width: 100% !important;
+  }
+}
+
+
+/* =====================================================================
+   APPLE HIG P1 & P2 REFINEMENTS (TEA GREEN / DESIGN RICRA)
+   ===================================================================== */
+
+/* 1. Academic Hero Card */
+.academic-hero-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(17, 26, 19, 0.04);
+  margin-bottom: 12px;
+}
+
+.academic-hero-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.academic-hero-caption {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+}
+
+.academic-hero-score {
+  font-family: var(--font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--deep-leaf);
+  line-height: 1.1;
+}
+
+[data-theme="dark"] .academic-hero-score {
+  color: var(--accent);
+}
+
+.academic-hero-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.academic-hero-sep {
+  width: 1px;
+  height: 48px;
+  background: var(--border-hairline);
+  flex-shrink: 0;
+}
+
+.academic-hero-metrics {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.hero-metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  min-width: 46px;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+.hero-metric-val {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.hero-metric-lbl {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+
+.hero-metric-item.st-ok .hero-metric-val {
+  color: var(--status-success);
+}
+
+.hero-metric-item.st-warn .hero-metric-val {
+  color: var(--status-warning);
+}
+
+/* 2. Cursos Header Actions Responsive */
+.cursos-header-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+@media (max-width: 599px) {
+  .btn-action-compact {
+    padding: 6px 9px;
+  }
+  .btn-action-compact .btn-label-desktop {
+    display: none;
+  }
+  .cursos-header-actions {
+    gap: 5px;
+  }
+}
+
+/* 3. Refined Seamless Grade Strip (Apple Clean Metrics Row) */
+.grade-strip {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr 1.25fr !important;
+  align-items: center !important;
+  gap: 0 !important;
+  background: transparent !important;
+  border-top: 1px solid var(--border-hairline) !important;
+  border-bottom: 1px solid var(--border-hairline) !important;
+  border-left: none !important;
+  border-right: none !important;
+  border-radius: 0 !important;
+  padding: 8px 0 !important;
+  margin: 8px 0 6px 0 !important;
+  box-shadow: none !important;
+}
+
+.grade-cell {
+  background: transparent !important;
+  border: none !important;
+  padding: 2px 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  position: relative !important;
+}
+
+/* Hairline vertical divider between metrics */
+.grade-cell:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 15%;
+  height: 70%;
+  width: 1px;
+  background: var(--border-hairline);
+}
+
+.grade-cell-label {
+  font-size: 9.5px !important;
+  font-weight: 600 !important;
+  color: var(--text-tertiary) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-bottom: 2px !important;
+}
+
+.grade-cell-value {
+  font-family: var(--font-mono) !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  color: var(--text-primary) !important;
+  line-height: 1.2 !important;
+}
+
+.grade-cell.is-empty .grade-cell-value {
+  color: var(--text-tertiary) !important;
+  font-weight: 400 !important;
+}
+
+/* Acumulado / Promedio on the right */
+.grade-cell-avg {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 2px 4px !important;
+}
+
+.grade-cell-avg .grade-cell-value {
+  font-size: 16px !important;
+  font-weight: 800 !important;
+}
+
+.grade-cell-avg.st-ok .grade-cell-value {
+  color: var(--status-success) !important;
+}
+
+.grade-cell-avg.st-warn .grade-cell-value {
+  color: var(--status-warning) !important;
+}
+
+.grade-cell-avg.st-danger .grade-cell-value,
+.grade-cell-avg.st-bad .grade-cell-value {
+  color: var(--status-danger) !important;
+}
+
+/* Course Card Footer (Single balanced row) */
+.course-card-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin-top: 4px !important;
+  flex-wrap: nowrap !important;
+}
+
+.course-card-footer-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.course-hint {
+  font-size: 11px !important;
+  color: var(--text-secondary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* Demo Semestre Buttons (Side-by-Side 2-Column Grid) */
+.settings-demo-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 10px !important;
+  width: 100%;
+}
+
+.settings-demo-grid .btn-secondary,
+.settings-demo-grid .btn-danger-outline {
+  width: 100%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 10px 8px;
+  font-size: 12px;
+  line-height: 1.25;
+  border-radius: var(--radius-sm);
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+/* 4. Schedule Day Strip (Apple Calendar 7-Day Header) */
+.matrix-toolbar {
+  margin-bottom: 10px;
+}
+
+.matrix-jump-scroll {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.matrix-jump-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.matrix-jump-chip {
+  flex: 1;
+  min-width: 38px;
+  height: 32px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.matrix-jump-chip.active {
+  background: var(--deep-leaf);
+  color: #FFFFFF;
+  border-color: var(--deep-leaf);
+}
+
+[data-theme="dark"] .matrix-jump-chip.active {
+  background: var(--accent);
+  color: var(--charcoal-deep);
+  border-color: var(--accent);
+}
+
+@media (max-width: 599px) {
+  .matrix-scroll-wrapper,
+  .gcal-wrapper {
+    scroll-snap-type: x proximity;
+    scroll-padding-left: 72px;
+  }
+  .gcal-day-column {
+    scroll-snap-align: start;
+  }
+}
+
+/* 5. Refined Tasks Card Layout (Reminders Group Inset feel) */
+.task-card {
+  padding: 11px 14px;
+  gap: 11px;
+  border-radius: var(--radius-md);
+  margin-bottom: 2px;
+}
+
+.task-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.task-card-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.task-card-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+}
+
+.task-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+
+/* Tasks Inset Group (Apple Reminders Style) */
+.tasks-inset-group {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(17, 26, 19, 0.03);
+  margin-bottom: 12px;
+}
+
+.tasks-inset-group .task-card {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid var(--border-hairline) !important;
+  padding: 10px 14px !important;
+  gap: 11px !important;
+  align-items: flex-start !important;
+  margin-bottom: 0 !important;
+}
+
+.tasks-inset-group .task-card:last-child {
+  border-bottom: none !important;
+}
+
+.tasks-inset-group .task-card:active {
+  background: var(--surface-subtle) !important;
+}
+
+/* Hide bulky countdown badge in task lists */
+.tasks-inset-group .task-countdown-badge {
+  display: none !important;
+}
+
+.tasks-inset-group .task-check-circle {
+  width: 19px !important;
+  height: 19px !important;
+  min-width: 19px !important;
+  margin-top: 1px !important;
+  border-width: 1.5px !important;
+}
+
+.tasks-inset-group .task-card-title {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--text-primary) !important;
+  line-height: 1.28 !important;
+}
+
+.tasks-inset-group .task-card-desc {
+  font-size: 11.5px !important;
+  color: var(--text-tertiary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin: 1px 0 2px 0 !important;
+  line-height: 1.3 !important;
+}
+
+/* Eliminate messy globos / pill badges in tasks */
+.tasks-inset-group .task-card-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex-wrap: nowrap !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  margin-top: 3px !important;
+  font-size: 11px !important;
+}
+
+.tasks-inset-group .task-card-meta > * {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: var(--text-secondary) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+.tasks-inset-group .task-card-meta .subject-pill {
+  color: var(--deep-leaf) !important;
+  font-weight: 600 !important;
+  max-width: 140px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  flex-shrink: 1 !important;
+}
+
+.tasks-inset-group .task-card-meta .task-meta-dot {
+  opacity: 0.35 !important;
+  font-weight: 400 !important;
+  color: var(--text-tertiary) !important;
+  padding: 0 1px !important;
+  flex-shrink: 0 !important;
+}
+
+.tasks-inset-group .task-card-meta .importance-gauge,
+.tasks-inset-group .task-card-meta .due-badge {
+  flex-shrink: 0 !important;
+}
+.tasks-inset-group .task-card-meta .importance-gauge.imp-5 {
+  color: var(--status-danger) !important;
+}
+.tasks-inset-group .task-card-meta .importance-gauge.imp-4 {
+  color: #b45309 !important;
+}
+
+.tasks-inset-group .task-card-meta .due-badge.urgent {
+  color: var(--status-danger) !important;
+  font-weight: 600 !important;
+}
+
+/* Compact Search & Chips Rhythm */
+@media (max-width: 599px) {
+  .tasks-toolbar {
+    margin-bottom: 8px;
+  }
+  #tasks-search-container {
+    margin-top: 2px !important;
+    margin-bottom: 8px !important;
+    height: 38px !important;
+  }
+  #tasks-filter-chips {
+    margin-bottom: 8px !important;
+    padding: 2px 0 4px !important;
+  }
+  .chips-scroll {
+    gap: 6px;
+  }
+  .chip {
+    padding: 5px 11px;
+    font-size: 11.5px;
+    height: 30px;
+  }
+}
+
+/* Side-by-side QR buttons in Ajustes */
+.settings-qr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 340px) {
+  .settings-qr-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Apple Inset Form Styling for Perfil del Estudiante */
+#form-perfil-estudiante {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#form-perfil-estudiante .form-row {
+  display: flex;
+  gap: 10px;
+}
+
+@media (max-width: 599px) {
+  #form-perfil-estudiante .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+#form-perfil-estudiante .form-group {
+  margin-bottom: 0;
+}
+
+#form-perfil-estudiante .form-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+#form-perfil-estudiante .field {
+  height: 40px;
+  font-size: 13.5px;
+  border-radius: var(--radius-sm);
+  padding: 0 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#form-perfil-estudiante .field:focus {
+  border-color: var(--deep-leaf);
+  box-shadow: 0 0 0 3px rgba(35, 120, 70, 0.12);
+  background: var(--surface);
+}
+
+
+/* =====================================================================
+   MODAL DE INFORMACIÓN DE CLASE Y ASISTENCIA (APPLE HIG)
+   ===================================================================== */
+.clase-info-type-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 6px;
+}
+
+.clase-info-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+  margin: 0 0 2px 0;
+  letter-spacing: -0.015em;
+}
+
+.clase-info-inset-card {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.clase-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: 13px;
+}
+
+.clase-info-row:last-child {
+  border-bottom: none;
+}
+
+.clase-info-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.clase-info-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: right;
+}
+
+.clase-asist-section {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(17, 26, 19, 0.03);
+}
+
+.clase-asist-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.clase-asist-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-tertiary);
+}
+
+.clase-asist-date {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.clase-asist-status-banner {
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.clase-asist-status-banner p {
+  margin: 2px 0 0 0;
+  font-size: 11.5px;
+  color: inherit;
+  opacity: 0.88;
+}
+
+.clase-asist-status-banner.st-presente {
+  background: rgba(35, 120, 70, 0.12);
+  color: var(--status-success);
+  border: 1px solid rgba(35, 120, 70, 0.25);
+}
+
+.clase-asist-status-banner.st-falta {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--status-danger);
+  border: 1px solid rgba(220, 38, 38, 0.22);
+}
+
+.clase-asist-status-banner.st-justificada {
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--status-warning);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
+.clase-asist-status-banner.st-cancelada {
+  background: rgba(100, 116, 139, 0.12);
+  color: #64748B;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+}
+
+.clase-asist-status-banner.st-pendiente {
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-hairline);
+}
+
+.asist-banner-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.asist-banner-icon svg {
+  color: #FFFFFF;
+}
+
+.clase-asist-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.btn-asist-pill {
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s var(--ease-apple-spring);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn-asist-pill:active {
+  transform: scale(0.94);
+}
+
+.btn-asist-pill.is-active.presente {
+  background: var(--deep-leaf);
+  color: #FFFFFF;
+  border-color: var(--deep-leaf);
+  box-shadow: 0 2px 8px rgba(35, 120, 70, 0.3);
+}
+
+.btn-asist-pill.is-active.falta {
+  background: var(--status-danger);
+  color: #FFFFFF;
+  border-color: var(--status-danger);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+}
+
+.btn-asist-pill.is-active.justificada {
+  background: var(--status-warning);
+  color: #FFFFFF;
+  border-color: var(--status-warning);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+}
+
+.btn-asist-pill.is-active.cancelada {
+  background: #64748B;
+  color: #FFFFFF;
+  border-color: #64748B;
+}
+
+.clase-info-actions-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
 }
