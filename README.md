@@ -11,20 +11,19 @@
 
 ---
 
-## Capturas
+## Capturas (Mobile — iPhone 16 Pro Max · 440 × 956 px)
 
-| Vista Principal y Próxima Clase (`view-hoy`) | Parrilla Semanal de Horario (`view-horario`) |
+| Vista Principal (view-hoy) | Horario y Parrilla (view-horario) |
 |:---:|:---:|
-| ![Panel de control diario con próxima clase y tareas](img/unumbral-hoy.png) | ![Parrilla semanal de cursos y actividades](img/unumbral-horario.png) |
+| ![Vista Principal Hoy en iPhone 16 Pro Max](img/unumbral-hoy.png) | ![Parrilla Semanal de Horario en iPhone 16 Pro Max](img/unumbral-horario.png) |
 
-| Catálogo de Asignaturas y Notas (`view-cursos`) | Planificador de Tareas por Urgencia (`view-tareas`) |
+| Asignaturas y Notas (view-cursos) | Planificador de Tareas (view-tareas) |
 |:---:|:---:|
-| ![Catálogo de asignaturas con créditos y notas](img/unumbral-cursos.png) | ![Listado de tareas clasificadas por nivel de importancia](img/unumbral-tareas.png) |
+| ![Catálogo de Cursos y Evaluaciones en iPhone 16 Pro Max](img/unumbral-cursos.png) | ![Planificador de Tareas por Urgencia en iPhone 16 Pro Max](img/unumbral-tareas.png) |
 
-| Resumen y Exportación de Horario por QR | Interfaz en Dispositivo Móvil |
+| Transferencia de Horario por QR | Modo Oscuro / Ajustes Móvil |
 |:---:|:---:|
-| ![Modal de exportación de horario por código QR](img/unumbral-qr.png) | ![Interfaz responsiva en teléfono móvil](img/unumbral-movil.png) |
-
+| ![Modal de Compartir Horario por QR en iPhone 16 Pro Max](img/unumbral-qr.png) | ![Interfaz en Modo Oscuro en iPhone 16 Pro Max](img/unumbral-movil.png) |
 ---
 
 Los estudiantes universitarios gestionan sus asignaturas, bloques de clases y fechas límite en un entorno local sin intermediarios. La aplicación proyecta automáticamente las 17 semanas del semestre, calcula promedios ponderados en escala vigesimal, descuenta inasistencias según el artículo 31 del reglamento académico, emite alarmas sonoras previas a cada sesión y permite intercambiar la carga lectiva con otros estudiantes mediante códigos QR comprimidos sin compartir calificaciones ni notas privadas.
