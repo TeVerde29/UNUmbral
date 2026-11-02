@@ -4122,3 +4122,41 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
     grid-column: 1 / -1;
   }
 }
+
+/* =====================================================================
+   REGLA DE ACCESIBILIDAD Y AUTO-ZOOM EN SAFARI MÓVIL (APPLE HIG 16px)
+   En iOS, inputs con menos de 16px provocan zoom brusco automático al enfocar.
+   ===================================================================== */
+input,
+select,
+textarea,
+.field,
+.search-box input {
+  font-size: 16px;
+}
+
+@media (min-width: 960px) {
+  input,
+  select,
+  textarea,
+  .field,
+  .search-box input {
+    font-size: 14px;
+  }
+}
+
+/* Área táctil mínima ergonomía móvil (44px) */
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-danger-outline {
+  min-height: 42px;
+}
+
+.btn-sm {
+  min-height: 34px;
+}
+
+.nav-tab {
+  min-height: 48px;
+}
