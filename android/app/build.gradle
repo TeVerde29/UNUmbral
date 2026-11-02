@@ -16,20 +16,31 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
     signingConfigs {
         release {
-            storeFile file('../unumbral-release-key.jks')
-            storePassword 'unumbral2026'
-            keyAlias 'unumbral'
-            keyPassword 'unumbral2026'
+            def keystoreFile = file('../unumbral-release-key.jks')
+            if (keystoreFile.exists()) {
+                storeFile keystoreFile
+                storePassword 'unumbral2026'
+                keyAlias 'unumbral'
+                keyPassword 'unumbral2026'
+            }
         }
     }
+
     buildTypes {
         debug {
-            signingConfig signingConfigs.release
+            def keystoreFile = file('../unumbral-release-key.jks')
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
         release {
-            signingConfig signingConfigs.release
+            def keystoreFile = file('../unumbral-release-key.jks')
+            if (keystoreFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

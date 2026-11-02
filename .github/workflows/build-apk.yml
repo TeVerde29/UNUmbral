@@ -2,7 +2,7 @@ name: Compilar APK Android (UNUmbral)
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, desarrollo ]
   workflow_dispatch:
 
 jobs:
@@ -39,6 +39,21 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
+      - name: Restaurar Keystore Permanente de Firma Oficial
+        env:
+          KEYSTORE_BASE64: ${{ secrets.UNUMBRAL_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > android/unumbral-release-key.jks
+            echo "Keystore permanente restaurado desde Secrets."
+          else
+            echo "Secrets no configurado, generando keystore permanente por defecto..."
+            keytool -genkeypair -v -keystore android/unumbral-release-key.jks \
+              -alias unumbral -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "unumbral2026" -keypass "unumbral2026" \
+              -dname "CN=UNUmbral, OU=UNU, O=TeVerde, L=Pucallpa, ST=Ucayali, C=PE"
+          fi
+
       - name: Aceptar licencias de Android SDK
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -54,6 +69,6 @@ jobs:
       - name: Subir APK como artefacto descargable
         uses: actions/upload-artifact@v4
         with:
-          name: UNUmbral-debug-apk
+          name: UNUmbral-v1.0.1-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
