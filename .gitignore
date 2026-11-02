@@ -10,3 +10,14 @@ android/app/src/main/assets/capacitor.config.json
 Thumbs.db
 test-results/
 playwright-report/
+
+# Documentos confidenciales y requerimientos internos
+REQUERIMIENTOS.md
+*.local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*.jks
