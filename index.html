@@ -154,8 +154,9 @@
     <section id="view-horario" class="view-panel">
       <div class="view-toolbar">
         <div class="segmented-control">
-          <button class="seg-btn active" id="btn-mode-matrix" data-mode="matrix">Parrilla Semanal</button>
-          <button class="seg-btn" id="btn-mode-cycle" data-mode="cycle">Ciclo Académico</button>
+          <button class="seg-btn active" id="btn-mode-day" data-mode="day">Día a Día</button>
+          <button class="seg-btn" id="btn-mode-matrix" data-mode="matrix">Semana</button>
+          <button class="seg-btn" id="btn-mode-cycle" data-mode="cycle">Ciclo</button>
         </div>
         <button id="btn-add-class" class="btn-secondary btn-sm">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -459,126 +460,174 @@
         </form>
       </div>
 
-<!-- Alertas y Notificaciones Locales (Capacitor APK) -->
+<!-- Ajustes Agrupados en Bloques (Estilo Apple Settings) -->
       <div class="section-header" style="margin-top: 28px;">
         <div>
-          <h2 class="section-title">Alertas y Notificaciones</h2>
-          <p class="section-subtitle">Avisos locales programados 100% offline sin servidores ni internet</p>
+          <h2 class="section-title">Configuración y Preferencias</h2>
+          <p class="section-subtitle">Avisos locales programados 100% offline y visualización</p>
         </div>
       </div>
 
-      <div class="settings-card highlight-card">
-
-        <div class="settings-toggle-group">
-          <label class="settings-toggle-item">
-            <div>
-              <strong>Avisos de Clases (30 y 10 min antes)</strong>
-              <p>Notificaciones antes de iniciar cada sesión programada.</p>
-            </div>
-            <input type="checkbox" id="ajuste-notif-clases" class="toggle-checkbox" checked>
-          </label>
-
-          <label class="settings-toggle-item">
-            <div>
-              <strong>Alertas de Tareas (Nivel 1 al 3)</strong>
-              <p>Inician 48 h antes del vencimiento y se repiten cada 8 h.</p>
-            </div>
-            <input type="checkbox" id="ajuste-notif-tareas" class="toggle-checkbox" checked>
-          </label>
-
-          <label class="settings-toggle-item">
-            <div>
-              <strong>Alertas Insistentes (Nivel 4 y 5)</strong>
-              <p>Canal urgente cada 4 h y avisos a 2 h, 30 min y 10 min antes.</p>
-            </div>
-            <input type="checkbox" id="ajuste-notif-urgentes" class="toggle-checkbox" checked>
-          </label>
-
-          <label class="settings-toggle-item">
-            <div>
-              <strong>Nivel 5 ignora horas de silencio</strong>
-              <p>Alerta con sonido y vibración máxima incluso en periodo nocturno.</p>
-            </div>
-            <input type="checkbox" id="ajuste-nivel5-silencio" class="toggle-checkbox" checked>
-          </label>
-
-          <label class="settings-toggle-item">
-            <div>
-              <strong>Resumen Matutino Diario</strong>
-              <p>Notificación a primera hora con las clases y tareas del día.</p>
-            </div>
-            <input type="checkbox" id="ajuste-resumen-activo" class="toggle-checkbox" checked>
-          </label>
-        </div>
-
-        <div class="form-row" style="margin-top: 14px;">
-          <div class="form-group">
-            <label class="form-label">Silencio: Desde</label>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-silencio-desde-h" class="field time-12h-select" aria-label="Hora silencio desde"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-silencio-desde-m" class="field time-12h-select" aria-label="Minuto silencio desde"></select>
-              <button type="button" id="btn-ajuste-silencio-desde-ampm" class="btn-ampm-toggle is-pm">PM</button>
-            </div>
-            <input type="hidden" id="ajuste-silencio-desde" value="22:00">
+      <div class="settings-blocks-stack">
+        <!-- Bloque 1: Notificaciones académicas -->
+        <div class="settings-card settings-group-block">
+          <div class="settings-block-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span>Notificaciones académicas</span>
           </div>
+          <div class="settings-toggle-group">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Avisos de Clases (30 y 10 min antes)</strong>
+                <p>Notificaciones antes de iniciar cada sesión programada.</p>
+              </div>
+              <input type="checkbox" id="ajuste-notif-clases" class="toggle-checkbox" checked>
+            </label>
 
-          <div class="form-group">
-            <label class="form-label">Silencio: Hasta</label>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-silencio-hasta-h" class="field time-12h-select" aria-label="Hora silencio hasta"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-silencio-hasta-m" class="field time-12h-select" aria-label="Minuto silencio hasta"></select>
-              <button type="button" id="btn-ajuste-silencio-hasta-ampm" class="btn-ampm-toggle">AM</button>
-            </div>
-            <input type="hidden" id="ajuste-silencio-hasta" value="07:00">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Alertas de Tareas (Nivel 1 al 3)</strong>
+                <p>Inician 48 h antes del vencimiento y se repiten cada 8 h.</p>
+              </div>
+              <input type="checkbox" id="ajuste-notif-tareas" class="toggle-checkbox" checked>
+            </label>
           </div>
         </div>
 
-        <div class="form-row" style="margin-top: 10px;">
-          <div class="form-group">
-            <label class="form-label">Ventana Huecos: Desde</label>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-huecos-desde-h" class="field time-12h-select" aria-label="Hora huecos desde"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-huecos-desde-m" class="field time-12h-select" aria-label="Minuto huecos desde"></select>
-              <button type="button" id="btn-ajuste-huecos-desde-ampm" class="btn-ampm-toggle">AM</button>
-            </div>
-            <input type="hidden" id="ajuste-huecos-desde" value="07:00">
+        <!-- Bloque 2: Horarios de silencio -->
+        <div class="settings-card settings-group-block">
+          <div class="settings-block-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <span>Horarios de silencio</span>
           </div>
-
-          <div class="form-group">
-            <label class="form-label">Ventana Huecos: Hasta</label>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-huecos-hasta-h" class="field time-12h-select" aria-label="Hora huecos hasta"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-huecos-hasta-m" class="field time-12h-select" aria-label="Minuto huecos hasta"></select>
-              <button type="button" id="btn-ajuste-huecos-hasta-ampm" class="btn-ampm-toggle is-pm">PM</button>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Silencio: Desde</label>
+              <div class="time-12h-picker-wrap">
+                <select id="select-ajuste-silencio-desde-h" class="field time-12h-select" aria-label="Hora silencio desde"></select>
+                <span class="time-12h-colon">:</span>
+                <select id="select-ajuste-silencio-desde-m" class="field time-12h-select" aria-label="Minuto silencio desde"></select>
+                <button type="button" id="btn-ajuste-silencio-desde-ampm" class="btn-ampm-toggle is-pm">PM</button>
+              </div>
+              <input type="hidden" id="ajuste-silencio-desde" value="22:00">
             </div>
-            <input type="hidden" id="ajuste-huecos-hasta" value="22:00">
+
+            <div class="form-group">
+              <label class="form-label">Silencio: Hasta</label>
+              <div class="time-12h-picker-wrap">
+                <select id="select-ajuste-silencio-hasta-h" class="field time-12h-select" aria-label="Hora silencio hasta"></select>
+                <span class="time-12h-colon">:</span>
+                <select id="select-ajuste-silencio-hasta-m" class="field time-12h-select" aria-label="Minuto silencio hasta"></select>
+                <button type="button" id="btn-ajuste-silencio-hasta-ampm" class="btn-ampm-toggle">AM</button>
+              </div>
+              <input type="hidden" id="ajuste-silencio-hasta" value="07:00">
+            </div>
           </div>
         </div>
 
-        <div class="form-row" style="margin-top: 10px;">
-          <div class="form-group">
-            <label class="form-label">Hora del Resumen</label>
-            <div class="time-12h-picker-wrap">
-              <select id="select-ajuste-resumen-h" class="field time-12h-select" aria-label="Hora resumen"></select>
-              <span class="time-12h-colon">:</span>
-              <select id="select-ajuste-resumen-m" class="field time-12h-select" aria-label="Minuto resumen"></select>
-              <button type="button" id="btn-ajuste-resumen-ampm" class="btn-ampm-toggle">AM</button>
-            </div>
-            <input type="hidden" id="ajuste-resumen-hora" value="07:00">
+        <!-- Bloque 3: Alertas urgentes -->
+        <div class="settings-card settings-group-block">
+          <div class="settings-block-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>Alertas urgentes</span>
           </div>
+          <div class="settings-toggle-group">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Alertas Insistentes (Nivel 4 y 5)</strong>
+                <p>Canal urgente cada 4 h y avisos a 2 h, 30 min y 10 min antes.</p>
+              </div>
+              <input type="checkbox" id="ajuste-notif-urgentes" class="toggle-checkbox" checked>
+            </label>
 
-          <div class="form-group">
-            <label class="form-label" for="ajuste-huecos-min">Mínimo Hueco (min)</label>
-            <input type="number" id="ajuste-huecos-min" class="field" min="15" max="180" step="5" value="30">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Nivel 5 ignora horas de silencio</strong>
+                <p>Alerta con sonido y vibración máxima incluso en periodo nocturno.</p>
+              </div>
+              <input type="checkbox" id="ajuste-nivel5-silencio" class="toggle-checkbox" checked>
+            </label>
           </div>
         </div>
 
-        <div class="settings-card-actions" style="margin-top: 16px;">
-          <button id="btn-save-ajustes" class="btn-primary">
+        <!-- Bloque 4: Resumen diario -->
+        <div class="settings-card settings-group-block">
+          <div class="settings-block-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line></svg>
+            <span>Resumen diario</span>
+          </div>
+          <div class="settings-toggle-group">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Resumen Matutino Diario</strong>
+                <p>Notificación a primera hora con las clases y tareas del día.</p>
+              </div>
+              <input type="checkbox" id="ajuste-resumen-activo" class="toggle-checkbox" checked>
+            </label>
+          </div>
+          <div class="form-row" style="margin-top: 12px;">
+            <div class="form-group">
+              <label class="form-label">Hora del Resumen</label>
+              <div class="time-12h-picker-wrap">
+                <select id="select-ajuste-resumen-h" class="field time-12h-select" aria-label="Hora resumen"></select>
+                <span class="time-12h-colon">:</span>
+                <select id="select-ajuste-resumen-m" class="field time-12h-select" aria-label="Minuto resumen"></select>
+                <button type="button" id="btn-ajuste-resumen-ampm" class="btn-ampm-toggle">AM</button>
+              </div>
+              <input type="hidden" id="ajuste-resumen-hora" value="07:00">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque 5: Preferencias de visualización -->
+        <div class="settings-card settings-group-block">
+          <div class="settings-block-title">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+            <span>Preferencias de visualización</span>
+          </div>
+          <div class="settings-toggle-group" style="margin-bottom: 12px;">
+            <label class="settings-toggle-item">
+              <div>
+                <strong>Modo Oscuro</strong>
+                <p>Alterna entre la paleta Tea Green clara y nocturna con transición suave.</p>
+              </div>
+              <input type="checkbox" id="ajuste-modo-oscuro-toggle" class="toggle-checkbox">
+            </label>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Ventana Huecos: Desde</label>
+              <div class="time-12h-picker-wrap">
+                <select id="select-ajuste-huecos-desde-h" class="field time-12h-select" aria-label="Hora huecos desde"></select>
+                <span class="time-12h-colon">:</span>
+                <select id="select-ajuste-huecos-desde-m" class="field time-12h-select" aria-label="Minuto huecos desde"></select>
+                <button type="button" id="btn-ajuste-huecos-desde-ampm" class="btn-ampm-toggle">AM</button>
+              </div>
+              <input type="hidden" id="ajuste-huecos-desde" value="07:00">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Ventana Huecos: Hasta</label>
+              <div class="time-12h-picker-wrap">
+                <select id="select-ajuste-huecos-hasta-h" class="field time-12h-select" aria-label="Hora huecos hasta"></select>
+                <span class="time-12h-colon">:</span>
+                <select id="select-ajuste-huecos-hasta-m" class="field time-12h-select" aria-label="Minuto huecos hasta"></select>
+                <button type="button" id="btn-ajuste-huecos-hasta-ampm" class="btn-ampm-toggle is-pm">PM</button>
+              </div>
+              <input type="hidden" id="ajuste-huecos-hasta" value="22:00">
+            </div>
+          </div>
+
+          <div class="form-row" style="margin-top: 10px;">
+            <div class="form-group">
+              <label class="form-label" for="ajuste-huecos-min">Duración mínima de hueco libre (min)</label>
+              <input type="number" id="ajuste-huecos-min" class="field" min="15" max="180" step="5" value="30">
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-save-bar">
+          <button id="btn-save-ajustes" class="btn-primary" style="width: 100%;">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
             <span>Guardar Ajustes</span>
           </button>

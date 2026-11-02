@@ -372,7 +372,7 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 
 .view-panel.active {
   display: block;
-  animation: iosFadeIn 0.28s var(--ease-apple-spring) forwards;
+  animation: iosFadeIn 0.20s var(--ease-apple-spring) forwards;
 }
 
 @keyframes iosFadeIn {
@@ -751,7 +751,20 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 
 .task-card.completed .task-card-title {
   text-decoration: line-through;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  transition: all 0.22s ease;
+}
+
+.task-card.completing {
+  opacity: 0.52;
+  transform: scale(0.985);
+  transition: opacity 0.24s ease, transform 0.24s var(--ease-apple-spring);
+}
+
+.task-card.completing .task-card-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+  transition: all 0.22s ease;
 }
 
 .task-check-circle {
@@ -771,7 +784,19 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 }
 
 .task-check-circle:active {
-  transform: scale(0.88);
+  transform: scale(0.85);
+}
+
+.task-check-circle.anim-pop {
+  animation: appleCheckPop 0.28s var(--ease-apple-spring) forwards;
+}
+
+@keyframes appleCheckPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.78); }
+  65% { transform: scale(1.22); }
+  85% { transform: scale(0.96); }
+  100% { transform: scale(1); }
 }
 
 .task-card.completed .task-check-circle {
@@ -1968,9 +1993,16 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
   color: var(--accent);
 }
 
-.nav-tab.active svg {
+@keyframes appleTabBounce {
+  0% { transform: scale(0.86); }
+  40% { transform: scale(1.24) translateY(-2px); }
+  75% { transform: scale(0.96) translateY(0); }
+  100% { transform: scale(1.14) translateY(-1px); }
+}
+
+.bottom-nav .nav-tab.active svg {
+  animation: appleTabBounce 0.32s var(--ease-apple-spring);
   transform: scale(1.14) translateY(-1px);
-  transition: transform 0.28s var(--ease-apple-bounce);
 }
 
 .nav-tab-icon-wrap {
@@ -2082,6 +2114,38 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 @keyframes iosModalPop {
   0% { transform: scale(0.94); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+.modal-backdrop.is-closing {
+  animation: iosBackdropFadeOut 0.22s cubic-bezier(0.32, 0, 0.67, 0) forwards;
+  pointer-events: none;
+}
+
+.modal-backdrop.is-closing .modal,
+.modal-backdrop.is-closing .modal-sheet {
+  animation: iosSheetDown 0.22s cubic-bezier(0.32, 0, 0.67, 0) forwards;
+}
+
+@media (min-width: 600px) {
+  .modal-backdrop.is-closing .modal,
+  .modal-backdrop.is-closing .modal-sheet {
+    animation: iosModalPopOut 0.18s cubic-bezier(0.32, 0, 0.67, 0) forwards;
+  }
+}
+
+@keyframes iosSheetDown {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
+}
+
+@keyframes iosBackdropFadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes iosModalPopOut {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0; }
 }
 
 .modal-header {
@@ -3881,25 +3945,77 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 }
 
 /* Entrada escalonada orgánica en listas (Apple Staggered Cascade) */
-.cards-list > *:nth-child(1) { animation-delay: 0.02s; }
-.cards-list > *:nth-child(2) { animation-delay: 0.05s; }
-.cards-list > *:nth-child(3) { animation-delay: 0.08s; }
-.cards-list > *:nth-child(4) { animation-delay: 0.11s; }
-.cards-list > *:nth-child(5) { animation-delay: 0.14s; }
-.cards-list > *:nth-child(6) { animation-delay: 0.17s; }
-.cards-list > *:nth-child(7) { animation-delay: 0.20s; }
-.cards-list > *:nth-child(8) { animation-delay: 0.23s; }
-
 .class-card,
 .task-card,
-.curso-card {
+.course-card,
+.free-slot-card {
   animation: appleCardCascade 0.32s var(--ease-apple-spring) backwards;
 }
+
+.class-card:nth-child(1),
+.task-card:nth-child(1),
+.course-card:nth-child(1),
+.free-slot-card:nth-child(1),
+.cards-list > *:nth-child(1) { animation-delay: 0.02s; }
+
+.class-card:nth-child(2),
+.task-card:nth-child(2),
+.course-card:nth-child(2),
+.free-slot-card:nth-child(2),
+.cards-list > *:nth-child(2) { animation-delay: 0.05s; }
+
+.class-card:nth-child(3),
+.task-card:nth-child(3),
+.course-card:nth-child(3),
+.free-slot-card:nth-child(3),
+.cards-list > *:nth-child(3) { animation-delay: 0.08s; }
+
+.class-card:nth-child(4),
+.task-card:nth-child(4),
+.course-card:nth-child(4),
+.free-slot-card:nth-child(4),
+.cards-list > *:nth-child(4) { animation-delay: 0.11s; }
+
+.class-card:nth-child(5),
+.task-card:nth-child(5),
+.course-card:nth-child(5),
+.free-slot-card:nth-child(5),
+.cards-list > *:nth-child(5) { animation-delay: 0.14s; }
+
+.class-card:nth-child(6),
+.task-card:nth-child(6),
+.course-card:nth-child(6),
+.free-slot-card:nth-child(6),
+.cards-list > *:nth-child(6) { animation-delay: 0.17s; }
+
+.class-card:nth-child(7),
+.task-card:nth-child(7),
+.course-card:nth-child(7),
+.free-slot-card:nth-child(7),
+.cards-list > *:nth-child(7) { animation-delay: 0.20s; }
+
+.class-card:nth-child(8),
+.task-card:nth-child(8),
+.course-card:nth-child(8),
+.free-slot-card:nth-child(8),
+.cards-list > *:nth-child(8) { animation-delay: 0.23s; }
+
+.class-card:nth-child(9),
+.task-card:nth-child(9),
+.course-card:nth-child(9),
+.free-slot-card:nth-child(9),
+.cards-list > *:nth-child(9) { animation-delay: 0.26s; }
+
+.class-card:nth-child(10),
+.task-card:nth-child(10),
+.course-card:nth-child(10),
+.free-slot-card:nth-child(10),
+.cards-list > *:nth-child(10) { animation-delay: 0.29s; }
 
 @keyframes appleCardCascade {
   0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.988);
+    transform: translateY(8px) scale(0.99);
   }
   100% {
     opacity: 1;
@@ -3910,7 +4026,8 @@ button:active, .btn-primary:active, .btn-secondary:active, .btn-danger:active {
 @media (prefers-reduced-motion: reduce) {
   .class-card,
   .task-card,
-  .curso-card {
+  .course-card,
+  .free-slot-card {
     animation: none !important;
   }
 }
@@ -5307,3 +5424,551 @@ textarea,
   align-items: center;
   gap: 4.5px;
 }
+
+
+/* =====================================================================
+   BLOQUES AGRUPADOS DE AJUSTES (ESTILO APPLE SETTINGS INSET GROUPED)
+   ===================================================================== */
+.settings-blocks-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.settings-group-block {
+  margin-bottom: 0 !important;
+  padding: 15px 16px !important;
+}
+
+.settings-block-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--primary);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+[data-theme="dark"] .settings-block-title {
+  color: var(--accent);
+}
+
+.settings-block-title svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.settings-save-bar {
+  margin-top: 2px;
+}
+
+/* =====================================================================
+   TRANSICIÓN SUAVE DE TEMA CLARO / OSCURO & FEEDBACK DISCRETO DE GUARDADO
+   ===================================================================== */
+html.theme-transitioning,
+html.theme-transitioning body,
+html.theme-transitioning .top-header,
+html.theme-transitioning .bottom-nav,
+html.theme-transitioning .live-card,
+html.theme-transitioning .class-card,
+html.theme-transitioning .course-card,
+html.theme-transitioning .task-card,
+html.theme-transitioning .free-slot-card,
+html.theme-transitioning .settings-card,
+html.theme-transitioning .apple-day-view,
+html.theme-transitioning .apple-day-header-card,
+html.theme-transitioning .apple-day-timeline-card,
+html.theme-transitioning .modal,
+html.theme-transitioning .modal-sheet {
+  transition:
+    background-color 0.22s ease,
+    color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease !important;
+}
+
+@keyframes btnSavedPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.96); }
+  80% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.btn-saved-feedback {
+  animation: btnSavedPulse 0.24s var(--ease-apple-spring);
+}
+
+/* =====================================================================
+   EXPANDIR TARJETA: ALTURA ANIMADA Y CONTENIDO GRADUAL (CICLO ACADÉMICO)
+   ===================================================================== */
+.cycle-week-card {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.18s var(--ease-apple-spring), box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.cycle-week-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cycle-week-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  transition: transform 0.22s var(--ease-apple-spring);
+  margin-left: 4px;
+}
+
+.cycle-week-card.is-expanded .cycle-week-chevron {
+  transform: rotate(180deg);
+}
+
+.cycle-week-expand-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.24s var(--ease-apple-spring),
+    opacity 0.20s ease,
+    margin-top 0.22s var(--ease-apple-spring);
+  margin-top: 0;
+}
+
+.cycle-week-card.is-expanded .cycle-week-expand-wrap {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 8px;
+}
+
+.cycle-week-expand-inner {
+  overflow: hidden;
+}
+
+/* =====================================================================
+   VISTA DÍA A DÍA EN HORARIO (APPLE CALENDAR DAY VIEW + UNUMBRAL TEA GREEN)
+   ===================================================================== */
+.apple-day-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.apple-day-header-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 12px 12px 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.apple-week-strip {
+  display: grid;
+  grid-template-columns: repeat(var(--apple-week-cols, 6), 1fr);
+  gap: 4px;
+  text-align: center;
+}
+
+.apple-week-day-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 2px;
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: transform 0.15s var(--ease-apple-spring), background-color 0.15s ease;
+  min-height: unset;
+}
+
+.apple-week-day-btn:active {
+  transform: scale(0.92);
+}
+
+.apple-day-initial {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-tertiary);
+}
+
+.apple-week-day-btn.is-today .apple-day-initial {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+[data-theme="dark"] .apple-week-day-btn.is-today .apple-day-initial {
+  color: var(--accent);
+}
+
+.apple-day-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.18s var(--ease-apple-spring), color 0.18s ease, transform 0.18s var(--ease-apple-spring);
+}
+
+.apple-week-day-btn.is-today:not(.is-selected) .apple-day-num {
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--surface-subtle);
+}
+
+[data-theme="dark"] .apple-week-day-btn.is-today:not(.is-selected) .apple-day-num {
+  color: var(--accent);
+}
+
+.apple-week-day-btn.is-selected .apple-day-num {
+  background: var(--deep-leaf);
+  color: #FFFFFF;
+  font-weight: 700;
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(31, 58, 43, 0.22);
+}
+
+[data-theme="dark"] .apple-week-day-btn.is-selected .apple-day-num {
+  background: var(--accent);
+  color: #0F1912;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+.apple-day-dots-row {
+  height: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.apple-day-dot {
+  width: 4.5px;
+  height: 4.5px;
+  border-radius: 50%;
+  background: var(--border-focus);
+}
+
+.apple-week-day-btn.is-selected .apple-day-dot {
+  background: var(--primary);
+}
+
+[data-theme="dark"] .apple-week-day-btn.is-selected .apple-day-dot {
+  background: var(--accent);
+}
+
+.apple-full-date-bar {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apple-full-date-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  text-align: center;
+  flex: 1;
+}
+
+.apple-day-nav-arrows {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.apple-day-arrow-btn {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-hairline);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.apple-day-today-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  min-height: 26px;
+  cursor: pointer;
+}
+
+[data-theme="dark"] .apple-day-today-pill {
+  color: var(--accent);
+}
+
+/* Fila Todo el día / Entregas (Estilo Apple Calendar All-Day) */
+.apple-allday-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.apple-allday-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  min-width: 48px;
+  padding-top: 4px;
+}
+
+.apple-allday-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+}
+
+.apple-allday-pill {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--surface-subtle);
+  border-left: 3px solid var(--primary);
+  border-radius: 6px;
+  padding: 4px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+
+/* Contenedor de línea de tiempo por horas (Día a Día) */
+.apple-day-timeline-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+}
+
+@keyframes appleDaySlideRight {
+  0% { opacity: 0; transform: translateX(18px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes appleDaySlideLeft {
+  0% { opacity: 0; transform: translateX(-18px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+.apple-day-timeline-card.day-slide-next {
+  animation: appleDaySlideRight 0.21s var(--ease-apple-spring) forwards;
+}
+
+.apple-day-timeline-card.day-slide-prev {
+  animation: appleDaySlideLeft 0.21s var(--ease-apple-spring) forwards;
+}
+
+.apple-day-timeline-body {
+  display: flex;
+  position: relative;
+  padding: 14px 0;
+}
+
+.apple-day-time-col {
+  width: 62px;
+  flex-shrink: 0;
+  position: relative;
+  border-right: 1px solid var(--border-hairline);
+  user-select: none;
+}
+
+.apple-day-hour-label {
+  position: absolute;
+  right: 8px;
+  transform: translateY(-50%);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.apple-day-canvas {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.apple-day-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-hairline);
+  pointer-events: none;
+}
+
+.apple-day-half-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  border-top: 1px dashed var(--border-hairline);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Indicador de hora actual estilo iOS Calendar (píldora + línea) */
+.apple-day-now-indicator {
+  position: absolute;
+  left: -62px;
+  right: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.apple-day-now-pill {
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 5px;
+  border-radius: 9999px;
+  margin-left: 4px;
+  min-width: 48px;
+  text-align: center;
+  line-height: 1.2;
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.35);
+}
+
+.apple-day-now-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #DC2626;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.apple-day-now-line {
+  flex: 1;
+  height: 1.5px;
+  background: #DC2626;
+}
+
+/* Bloques de eventos en Día a Día */
+.apple-day-event {
+  position: absolute;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  border-left-width: 4px;
+  padding: 8px 11px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 2px;
+  z-index: 5;
+  box-shadow: 0 2px 6px rgba(17, 26, 19, 0.06);
+  transition: transform 0.16s var(--ease-apple-spring), box-shadow 0.16s ease;
+}
+
+.apple-day-event:hover {
+  box-shadow: 0 4px 12px rgba(17, 26, 19, 0.12);
+}
+
+.apple-day-event:active {
+  transform: scale(0.985);
+}
+
+.apple-day-event-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apple-day-event-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+}
+
+.apple-day-event-repeat-icon {
+  opacity: 0.55;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.apple-day-event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.88;
+  margin-top: 1px;
+}
+
+.apple-day-event-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+}
+
+.apple-day-event-meta svg {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.apple-day-empty-overlay {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+

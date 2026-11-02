@@ -486,7 +486,7 @@ function enriquecerClase(clase, cursosMap) {
       ...clase,
       esActividad: true,
       creditos: 0,
-      materia: clase.titulo || "Actividad",
+      materia: clase.titulo || clase.materia || "Actividad",
       color: normalizarColorPastel(clase.color || "#BAE6FD"),
       profesor: "",
       aula: clase.aula || (clase.categoria ? (CATEGORIAS_ACTIVIDAD[clase.categoria] || clase.categoria) : "Actividad")
@@ -618,8 +618,10 @@ function mensajeRendimiento(r) {
    ===================================================================== */
 const state = {
   currentTab: "view-hoy",
-  scheduleMode: "matrix", // "matrix" o "cycle"
+  scheduleMode: "day", // "day", "matrix" o "cycle"
   selectedDay: getTodayDayKey(),
+  selectedScheduleDay: getTodayDayKey(),
+  daySlideDir: "",
   tasksViewMode: "list", // "list" o "calendar"
   tasksFilter: "semana", // semana, pendientes, urgentes, proximas, todas, completadas
   tasksMateriaFilter: "",
@@ -1010,14 +1012,14 @@ function confirmDialog(title, message) {
     const backdrop = $("#modal-confirm-backdrop");
     $("#confirm-title").textContent = title || "¿Confirmar acción?";
     $("#confirm-message").textContent = message;
-    backdrop.classList.remove("hidden");
+    openModalSpring(backdrop);
 
     const onOk = () => { cleanup(); resolve(true); };
     const onCancel = () => { cleanup(); resolve(false); };
 
     function cleanup() {
       activeConfirmCancel = null;
-      backdrop.classList.add("hidden");
+      closeModalSpring(backdrop);
       $("#btn-confirm-ok").removeEventListener("click", onOk);
       $("#btn-confirm-cancel").removeEventListener("click", onCancel);
     }
@@ -1062,28 +1064,208 @@ function applyTheme(theme) {
   localStorage.setItem("uniflow-theme", theme);
 
   if (theme === "dark") {
-    $("#theme-icon-sun").classList.remove("hidden");
-    $("#theme-icon-moon").classList.add("hidden");
-    $('meta[name="theme-color"]').setAttribute("content", "#0D140F");
+    if ($("#theme-icon-sun")) $("#theme-icon-sun").classList.remove("hidden");
+    if ($("#theme-icon-moon")) $("#theme-icon-moon").classList.add("hidden");
+    if ($('meta[name="theme-color"]')) $('meta[name="theme-color"]').setAttribute("content", "#0D140F");
   } else {
-    $("#theme-icon-sun").classList.add("hidden");
-    $("#theme-icon-moon").classList.remove("hidden");
-    $('meta[name="theme-color"]').setAttribute("content", "#F4F6EE");
+    if ($("#theme-icon-sun")) $("#theme-icon-sun").classList.add("hidden");
+    if ($("#theme-icon-moon")) $("#theme-icon-moon").classList.remove("hidden");
+    if ($('meta[name="theme-color"]')) $('meta[name="theme-color"]').setAttribute("content", "#F4F6EE");
+  }
+
+  const darkToggle = $("#ajuste-modo-oscuro-toggle");
+  if (darkToggle) {
+    darkToggle.checked = (theme === "dark");
   }
 }
 
 function toggleTheme() {
+  if (typeof Haptic !== "undefined") Haptic.selection();
+  document.documentElement.classList.add("theme-transitioning");
   applyTheme(state.theme === "dark" ? "light" : "dark");
+  setTimeout(() => {
+    document.documentElement.classList.remove("theme-transitioning");
+  }, 260);
+}
+
+function triggerSaveButtonFeedback(btnSelector) {
+  const btn = typeof btnSelector === "string" ? $(btnSelector) : btnSelector;
+  if (!btn) return;
+  if (typeof Haptic !== "undefined" && typeof Haptic.success === "function") Haptic.success();
+  btn.classList.remove("btn-saved-feedback");
+  void btn.offsetWidth;
+  btn.classList.add("btn-saved-feedback");
+  setTimeout(() => {
+    btn.classList.remove("btn-saved-feedback");
+  }, 300);
+}
+
+/* =====================================================================
+   APPLE SPRING PHYSICS: MODALES Y GESTOS DRAG-TO-DISMISS
+   ===================================================================== */
+function closeModalSpring(backdropEl, onClosed) {
+  if (typeof document === "undefined") {
+    if (typeof onClosed === "function") onClosed();
+    return;
+  }
+  if (typeof backdropEl === "string") backdropEl = $(backdropEl);
+  if (!backdropEl) {
+    if (typeof onClosed === "function") onClosed();
+    return;
+  }
+  if (backdropEl.classList.contains("hidden")) {
+    if (typeof onClosed === "function") onClosed();
+    return;
+  }
+  if (backdropEl.classList.contains("is-closing")) return;
+
+  const isReducedMotion = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (isReducedMotion || typeof setTimeout === "undefined") {
+    backdropEl.classList.add("hidden");
+    if (typeof onClosed === "function") onClosed();
+    return;
+  }
+
+  backdropEl.classList.add("is-closing");
+  const timer = setTimeout(() => {
+    backdropEl.classList.remove("is-closing");
+    backdropEl.classList.add("hidden");
+    const sheet = backdropEl.querySelector(".modal, .modal-sheet");
+    if (sheet) {
+      sheet.style.transform = "";
+      sheet.style.transition = "";
+    }
+    if (typeof onClosed === "function") onClosed();
+  }, 210);
+  backdropEl._closeTimer = timer;
+}
+
+function openModalSpring(backdropEl) {
+  if (typeof backdropEl === "string") backdropEl = $(backdropEl);
+  if (!backdropEl) return;
+  if (backdropEl._closeTimer) {
+    clearTimeout(backdropEl._closeTimer);
+    backdropEl._closeTimer = null;
+  }
+  backdropEl.classList.remove("is-closing");
+  backdropEl.classList.remove("hidden");
+  const sheet = backdropEl.querySelector(".modal, .modal-sheet");
+  if (sheet) {
+    sheet.style.transform = "";
+    sheet.style.transition = "";
+  }
+}
+
+function initModalDragToDismiss() {
+  if (typeof document === "undefined") return;
+  $$(".modal-backdrop").forEach(backdrop => {
+    const sheet = backdrop.querySelector(".modal, .modal-sheet");
+    if (!sheet || sheet.dataset.dragInit) return;
+    sheet.dataset.dragInit = "true";
+
+    let startY = 0;
+    let currentY = 0;
+    let isDragging = false;
+    let canDrag = false;
+
+    sheet.addEventListener("touchstart", (e) => {
+      if (typeof window !== "undefined" && window.innerWidth >= 600) return;
+      if (!e.touches || !e.touches[0]) return;
+      const touch = e.touches[0];
+      const rect = sheet.getBoundingClientRect();
+      const relativeY = touch.clientY - rect.top;
+      const scrollable = sheet.querySelector(".modal-body, .scrollable, form");
+      const isAtTop = !scrollable || scrollable.scrollTop <= 0;
+
+      if (relativeY <= 65 || isAtTop) {
+        canDrag = true;
+        startY = touch.clientY;
+        currentY = startY;
+      } else {
+        canDrag = false;
+      }
+    }, { passive: true });
+
+    sheet.addEventListener("touchmove", (e) => {
+      if (!canDrag || (typeof window !== "undefined" && window.innerWidth >= 600)) return;
+      if (!e.touches || !e.touches[0]) return;
+      const touch = e.touches[0];
+      currentY = touch.clientY;
+      const deltaY = currentY - startY;
+
+      if (deltaY > 0) {
+        isDragging = true;
+        sheet.style.transition = "none";
+        sheet.style.transform = `translateY(${deltaY}px)`;
+        if (e.cancelable) e.preventDefault();
+      } else if (deltaY < 0 && Math.abs(deltaY) < 60) {
+        isDragging = true;
+        sheet.style.transition = "none";
+        sheet.style.transform = `translateY(${deltaY * 0.18}px)`;
+      }
+    }, { passive: false });
+
+    sheet.addEventListener("touchend", () => {
+      if (!isDragging) {
+        canDrag = false;
+        return;
+      }
+      isDragging = false;
+      canDrag = false;
+      const deltaY = currentY - startY;
+
+      if (deltaY > 100) {
+        sheet.style.transition = "transform 0.22s cubic-bezier(0.32, 0, 0.67, 0)";
+        sheet.style.transform = "translateY(100%)";
+        setTimeout(() => {
+          closeModalSpring(backdrop);
+        }, 120);
+      } else {
+        sheet.style.transition = "transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)";
+        sheet.style.transform = "translateY(0)";
+        setTimeout(() => {
+          sheet.style.transition = "";
+          sheet.style.transform = "";
+        }, 320);
+      }
+    });
+
+    sheet.addEventListener("touchcancel", () => {
+      isDragging = false;
+      canDrag = false;
+      sheet.style.transition = "transform 0.25s ease";
+      sheet.style.transform = "translateY(0)";
+      setTimeout(() => {
+        sheet.style.transition = "";
+        sheet.style.transform = "";
+      }, 260);
+    });
+  });
 }
 
 /* =====================================================================
    6. NAVEGACIÓN Y VISTAS
    ===================================================================== */
 function switchTab(tabId) {
-  if (typeof Haptic !== "undefined") Haptic.tap();
+  const isTabChange = state.currentTab !== tabId;
+  if (isTabChange && typeof Haptic !== "undefined") {
+    if (typeof Haptic.selection === "function") Haptic.selection();
+    else if (typeof Haptic.tap === "function") Haptic.tap();
+  }
   state.currentTab = tabId;
   $$(".view-panel").forEach(p => p.classList.toggle("active", p.id === tabId));
-  $$(".nav-tab").forEach(b => b.classList.toggle("active", b.dataset.view === tabId));
+  $$(".nav-tab").forEach(b => {
+    const isActive = b.dataset.view === tabId;
+    b.classList.toggle("active", isActive);
+    if (isActive && isTabChange) {
+      const svg = b.querySelector("svg");
+      if (svg) {
+        svg.style.animation = "none";
+        void svg.offsetWidth;
+        svg.style.animation = "";
+      }
+    }
+  });
 
   if (tabId === "view-hoy") renderHoy();
   else if (tabId === "view-horario") renderHorario();
@@ -1091,7 +1273,8 @@ function switchTab(tabId) {
   else if (tabId === "view-tareas") renderTareas();
   else if (tabId === "view-ajustes") renderAjustes();
 
-  $("#main-content").scrollTop = 0;
+  const mainContent = $("#main-content");
+  if (mainContent) mainContent.scrollTop = 0;
 }
 
 /* =====================================================================
@@ -1281,13 +1464,24 @@ async function renderHoy() {
       $$('[data-action="completar-tarea-hueco"]', listHuecos).forEach(btn => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
-      if (typeof Haptic !== "undefined") Haptic.selection();
+          if (typeof Haptic !== "undefined") {
+            if (typeof Haptic.selection === "function") Haptic.selection();
+            else if (typeof Haptic.tap === "function") Haptic.tap();
+          }
           const tid = btn.dataset.taskId;
           if (!tid) return;
-          await db.tareas.update(tid, { completada: true });
-          showToast("¡Tarea completada!");
-          if (typeof reprogramarTodo === "function") reprogramarTodo();
-          renderHoy();
+          btn.style.transform = "scale(0.88)";
+          setTimeout(() => {
+            btn.style.transform = "scale(1.15)";
+            btn.style.background = "var(--deep-leaf)";
+            btn.style.color = "#FFFFFF";
+          }, 60);
+          setTimeout(async () => {
+            await db.tareas.update(tid, { completada: true });
+            showToast("Tarea completada.");
+            if (typeof reprogramarTodo === "function") reprogramarTodo();
+            renderHoy();
+          }, 230);
         });
       });
 
@@ -1351,10 +1545,24 @@ async function renderHoy() {
         if (typeof Haptic !== "undefined") Haptic.selection();
         const tid = btn.dataset.taskId;
         if (!tid) return;
-        await db.tareas.update(tid, { completada: true });
-        showToast("¡Tarea completada!");
-        if (typeof reprogramarTodo === "function") reprogramarTodo();
-        renderHoy();
+        btn.style.transition = "transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.18s ease, color 0.18s ease";
+        btn.style.transform = "scale(1.12)";
+        btn.style.background = "var(--deep-leaf)";
+        btn.style.color = "#FFFFFF";
+        const row = btn.closest("[data-task-id]");
+        if (row) {
+          row.style.transition = "opacity 0.2s ease, transform 0.2s ease";
+          setTimeout(() => {
+            row.style.opacity = "0.35";
+            row.style.transform = "translateX(8px)";
+          }, 70);
+        }
+        setTimeout(async () => {
+          await db.tareas.update(tid, { completada: true });
+          showToast("Tarea completada.");
+          if (typeof reprogramarTodo === "function") reprogramarTodo();
+          renderHoy();
+        }, 220);
       });
     });
 
@@ -1775,7 +1983,7 @@ function openNewCicloModal(opts) {
   $("#ciclo-form-error").classList.add("hidden");
   actualizarPreviewCiclo();
 
-  $("#modal-ciclo-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-ciclo-backdrop");
   $("#ciclo-nombre").focus();
 }
 
@@ -1788,12 +1996,13 @@ function openEditCicloModal(ciclo) {
   $("#ciclo-form-error").classList.add("hidden");
   actualizarPreviewCiclo();
 
-  $("#modal-ciclo-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-ciclo-backdrop");
 }
 
 function closeModalCiclo() {
-  $("#modal-ciclo-backdrop").classList.add("hidden");
-  state.cicloModalCallback = null;
+  closeModalSpring("#modal-ciclo-backdrop", () => {
+    state.cicloModalCallback = null;
+  });
 }
 
 function actualizarPreviewCiclo() {
@@ -1982,40 +2191,57 @@ async function renderCicloRoadmap() {
     const isExamenParcial = s.numero === 8;
     const isExamenFinal = s.numero === 17;
     const isCurrent = s.esActual;
-
     const evSemana = eventos.filter(ev => ev.fecha >= s.inicio && ev.fecha <= s.fin);
     const tarSemana = tareas.filter(t => t.fecha_limite && t.fecha_limite.slice(0, 10) >= s.inicio && t.fecha_limite.slice(0, 10) <= s.fin);
+    const shouldExpand = isCurrent || isExamenParcial || isExamenFinal || evSemana.length > 0 || tarSemana.length > 0;
 
     let cardClasses = ["cycle-week-card"];
     if (isCurrent) cardClasses.push("is-current");
     if (isExamenParcial) cardClasses.push("is-exam");
     if (isExamenFinal) cardClasses.push("is-final");
+    if (shouldExpand) cardClasses.push("is-expanded");
 
     return `
       <div class="${cardClasses.join(" ")}" data-week="${s.numero}">
         <div class="cycle-week-header">
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span class="cycle-week-num">Semana ${s.numero}</span>
             ${isCurrent ? `<span class="cycle-tag-badge is-current-badge">Actual</span>` : ""}
             ${isExamenParcial ? `<span class="cycle-tag-badge is-exam-badge">Exámenes Parciales</span>` : ""}
             ${isExamenFinal ? `<span class="cycle-tag-badge is-final-badge">Exámenes Finales</span>` : ""}
           </div>
-          <span class="cycle-week-dates">${s.inicio} — ${s.fin}</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="cycle-week-dates">${s.inicio} — ${s.fin}</span>
+            <span class="cycle-week-chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
         </div>
-        <div class="cycle-week-content">
-          ${isExamenParcial ? `<div class="cycle-week-highlight">Semana 8: Evaluaciones Parciales Universitarias.</div>` : ""}
-          ${isExamenFinal ? `<div class="cycle-week-highlight">Semana 17: Evaluaciones Finales y Cierre de Actas Académicas.</div>` : ""}
-          ${evSemana.length > 0 || tarSemana.length > 0 ? `
-            <div class="cycle-week-items">
-              ${evSemana.map(ev => `<span class="cycle-item-chip">${ICONS.calendar} ${escapeHtml(ev.titulo || ev.tipo)}</span>`).join("")}
-              ${tarSemana.map(t => `<span class="cycle-item-chip">${ICONS.check} ${escapeHtml(t.titulo)}</span>`).join("")}
+        <div class="cycle-week-expand-wrap">
+          <div class="cycle-week-expand-inner">
+            <div class="cycle-week-content" style="padding-top: 8px;">
+              ${isExamenParcial ? `<div class="cycle-week-highlight">Semana 8: Evaluaciones Parciales Universitarias.</div>` : ""}
+              ${isExamenFinal ? `<div class="cycle-week-highlight">Semana 17: Evaluaciones Finales y Cierre de Actas Académicas.</div>` : ""}
+              ${evSemana.length > 0 || tarSemana.length > 0 ? `
+                <div class="cycle-week-items">
+                  ${evSemana.map(ev => `<span class="cycle-item-chip">${ICONS.calendar} ${escapeHtml(ev.titulo || ev.tipo)}</span>`).join("")}
+                  ${tarSemana.map(t => `<span class="cycle-item-chip">${ICONS.check} ${escapeHtml(t.titulo)}</span>`).join("")}
+                </div>
+              ` : `
+                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${isExamenParcial ? "Evaluación parcial central" : (isExamenFinal ? "Cierre y entrega de promedios" : "Sesiones lectivas regulares · Toca para contraer")}</div>
+              `}
             </div>
-          ` : `
-            <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">${isExamenParcial ? "Evaluación parcial central" : (isExamenFinal ? "Cierre y entrega de promedios" : "Sesiones lectivas regulares")}</div>
-          `}
+          </div>
         </div>
       </div>`;
   }).join("");
+
+  $$(".cycle-week-card", listEl).forEach(card => {
+    card.addEventListener("click", () => {
+      if (typeof Haptic !== "undefined") Haptic.tap();
+      card.classList.toggle("is-expanded");
+    });
+  });
 }
 
 async function renderHorario() {
@@ -2023,6 +2249,8 @@ async function renderHorario() {
   const cycleContainer = $("#cycle-container");
   const matrixToolbarEl = $("#matrix-toolbar");
 
+  const btnDay = $("#btn-mode-day");
+  if (btnDay) btnDay.classList.toggle("active", state.scheduleMode === "day");
   const btnMatrix = $("#btn-mode-matrix");
   if (btnMatrix) btnMatrix.classList.toggle("active", state.scheduleMode === "matrix");
   const btnCycle = $("#btn-mode-cycle");
@@ -2040,7 +2268,6 @@ async function renderHorario() {
 
   if (cycleContainer) cycleContainer.classList.add("hidden");
   container.classList.remove("hidden");
-  if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
 
   const allClasses = await obtenerClasesEnriquecidas();
   const cursosCount = await db.cursos.count();
@@ -2062,6 +2289,13 @@ async function renderHorario() {
     return;
   }
 
+  if (state.scheduleMode === "day") {
+    if (matrixToolbarEl) matrixToolbarEl.classList.add("hidden");
+    await renderDiaADiaView(container, allClasses);
+    return;
+  }
+
+  if (matrixToolbarEl) matrixToolbarEl.classList.remove("hidden");
   container.innerHTML = renderMatrixTableHTML(allClasses);
 
   // Eventos para editar al pulsar una celda
@@ -2070,6 +2304,301 @@ async function renderHorario() {
   });
 
   wireMatrixJumpBar(container);
+}
+
+async function renderDiaADiaView(container, allClasses) {
+  const hasSunday = allClasses.some(c => c.dia_semana === "DOMINGO");
+  const todayKey = getTodayDayKey();
+  const activeDays = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+  if (hasSunday || todayKey === "DOMINGO") activeDays.push("DOMINGO");
+
+  if (!state.selectedScheduleDay || !activeDays.includes(state.selectedScheduleDay)) {
+    state.selectedScheduleDay = activeDays.includes(todayKey) ? todayKey : "LUNES";
+  }
+  const selDay = state.selectedScheduleDay;
+
+  const now = new Date();
+  const jsDay = now.getDay(); // 0=Dom, 1=Lun...
+  const diffToMon = jsDay === 0 ? -6 : 1 - jsDay;
+  const mondayDate = new Date(now);
+  mondayDate.setDate(now.getDate() + diffToMon);
+
+  const dayMetaMap = {};
+  const DAY_INITIALS = {
+    LUNES: "L",
+    MARTES: "M",
+    MIERCOLES: "M",
+    JUEVES: "J",
+    VIERNES: "V",
+    SABADO: "S",
+    DOMINGO: "D"
+  };
+
+  activeDays.forEach((dKey, idx) => {
+    const dDate = new Date(mondayDate);
+    dDate.setDate(mondayDate.getDate() + idx);
+    const iso = formatFechaISO(dDate);
+    const classesCount = allClasses.filter(c => c.dia_semana === dKey).length;
+    dayMetaMap[dKey] = {
+      key: dKey,
+      initial: DAY_INITIALS[dKey] || dKey[0],
+      dateObj: dDate,
+      dayNum: dDate.getDate(),
+      iso,
+      hasClasses: classesCount > 0,
+      classesCount
+    };
+  });
+
+  const selMeta = dayMetaMap[selDay] || dayMetaMap["LUNES"];
+  const fullDateLabel = selMeta.dateObj.toLocaleDateString("es-ES", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+  const formattedFullDate = fullDateLabel.charAt(0).toUpperCase() + fullDateLabel.slice(1);
+
+  const [tareasRaw, eventosRaw, excepciones] = await Promise.all([
+    db.tareas.toArray().catch(() => []),
+    db.eventos.toArray().catch(() => []),
+    db.excepciones.toArray().catch(() => [])
+  ]);
+
+  const tareasDelDia = tareasRaw.filter(t => !t.completada && t.fecha_limite && t.fecha_limite.startsWith(selMeta.iso));
+  const eventosDelDia = eventosRaw.filter(e => e.fecha === selMeta.iso);
+  const feriadoObj = excepciones.find(e => e.fecha === selMeta.iso && e.tipo === "feriado");
+
+  const weekStripHtml = activeDays.map(dKey => {
+    const m = dayMetaMap[dKey];
+    const isSel = dKey === selDay;
+    const isToday = dKey === todayKey;
+    return `
+      <button type="button" class="apple-week-day-btn ${isSel ? "is-selected" : ""} ${isToday ? "is-today" : ""}" data-day="${dKey}">
+        <span class="apple-day-initial">${m.initial}</span>
+        <span class="apple-day-num">${m.dayNum}</span>
+        <span class="apple-day-dot ${m.hasClasses ? "has-events" : ""}"></span>
+      </button>`;
+  }).join("");
+
+  let allDayRowHtml = "";
+  if (feriadoObj || eventosDelDia.length > 0 || tareasDelDia.length > 0) {
+    const pills = [];
+    if (feriadoObj) {
+      pills.push(`<span class="apple-allday-pill" style="background:rgba(217,119,6,0.14); color:var(--status-warning);">${ICONS.star} Feriado: ${escapeHtml(feriadoObj.motivo || "Día no laborable")}</span>`);
+    }
+    eventosDelDia.forEach(ev => {
+      pills.push(`<span class="apple-allday-pill">${ICONS.calendar} ${escapeHtml(ev.titulo || ev.tipo)}</span>`);
+    });
+    tareasDelDia.forEach(t => {
+      pills.push(`<span class="apple-allday-pill" data-task-id="${escapeHtml(t.id)}" style="cursor:pointer;">${ICONS.check} Entrega: ${escapeHtml(t.titulo)}</span>`);
+    });
+    allDayRowHtml = `
+      <div class="apple-allday-row" style="border-radius:0; border-left:0; border-right:0; border-top:0; border-bottom:1px solid var(--border-hairline); background:var(--surface-subtle);">
+        <span class="apple-allday-label">Entregas</span>
+        <div class="apple-allday-items">${pills.join("")}</div>
+      </div>`;
+  }
+
+  const dayClasses = allClasses
+    .filter(c => c.dia_semana === selDay)
+    .sort((a, b) => timeToMinutes(a.hora_inicio) - timeToMinutes(b.hora_inicio));
+
+  const slideClass = state.daySlideDir === "next"
+    ? "day-slide-next"
+    : (state.daySlideDir === "prev" ? "day-slide-prev" : "");
+  state.daySlideDir = "";
+
+  let timelineBodyHtml = "";
+  if (dayClasses.length === 0) {
+    timelineBodyHtml = `
+      <div class="apple-day-timeline-card ${slideClass}" id="apple-day-swipe-surface">
+        ${allDayRowHtml}
+        <div class="apple-day-empty-overlay">
+          <div class="empty-card-icon-wrap" style="margin:0 auto 6px;">${ICONS.calendar}</div>
+          <strong style="display:block; font-size:14px; color:var(--text-primary); margin-bottom:2px;">Día libre de clases</strong>
+          <p style="font-size:12.5px; color:var(--text-secondary); margin:0 0 10px;">No tienes asignaturas ni actividades programadas para ${DIAS_LABEL[selDay] || selDay}.</p>
+          <button type="button" class="btn-secondary btn-sm" id="btn-add-class-day-view">+ Añadir a ${DIAS_LABEL[selDay] || selDay}</button>
+        </div>
+      </div>`;
+  } else {
+    const bounds = calcularLimitesTimeline(dayClasses);
+    const startHour = Math.max(6, bounds.startHour - 1);
+    const endHour = Math.min(24, bounds.endHour + 1);
+    const totalHours = Math.max(1, endHour - startHour);
+    const PX_PER_HOUR = 64;
+    const PX_PER_MIN = PX_PER_HOUR / 60;
+    const totalHeight = totalHours * PX_PER_HOUR;
+
+    const hoursTicks = [];
+    const gridLines = [];
+    for (let h = startHour; h <= endHour; h++) {
+      const topPx = (h - startHour) * PX_PER_HOUR;
+      hoursTicks.push(`
+        <span class="apple-day-hour-label" style="top:${topPx}px;">${formatMinutes12(h * 60)}</span>`);
+      gridLines.push(`<div class="apple-day-hour-line" style="top:${topPx}px;"></div>`);
+      if (h < endHour) {
+        gridLines.push(`<div class="apple-day-half-line" style="top:${topPx + PX_PER_HOUR / 2}px;"></div>`);
+      }
+    }
+
+    const positioned = computeDayEventPositions(dayClasses, startHour, PX_PER_MIN);
+    const eventsHtml = positioned.map(({ c, top, height, leftStyle, widthStyle }) => {
+      const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
+      const borderColor = darkenColor(color, 0.30);
+      const textColor = "#111827";
+      const rango12 = formatTimeRange12(c.hora_inicio, c.hora_fin);
+      const durMin = Math.max(0, timeToMinutes(c.hora_fin) - timeToMinutes(c.hora_inicio));
+      const esCompacta = durMin <= 40 || height <= 44;
+      const esAct = Boolean(c.esActividad || c.tipo === "actividad");
+
+      return `
+        <div class="apple-day-event"
+             data-id="${escapeHtml(c.id)}"
+             style="top:${Math.round(top)}px; height:${Math.round(height)}px; left:${leftStyle === '3px' ? '8px' : leftStyle}; width:${widthStyle === 'calc(100% - 6px)' ? 'calc(100% - 16px)' : widthStyle}; background:${color}; color:${textColor}; border-color:${borderColor}; border-left-color:${borderColor}; ${esCompacta ? 'padding:4px 10px; display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap:8px;' : ''}">
+          <div class="apple-day-event-title" style="${esCompacta ? 'margin:0; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' : ''}">${escapeHtml(c.materia)}</div>
+          ${esCompacta ? `<span style="font-size:10.5px; font-weight:700; font-family:var(--font-mono); color:#1E293B; flex-shrink:0;">${rango12}</span>` : `
+            <div class="apple-day-event-meta">
+              <span>${ICONS.clock} ${rango12}</span>
+              ${c.aula ? `<span>${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
+              ${(!esAct && c.profesor) ? `<span>${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
+            </div>
+          `}
+        </div>`;
+    }).join("");
+
+    let nowLineHtml = "";
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+    if (selDay === todayKey && currentMin >= startHour * 60 && currentMin <= endHour * 60) {
+      const nowTop = Math.round((currentMin - startHour * 60) * PX_PER_MIN);
+      nowLineHtml = `
+        <div class="apple-day-now-indicator" style="top:${nowTop}px;">
+          <span class="apple-day-now-pill">${formatMinutes12(currentMin)}</span>
+          <span class="apple-day-now-dot"></span>
+          <div class="apple-day-now-line"></div>
+        </div>`;
+    }
+
+    timelineBodyHtml = `
+      <div class="apple-day-timeline-card ${slideClass}" id="apple-day-swipe-surface">
+        ${allDayRowHtml}
+        <div class="apple-day-timeline-body" style="min-height:${totalHeight + 28}px;">
+          <div class="apple-day-time-col" style="height:${totalHeight}px;">
+            ${hoursTicks.join("")}
+          </div>
+          <div class="apple-day-canvas" style="height:${totalHeight}px;">
+            ${gridLines.join("")}
+            ${nowLineHtml}
+            ${eventsHtml}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="apple-day-view">
+      <div class="apple-day-header-card">
+        <div class="apple-week-strip">
+          ${weekStripHtml}
+        </div>
+        <div class="apple-full-date-bar">
+          <div class="apple-day-nav-arrows">
+            <button type="button" class="apple-day-arrow-btn" id="btn-day-prev" aria-label="Día anterior" title="Día anterior">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+          </div>
+          <span class="apple-full-date-label">${escapeHtml(formattedFullDate)}</span>
+          <div class="apple-day-nav-arrows">
+            ${selDay !== todayKey && activeDays.includes(todayKey) ? `<button type="button" class="apple-day-today-pill" id="btn-day-go-today">Hoy</button>` : ""}
+            <button type="button" class="apple-day-arrow-btn" id="btn-day-next" aria-label="Día siguiente" title="Día siguiente">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      ${timelineBodyHtml}
+    </div>`;
+
+  const changeSelectedDay = (targetDay, dir) => {
+    if (targetDay === state.selectedScheduleDay) return;
+    if (typeof Haptic !== "undefined") Haptic.selection();
+    const curIdx = activeDays.indexOf(state.selectedScheduleDay);
+    const nextIdx = activeDays.indexOf(targetDay);
+    state.daySlideDir = dir || (nextIdx > curIdx ? "next" : "prev");
+    state.selectedScheduleDay = targetDay;
+    renderHorario();
+  };
+
+  $$(".apple-week-day-btn", container).forEach(btn => {
+    btn.addEventListener("click", () => {
+      changeSelectedDay(btn.dataset.day);
+    });
+  });
+
+  const btnPrev = $("#btn-day-prev", container);
+  if (btnPrev) {
+    btnPrev.addEventListener("click", () => {
+      const idx = activeDays.indexOf(selDay);
+      const prevIdx = (idx - 1 + activeDays.length) % activeDays.length;
+      changeSelectedDay(activeDays[prevIdx], "prev");
+    });
+  }
+
+  const btnNext = $("#btn-day-next", container);
+  if (btnNext) {
+    btnNext.addEventListener("click", () => {
+      const idx = activeDays.indexOf(selDay);
+      const nextIdx = (idx + 1) % activeDays.length;
+      changeSelectedDay(activeDays[nextIdx], "next");
+    });
+  }
+
+  const btnToday = $("#btn-day-go-today", container);
+  if (btnToday) {
+    btnToday.addEventListener("click", () => {
+      if (activeDays.includes(todayKey)) {
+        changeSelectedDay(todayKey);
+      }
+    });
+  }
+
+  const btnAddDayEmpty = $("#btn-add-class-day-view", container);
+  if (btnAddDayEmpty) {
+    btnAddDayEmpty.addEventListener("click", () => openNewClassModal(selDay));
+  }
+
+  $$(".apple-day-event", container).forEach(evEl => {
+    evEl.addEventListener("click", () => openClaseHoyModal(evEl.dataset.id));
+  });
+
+  $$(".apple-allday-pill[data-task-id]", container).forEach(pill => {
+    pill.addEventListener("click", () => openEditTaskModal(pill.dataset.taskId));
+  });
+
+  // Soporte swipe horizontal táctil para cambiar de día
+  const swipeSurface = $("#apple-day-swipe-surface", container);
+  if (swipeSurface) {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    swipeSurface.addEventListener("touchstart", (e) => {
+      if (!e.touches || !e.touches[0]) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    swipeSurface.addEventListener("touchend", (e) => {
+      if (!e.changedTouches || !e.changedTouches[0]) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+        const idx = activeDays.indexOf(selDay);
+        if (dx < 0) {
+          changeSelectedDay(activeDays[(idx + 1) % activeDays.length], "next");
+        } else {
+          changeSelectedDay(activeDays[(idx - 1 + activeDays.length) % activeDays.length], "prev");
+        }
+      }
+    }, { passive: true });
+  }
 }
 
 /* =====================================================================
@@ -2933,17 +3462,32 @@ function wireTaskCardEvents(containerEl) {
   $$('[data-action="toggle"]', containerEl).forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (typeof Haptic !== "undefined") Haptic.selection();
+      if (typeof Haptic !== "undefined") {
+        if (typeof Haptic.selection === "function") Haptic.selection();
+        else if (typeof Haptic.tap === "function") Haptic.tap();
+      }
       const card = btn.closest(".task-card");
+      if (!card) return;
       const id = card.dataset.id;
       const task = await db.tareas.get(id);
       if (!task) return;
       const nextStatus = !task.completada;
-      await db.tareas.update(id, { completada: nextStatus });
-      showToast(nextStatus ? "Tarea marcada como completada." : "Tarea reabierta.");
-      if (typeof reprogramarTodo === "function") reprogramarTodo();
-      if (state.currentTab === "view-hoy") renderHoy();
-      else renderTareas();
+
+      // Animación elástica estilo Apple Reminders
+      btn.classList.add("anim-pop");
+      if (nextStatus) {
+        card.classList.add("completed", "completing");
+      } else {
+        card.classList.remove("completed", "completing");
+      }
+
+      setTimeout(async () => {
+        await db.tareas.update(id, { completada: nextStatus });
+        showToast(nextStatus ? "Tarea marcada como completada." : "Tarea reabierta.");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        if (state.currentTab === "view-hoy") renderHoy();
+        else renderTareas();
+      }, 230);
     });
   });
 
@@ -3176,11 +3720,11 @@ async function openSimuladorModal() {
     input.value = "14.0";
   }
   await actualizarSimulador(cursos);
-  $("#modal-simulador-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-simulador-backdrop");
 }
 
 function closeSimuladorModal() {
-  $("#modal-simulador-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-simulador-backdrop");
 }
 
 async function actualizarSimulador(cursosPreloaded) {
@@ -3458,7 +4002,7 @@ async function openNewCursoModal(origin) {
 
   await actualizarDisponibilidadColores($("#curso-color-picker"), null, null);
 
-  $("#modal-curso-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-curso-backdrop");
   $("#curso-nombre").focus();
 }
 
@@ -3491,12 +4035,13 @@ async function openEditCursoModal(id) {
     : "Este curso aún no tiene horario asignado.";
   infoEl.classList.remove("hidden");
 
-  $("#modal-curso-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-curso-backdrop");
 }
 
 function closeCursoModal() {
-  $("#modal-curso-backdrop").classList.add("hidden");
-  state.cursoModalOrigin = null;
+  closeModalSpring("#modal-curso-backdrop", () => {
+    state.cursoModalOrigin = null;
+  });
 }
 
 async function guardarCurso(e) {
@@ -3542,6 +4087,7 @@ async function guardarCurso(e) {
   };
 
   await db.cursos.put(curso);
+  triggerSaveButtonFeedback('#form-curso button[type="submit"]');
   const origin = state.cursoModalOrigin;
   closeCursoModal();
   showToast(previo ? "Curso actualizado." : "Curso registrado.");
@@ -3708,11 +4254,11 @@ async function openNotasModal(id) {
   actualizarResumenNotas();
   $$(".field.invalid", $("#form-notas")).forEach(f => f.classList.remove("invalid"));
 
-  $("#modal-notas-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-notas-backdrop");
 }
 
 function closeNotasModal() {
-  $("#modal-notas-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-notas-backdrop");
 }
 
 function agregarPractica() {
@@ -3743,6 +4289,7 @@ async function guardarNotas(e) {
   errorEl.classList.add("hidden");
 
   await db.cursos.update(id, { evaluacion });
+  triggerSaveButtonFeedback('#form-notas button[type="submit"]');
   closeNotasModal();
   showToast("Notas guardadas.");
   refrescarVistaActual();
@@ -4070,7 +4617,7 @@ async function openNewClassModal(preselectedDay, preselectedCursoId) {
     await setClassTypeMode("curso");
     await populateClassCursoSelect(preselectedCursoId || "");
   }
-  $("#modal-class-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-class-backdrop");
 }
 
 async function openEditClassModal(id) {
@@ -4110,11 +4657,11 @@ async function openEditClassModal(id) {
     await setClassTypeMode("curso");
     await populateClassCursoSelect(c.curso_id);
   }
-  $("#modal-class-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-class-backdrop");
 }
 
 function closeClassModal() {
-  $("#modal-class-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-class-backdrop");
 }
 
 /* =====================================================================
@@ -4149,7 +4696,7 @@ function openNewTaskModal(defaultCursoId) {
   $("#btn-delete-task").classList.add("hidden");
 
   populateTaskSubjectSelect(defaultCursoId || "");
-  $("#modal-task-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-task-backdrop");
   $("#task-titulo").focus();
 }
 
@@ -4171,11 +4718,11 @@ async function openEditTaskModal(id) {
   $("#btn-delete-task").classList.remove("hidden");
 
   await populateTaskSubjectSelect(t.curso_id || "");
-  $("#modal-task-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-task-backdrop");
 }
 
 function closeTaskModal() {
-  $("#modal-task-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-task-backdrop");
 }
 
 function setImportanceStars(val) {
@@ -4243,6 +4790,7 @@ async function cargarAjustesUI() {
   const setChk = (id, val) => { const el = $(id); if (el) el.checked = Boolean(val); };
 
 
+  setChk("#ajuste-modo-oscuro-toggle", state.theme === "dark");
   setChk("#ajuste-notif-clases", map.notif_clases);
   setChk("#ajuste-notif-tareas", map.notif_tareas);
   setChk("#ajuste-notif-urgentes", map.notif_urgentes);
@@ -4363,6 +4911,7 @@ async function guardarAjustesUI() {
     await db.ajustes.put({ clave, valor });
   }
 
+  triggerSaveButtonFeedback("#btn-save-ajustes");
   showToast("Ajustes guardados correctamente.");
   if (typeof reprogramarTodo === "function") reprogramarTodo();
 }
@@ -4427,12 +4976,12 @@ async function openModalExcepcion(opts = {}) {
   $("#excepcion-motivo").value = opts.motivo || "";
   if (opts.cursoId) selCurso.value = opts.cursoId;
 
-  $("#modal-excepcion-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-excepcion-backdrop");
   $("#excepcion-motivo").focus();
 }
 
 function closeModalExcepcion() {
-  $("#modal-excepcion-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-excepcion-backdrop");
 }
 
 async function guardarExcepcion() {
@@ -4620,11 +5169,11 @@ async function openAsistenciaModal(cursoId) {
     });
   }
 
-  $("#modal-asistencia-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-asistencia-backdrop");
 }
 
 function closeAsistenciaModal() {
-  $("#modal-asistencia-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-asistencia-backdrop");
 }
 
 async function openModalEvento(eventoId = null, defaultCursoId = null) {
@@ -4658,12 +5207,12 @@ async function openModalEvento(eventoId = null, defaultCursoId = null) {
     $("#evento-modal-title").textContent = "Nuevo Evento Académico";
   }
 
-  $("#modal-evento-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-evento-backdrop");
   $("#evento-titulo").focus();
 }
 
 function closeModalEvento() {
-  $("#modal-evento-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-evento-backdrop");
 }
 
 async function guardarEvento() {
@@ -5042,11 +5591,11 @@ async function openModalQrSchedule() {
     }
   }
 
-  $("#modal-qr-schedule-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-qr-schedule-backdrop");
 }
 
 function closeModalQrSchedule() {
-  $("#modal-qr-schedule-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-qr-schedule-backdrop");
 }
 
 let horarioCompartidoActual = null;
@@ -5287,11 +5836,11 @@ function openModalQrScanner() {
   if (statusEl) statusEl.textContent = "Selecciona una foto o captura de pantalla con el código QR para importar.";
   const txtManual = $("#textarea-qr-manual");
   if (txtManual) txtManual.value = "";
-  $("#modal-qr-scanner-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-qr-scanner-backdrop");
 }
 
 function closeModalQrScanner() {
-  $("#modal-qr-scanner-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-qr-scanner-backdrop");
 }
 
 function cargarImagenDesdeArchivo(file) {
@@ -6033,6 +6582,7 @@ async function guardarClase(e) {
     showToast(msg);
   }
 
+  triggerSaveButtonFeedback('#form-class button[type="submit"]');
   closeClassModal();
   if (typeof reprogramarTodo === "function") reprogramarTodo();
   refrescarVistaActual();
@@ -6080,6 +6630,7 @@ async function guardarTarea(e) {
   const fecha_creacion = (await db.tareas.get(id))?.fecha_creacion || new Date().toISOString();
 
   await db.tareas.put({ id, titulo, curso_id, fecha_limite, importancia, estimado_min, completada, fecha_creacion, notas, enlace });
+  triggerSaveButtonFeedback('#form-task button[type="submit"]');
   closeTaskModal();
   showToast("Tarea guardada.");
   if (typeof reprogramarTodo === "function") reprogramarTodo();
@@ -6131,6 +6682,7 @@ async function guardarPerfilEstudiante(e) {
     correo: ($("#perfil-correo")?.value || "").trim()
   };
   await db.ajustes.put({ clave: "perfil_estudiante", valor: perfil });
+  triggerSaveButtonFeedback("#btn-guardar-perfil");
   showToast("Perfil de estudiante guardado exitosamente.");
 }
 
@@ -6351,11 +6903,11 @@ async function openReporteFinCicloModal() {
     </div>
   `;
 
-  $("#modal-reporte-ciclo-backdrop").classList.remove("hidden");
+  openModalSpring("#modal-reporte-ciclo-backdrop");
 }
 
 function closeReporteFinCicloModal() {
-  $("#modal-reporte-ciclo-backdrop").classList.add("hidden");
+  closeModalSpring("#modal-reporte-ciclo-backdrop");
 }
 
 function descargarReporteComoImagen(reporte) {
@@ -6554,25 +7106,22 @@ function wireNavigationEvents() {
   $("#btn-theme-toggle").addEventListener("click", toggleTheme);
 
   $("#btn-quick-add").addEventListener("click", () => {
-    $("#modal-quick-backdrop").classList.remove("hidden");
+    openModalSpring("#modal-quick-backdrop");
   });
   $("#btn-quick-cancel").addEventListener("click", () => {
-    $("#modal-quick-backdrop").classList.add("hidden");
+    closeModalSpring("#modal-quick-backdrop");
   });
   $("#modal-quick-backdrop").addEventListener("click", (e) => {
-    if (e.target.id === "modal-quick-backdrop") $("#modal-quick-backdrop").classList.add("hidden");
+    if (e.target.id === "modal-quick-backdrop") closeModalSpring("#modal-quick-backdrop");
   });
   $("#btn-quick-create-curso").addEventListener("click", () => {
-    $("#modal-quick-backdrop").classList.add("hidden");
-    openNewCursoModal();
+    closeModalSpring("#modal-quick-backdrop", () => openNewCursoModal());
   });
   $("#btn-quick-create-task").addEventListener("click", () => {
-    $("#modal-quick-backdrop").classList.add("hidden");
-    openNewTaskModal();
+    closeModalSpring("#modal-quick-backdrop", () => openNewTaskModal());
   });
   $("#btn-quick-create-class").addEventListener("click", () => {
-    $("#modal-quick-backdrop").classList.add("hidden");
-    openNewClassModal();
+    closeModalSpring("#modal-quick-backdrop", () => openNewClassModal());
   });
 
   const btnGestionarCicloCursos = $("#btn-gestionar-ciclo-cursos");
@@ -6597,11 +7146,11 @@ function wireNavigationEvents() {
 
   // Modal Política de Privacidad
   const btnVerPriv = $("#btn-ver-privacidad");
-  if (btnVerPriv) btnVerPriv.addEventListener("click", (e) => { e.preventDefault(); $("#modal-privacidad-backdrop").classList.remove("hidden"); });
+  if (btnVerPriv) btnVerPriv.addEventListener("click", (e) => { e.preventDefault(); openModalSpring("#modal-privacidad-backdrop"); });
   const btnCerrarPriv = $("#modal-privacidad-close");
-  if (btnCerrarPriv) btnCerrarPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.add("hidden"));
+  if (btnCerrarPriv) btnCerrarPriv.addEventListener("click", () => closeModalSpring("#modal-privacidad-backdrop"));
   const btnEntendidoPriv = $("#btn-privacidad-entendido");
-  if (btnEntendidoPriv) btnEntendidoPriv.addEventListener("click", () => $("#modal-privacidad-backdrop").classList.add("hidden"));
+  if (btnEntendidoPriv) btnEntendidoPriv.addEventListener("click", () => closeModalSpring("#modal-privacidad-backdrop"));
 
   // Modal Reporte Fin de Ciclo
   const btnReporteCiclo = $("#btn-reporte-ciclo");
@@ -6622,7 +7171,7 @@ function wireNavigationEvents() {
   const modPrivBackdrop = $("#modal-privacidad-backdrop");
   if (modPrivBackdrop) {
     modPrivBackdrop.addEventListener("click", (e) => {
-      if (e.target.id === "modal-privacidad-backdrop") $("#modal-privacidad-backdrop").classList.add("hidden");
+      if (e.target.id === "modal-privacidad-backdrop") closeModalSpring("#modal-privacidad-backdrop");
     });
   }
 
@@ -6636,13 +7185,29 @@ function wireNavigationEvents() {
 }
 
 function wireScheduleAndCourseEvents() {
+  const btnModeDay = $("#btn-mode-day");
+  if (btnModeDay) {
+    btnModeDay.addEventListener("click", () => {
+      if (typeof Haptic !== "undefined") Haptic.selection();
+      state.scheduleMode = "day";
+      renderHorario();
+    });
+  }
   const btnModeMatrix = $("#btn-mode-matrix");
   if (btnModeMatrix) {
-    btnModeMatrix.addEventListener("click", () => { state.scheduleMode = "matrix"; renderHorario(); });
+    btnModeMatrix.addEventListener("click", () => {
+      if (typeof Haptic !== "undefined") Haptic.selection();
+      state.scheduleMode = "matrix";
+      renderHorario();
+    });
   }
   const btnModeCycle = $("#btn-mode-cycle");
   if (btnModeCycle) {
-    btnModeCycle.addEventListener("click", () => { state.scheduleMode = "cycle"; renderHorario(); });
+    btnModeCycle.addEventListener("click", () => {
+      if (typeof Haptic !== "undefined") Haptic.selection();
+      state.scheduleMode = "cycle";
+      renderHorario();
+    });
   }
 
   // Inicializar selector 12h y paleta de actividades
@@ -6901,6 +7466,16 @@ function wireSettingsEvents() {
   $("#btn-load-demo").addEventListener("click", loadDemoSemester);
   $("#btn-clear-data").addEventListener("click", clearAllData);
 
+  const darkToggleAjuste = $("#ajuste-modo-oscuro-toggle");
+  if (darkToggleAjuste) {
+    darkToggleAjuste.addEventListener("change", () => {
+      const wantDark = darkToggleAjuste.checked;
+      if ((state.theme === "dark") !== wantDark) {
+        toggleTheme();
+      }
+    });
+  }
+
   const btnSaveAjustes = $("#btn-save-ajustes");
   if (btnSaveAjustes) {
     btnSaveAjustes.addEventListener("click", guardarAjustesUI);
@@ -6908,6 +7483,7 @@ function wireSettingsEvents() {
 }
 
 function wireAttendanceAndModalEvents() {
+  initModalDragToDismiss();
   // Eventos de Asistencia y Feriados (Fase 3)
   const btnMarcarFeriado = $("#btn-marcar-feriado-hoy");
   if (btnMarcarFeriado) {
@@ -7330,9 +7906,9 @@ async function openClaseHoyModal(claseId) {
     `;
   }
 
-  // 3. Asistencia de Hoy (Solo para cursos académicos universitarios)
+  // 3. Asistencia de Hoy (Solo para cursos académicos universitarios que se dictan hoy)
   const secAsist = $(".clase-asist-section", modal);
-  const esCursoAcademico = Boolean(!c.esActividad && c.curso_id);
+  const esCursoAcademico = Boolean(!c.esActividad && c.curso_id && c.dia_semana === getTodayDayKey());
 
   if (secAsist) {
     secAsist.classList.toggle("hidden", !esCursoAcademico);
@@ -7424,11 +8000,11 @@ async function openClaseHoyModal(claseId) {
     };
   }
 
-  modal.classList.remove("hidden");
+  openModalSpring(modal);
 }
 
 function closeClaseHoyModal() {
-  const modal = $("#modal-clase-info-backdrop");
-  if (modal) modal.classList.add("hidden");
-  claseHoyModalClaseIdActual = null;
+  closeModalSpring("#modal-clase-info-backdrop", () => {
+    claseHoyModalClaseIdActual = null;
+  });
 }
