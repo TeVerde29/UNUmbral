@@ -637,6 +637,30 @@ const state = {
    ===================================================================== */
 const $  = (sel, root) => (root || document).querySelector(sel);
 const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+// Motor háptico de vibración estilo Apple Taptic Engine
+const Haptic = {
+  tap: () => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate(8); } catch (_) {}
+    }
+  },
+  selection: () => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate(14); } catch (_) {}
+    }
+  },
+  success: () => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate([10, 30, 15]); } catch (_) {}
+    }
+  },
+  warning: () => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      try { navigator.vibrate([20, 40, 20]); } catch (_) {}
+    }
+  }
+};
+
 
 function uuid() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -1055,6 +1079,7 @@ function toggleTheme() {
    6. NAVEGACIÓN Y VISTAS
    ===================================================================== */
 function switchTab(tabId) {
+  if (typeof Haptic !== "undefined") Haptic.tap();
   state.currentTab = tabId;
   $$(".view-panel").forEach(p => p.classList.toggle("active", p.id === tabId));
   $$(".nav-tab").forEach(b => b.classList.toggle("active", b.dataset.view === tabId));
@@ -1122,7 +1147,7 @@ async function renderHoy() {
     }).join("");
 
     $$(".class-card", listEl).forEach(card => {
-      card.addEventListener("click", () => openEditClassModal(card.dataset.id));
+      card.addEventListener("click", () => openClaseHoyModal(card.dataset.id));
     });
 
     wireTodayAttendanceEvents(listEl, classesToday, fechaHoyStr, excepciones, asistencias);
@@ -1200,58 +1225,62 @@ async function renderHoy() {
 
       listHuecos.innerHTML = huecos.map(h => {
         const noAsignadas = tareasDisponibles.filter(t => !tareasAsignadas.has(t.id));
-        // Sugerir tareas distintas para cada hueco sin repetirlas
-        const cantSugerir = h.duracionMinutos >= 90 ? 2 : 1;
-        const tareasSug = noAsignadas.slice(0, cantSugerir);
-        tareasSug.forEach(t => tareasAsignadas.add(t.id));
+        // Modo Enfoque: Sugerir exactamente 1 tarea prioritaria por hueco
+        const tareaEnfoque = noAsignadas.length > 0 ? noAsignadas[0] : null;
+        if (tareaEnfoque) tareasAsignadas.add(tareaEnfoque.id);
 
         const rangoTexto = h.enCurso
           ? `Ahora (${formatMinutes12(h.inicioMinutos)}) – ${formatTime12(h.fin)}`
           : `${formatTime12(h.inicio)} – ${formatTime12(h.fin)}`;
         const durTexto = typeof formatearDuracion === "function" ? formatearDuracion(h.duracionMinutos) : `${h.duracionMinutos} min`;
 
-        const sugerenciasHtml = tareasSug.length > 0
-          ? `<div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-              ${tareasSug.map(t => `
-                <div style="background:var(--surface-hover); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:8px 10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                  <div style="min-width:0; flex:1;">
-                    <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;">${escapeHtml(t.titulo)}</div>
-                    <!-- Fila 1: Nombre del curso y su nivel de importancia (Punto 5) -->
-                    <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                      ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:700;">${escapeHtml(t.materia)}</span> <span style="opacity:0.5;">·</span> ` : ""}
-                      <span style="display:inline-flex; align-items:center; gap:2px; font-weight:600;">${ICONS.star} Nivel ${t.importancia || 1}</span>
-                    </div>
-                    <!-- Fila 2: Fecha de vencimiento abajo (Punto 5) -->
-                    ${t.fecha_limite ? `
-                      <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; display:flex; align-items:center; gap:4px;">
-                        <span>Vence: ${escapeHtml(t.fecha_limite.replace('T', ' '))}</span>
-                      </div>` : ""}
-                  </div>
-                  <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 8px; flex-shrink:0;">
-                    ${ICONS.check} Lista
-                  </button>
+        const sugerenciaHtml = tareaEnfoque
+          ? `<div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-hairline); display:flex; justify-content:space-between; align-items:center; gap:12px;">
+              <div class="hueco-enfoque-clickable" data-task-id="${escapeHtml(tareaEnfoque.id)}" style="min-width:0; flex:1; cursor:pointer;" title="Ver o editar tarea">
+                <div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--deep-leaf); margin-bottom:2px; display:flex; align-items:center; gap:4px;">
+                  <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--deep-leaf);"></span>
+                  Enfoque sugerido
                 </div>
-              `).join("")}
+                <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:1px;">
+                  ${escapeHtml(tareaEnfoque.titulo)}
+                </div>
+                <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">
+                  ${tareaEnfoque.materia ? `<span style="color:${tareaEnfoque.color || 'var(--deep-leaf)'}; font-weight:600; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(tareaEnfoque.materia)}</span> <span style="opacity:0.35;">·</span> ` : ""}
+                  <span style="font-weight:500; flex-shrink:0;">Nivel ${tareaEnfoque.importancia || 1}</span>
+                </div>
+              </div>
+              <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hueco" data-task-id="${escapeHtml(tareaEnfoque.id)}" style="font-size:11px; padding:4px 10px; border-radius:var(--radius-pill); flex-shrink:0;">
+                ${ICONS.check} Lista
+              </button>
             </div>`
           : (pendingTasks.length > 0 && tareasAsignadas.size >= pendingTasks.length
-              ? `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">Tus tareas pendientes ya fueron programadas en los huecos anteriores. ¡Aprovecha este tiempo para descansar o repasar!</p>`
-              : `<p style="font-size:11.5px; color:var(--text-secondary); margin:6px 0 0 0;">No tienes tareas universitarias pendientes. ¡Aprovecha para descansar!</p>`);
+              ? `<p style="font-size:11.5px; color:var(--text-secondary); margin:8px 0 0 0; padding-top:8px; border-top:1px solid var(--border-hairline);">Tus tareas pendientes ya fueron programadas en los huecos anteriores. ¡Aprovecha para descansar o repasar!</p>`
+              : `<p style="font-size:11.5px; color:var(--text-secondary); margin:8px 0 0 0; padding-top:8px; border-top:1px solid var(--border-hairline);">No tienes tareas universitarias pendientes. ¡Aprovecha para descansar!</p>`);
 
         return `
-          <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:12px;">
+          <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:11px 13px; box-shadow:var(--shadow-xs);">
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div>
-                <span style="font-weight:700; font-size:13px; color:var(--text-primary);">${rangoTexto}</span>
-                <span style="margin-left:6px; font-size:11px; background:rgba(35,120,70,0.12); color:var(--deep-leaf); padding:2px 7px; border-radius:var(--radius-pill); font-weight:700;">${durTexto} libres${h.enCurso ? ' restantes' : ''}</span>
+              <div style="display:flex; align-items:center; gap:7px;">
+                <span style="display:inline-flex; align-items:center; color:var(--deep-leaf); font-size:13px;">${ICONS.clock}</span>
+                <span style="font-weight:600; font-size:13px; color:var(--text-primary); letter-spacing:-0.01em;">${rangoTexto}</span>
               </div>
+              <span style="font-size:11px; background:rgba(35,120,70,0.1); color:var(--deep-leaf); padding:2px 8px; border-radius:var(--radius-pill); font-weight:600;">${durTexto} libres${h.enCurso ? ' restantes' : ''}</span>
             </div>
-            ${sugerenciasHtml}
+            ${sugerenciaHtml}
           </div>`;
       }).join("");
+
+      $$('.hueco-enfoque-clickable', listHuecos).forEach(el => {
+        el.addEventListener("click", () => {
+          const tid = el.dataset.taskId;
+          if (tid && typeof openModalTask === "function") openModalTask(tid);
+        });
+      });
 
       $$('[data-action="completar-tarea-hueco"]', listHuecos).forEach(btn => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
+      if (typeof Haptic !== "undefined") Haptic.selection();
           const tid = btn.dataset.taskId;
           if (!tid) return;
           await db.tareas.update(tid, { completada: true });
@@ -1293,8 +1322,48 @@ async function renderHoy() {
         <p>No hay entregas pendientes ni evaluaciones críticas próximas.</p>
       </div>`;
   } else {
-    urgentListEl.innerHTML = urgentTasks.slice(0, 5).map(t => renderTaskCardHTML(t)).join("");
-    wireTaskCardEvents(urgentListEl);
+    urgentListEl.innerHTML = `
+      <div style="background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 14px; box-shadow:var(--shadow-xs);">
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          ${urgentTasks.slice(0, 5).map((t, idx, arr) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:4px 0; ${idx < arr.length - 1 ? 'border-bottom:1px solid var(--border-hairline); padding-bottom:8px;' : ''}" data-task-id="${escapeHtml(t.id)}">
+              <div class="urgent-task-hoy-clickable" style="min-width:0; flex:1; cursor:pointer;" title="Ver o editar tarea">
+                <div style="font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px;">${escapeHtml(t.titulo)}</div>
+                <div style="font-size:11px; color:var(--text-secondary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                  ${t.materia ? `<span style="color:${t.color || 'var(--deep-leaf)'}; font-weight:600;">${escapeHtml(t.materia)}</span> <span style="opacity:0.4;">·</span> ` : ""}
+                  <span style="font-weight:500;">Nivel ${t.importancia || 1}</span>
+                  ${t.fecha_limite ? `<span style="opacity:0.4;">·</span> <span>Vence: ${escapeHtml(t.fecha_limite.replace('T', ' '))}</span>` : ""}
+                </div>
+              </div>
+              <button type="button" class="btn-secondary btn-sm" data-action="completar-tarea-hoy" data-task-id="${escapeHtml(t.id)}" style="font-size:11px; padding:3px 9px; border-radius:var(--radius-pill); flex-shrink:0;">
+                ${ICONS.check} Lista
+              </button>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    $$('[data-action="completar-tarea-hoy"]', urgentListEl).forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if (typeof Haptic !== "undefined") Haptic.selection();
+        const tid = btn.dataset.taskId;
+        if (!tid) return;
+        await db.tareas.update(tid, { completada: true });
+        showToast("¡Tarea completada!");
+        if (typeof reprogramarTodo === "function") reprogramarTodo();
+        renderHoy();
+      });
+    });
+
+    $$('.urgent-task-hoy-clickable', urgentListEl).forEach(el => {
+      el.addEventListener("click", (e) => {
+        const row = el.closest("[data-task-id]");
+        const tid = row?.dataset.taskId;
+        if (tid && typeof openModalTask === "function") openModalTask(tid);
+      });
+    });
   }
 }
 
@@ -1509,6 +1578,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
   $$("button[data-action^='asist-']", container).forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (typeof Haptic !== "undefined") Haptic.selection();
       const action = btn.dataset.action;
       const claseId = btn.dataset.claseId;
       const cursoId = btn.dataset.cursoId;
@@ -1586,6 +1656,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
   $$("button[data-action='cancelar-sesion']", container).forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (typeof Haptic !== "undefined") Haptic.selection();
       const claseId = btn.dataset.claseId;
       const cursoId = btn.dataset.cursoId;
       const c = classesToday.find(x => x.id === claseId);
@@ -1609,6 +1680,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
   $$("button[data-action='restaurar-sesion']", container).forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (typeof Haptic !== "undefined") Haptic.selection();
       const claseId = btn.dataset.claseId;
       const cursoId = btn.dataset.cursoId;
       const ex = excepciones.find(x => x.fecha === fechaHoyStr && x.tipo === "cancelada" && (x.clase_id === claseId || (!x.clase_id && x.curso_id === cursoId)));
@@ -1625,9 +1697,7 @@ function wireTodayAttendanceEvents(container, classesToday, fechaHoyStr, excepci
 function renderClassCardHTML(c, opts = {}) {
   const color = normalizarColorPastel(c.color || COLOR_CURSO_DEFECTO);
   const cancelada = Boolean(opts.cancelada);
-  const isHoy = Boolean(opts.isHoy);
   const motivoCancelada = opts.motivoCancelada;
-  const est = opts.estadoAsistencia;
   const esAct = Boolean(c.esActividad);
 
   return `
@@ -1643,32 +1713,7 @@ function renderClassCardHTML(c, opts = {}) {
           <span class="class-time-tag">${ICONS.clock} ${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
           ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
           ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
-          ${!esAct && c.creditos ? `<span class="class-detail-tag">${c.creditos} Créditos</span>` : ""}
         </div>
-        ${isHoy && !esAct ? (
-          !cancelada ? `
-            <div class="class-card-attendance" onclick="event.stopPropagation();">
-              <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ${ICONS.check} Asistí
-              </button>
-              <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ${ICONS.x} Falté
-              </button>
-              <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ${ICONS.message} Justif.
-              </button>
-              <button type="button" class="asist-pill-btn" style="margin-left:auto;opacity:0.8;" data-action="cancelar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}" title="Cancelar solo la sesión de hoy">
-                ${ICONS.ban} Cancelar
-              </button>
-            </div>
-          ` : `
-            <div class="class-card-attendance" onclick="event.stopPropagation();">
-              <button type="button" class="asist-pill-btn" data-action="restaurar-sesion" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ""}">
-                ${ICONS.rotateCcw} Restaurar sesión
-              </button>
-            </div>
-          `
-        ) : ""}
       </div>
       ${ICONS.chevronRight}
     </div>`;
@@ -2506,7 +2551,9 @@ async function renderTareas() {
           <span class="week-group-title">${titulo}</span>
           <span class="week-group-badge ${badgeClass}">${items.length}</span>
         </div>
-        ${items.map(t => renderTaskCardHTML(t)).join("")}
+        <div class="tasks-inset-group">
+          ${items.map(t => renderTaskCardHTML(t)).join("")}
+        </div>
       `;
     };
 
@@ -2568,7 +2615,7 @@ async function renderTareas() {
     return;
   }
 
-  listEl.innerHTML = list.map(t => renderTaskCardHTML(t)).join("");
+  listEl.innerHTML = `<div class="tasks-inset-group">${list.map(t => renderTaskCardHTML(t)).join("")}</div>`;
   wireTaskCardEvents(listEl);
 }
 
@@ -2859,9 +2906,11 @@ function renderTaskCardHTML(t, refDate = new Date()) {
         ${descHTML}
         <div class="task-card-meta">
           <span class="subject-pill">${t.materia || "General"}</span>
+          <span class="task-meta-dot">·</span>
           <span class="importance-gauge ${imp.class}">${imp.badge}</span>
+          <span class="task-meta-dot">·</span>
           <span class="due-badge ${dueClass}">${rawHtml(ICONS.clock)} ${due.text}</span>
-          ${enlaceBadge}
+          ${enlaceBadge ? safeHtml`<span class="task-meta-dot">·</span>${enlaceBadge}` : rawHtml("")}
         </div>
       </div>
     </div>`.toString();
@@ -2871,6 +2920,7 @@ function wireTaskCardEvents(containerEl) {
   $$('[data-action="toggle"]', containerEl).forEach(btn => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (typeof Haptic !== "undefined") Haptic.selection();
       const card = btn.closest(".task-card");
       const id = card.dataset.id;
       const task = await db.tareas.get(id);
@@ -2928,7 +2978,7 @@ async function renderCursos() {
     let cicloBannerHTML = "";
     if (!cicloActivo) {
       cicloBannerHTML = `
-        <div class="empty-card" style="border:1.5px dashed var(--accent-teal); background:rgba(82,183,136,0.08); margin-bottom:14px; text-align:center;">
+        <div class="empty-card" style="border:1px solid var(--border-subtle); background:var(--surface-subtle); margin-bottom:14px; text-align:center;">
           <div class="empty-card-icon-wrap">${ICONS.calendar}</div>
           <strong style="font-size:14px; color:var(--text-primary);">Ciclo Académico Requerido</strong>
           <p style="font-size:12px; color:var(--text-secondary); margin:6px 0 10px;">Para registrar asignaturas y organizar tu horario universitario, primero debes definir tu Ciclo Académico (17 semanas).</p>
@@ -3026,24 +3076,39 @@ function renderResumenCiclo(resultados, cursos = []) {
       </div>`
     : "";
 
+  const notaDisplay = ponderadoInfo && ponderadoInfo.creditosCalificados > 0
+    ? formatNota(ponderadoInfo.promedioPonderado)
+    : formatNota(promedioCiclo);
+  const captionDisplay = ponderadoInfo && ponderadoInfo.creditosCalificados > 0
+    ? "Promedio Ponderado"
+    : "Promedio del Ciclo";
+  const subDisplay = ponderadoInfo && ponderadoInfo.creditosCalificados > 0
+    ? `${ponderadoInfo.creditosCalificados} de ${ponderadoInfo.totalCreditos} créditos evaluados`
+    : (completos.length ? `${completos.length} de ${resultados.length} cursos con notas` : "Sin evaluaciones completas");
+
   $("#cursos-resumen").innerHTML = `
-    <div class="overview-tile">
-      <span class="overview-value">${resultados.length}</span>
-      <span class="overview-label">Cursos</span>
-    </div>
-    <div class="overview-tile st-ok">
-      <span class="overview-value">${aprobados}</span>
-      <span class="overview-label">Aprobados</span>
-    </div>
-    <div class="overview-tile ${enRiesgo ? "st-warn" : ""}">
-      <span class="overview-value">${enRiesgo}</span>
-      <span class="overview-label">En riesgo</span>
-    </div>
-    <div class="overview-tile" title="Promedio simple de los cursos con las 3 notas completas">
-      <span class="overview-value">${formatNota(promedioCiclo)}</span>
-      <span class="overview-label">Prom. simple${completos.length ? ` (${completos.length})` : ""}</span>
-    </div>
-    ${ponderadoHtml}`;
+    <div class="academic-hero-card">
+      <div class="academic-hero-main">
+        <span class="academic-hero-caption">${captionDisplay}</span>
+        <div class="academic-hero-score overview-value">${notaDisplay}</div>
+        <span class="academic-hero-sub">${subDisplay}</span>
+      </div>
+      <div class="academic-hero-sep" aria-hidden="true"></div>
+      <div class="academic-hero-metrics">
+        <div class="hero-metric-item overview-tile">
+          <span class="hero-metric-val overview-value">${resultados.length}</span>
+          <span class="hero-metric-lbl overview-label">Inscritos</span>
+        </div>
+        <div class="hero-metric-item st-ok overview-tile">
+          <span class="hero-metric-val overview-value">${aprobados}</span>
+          <span class="hero-metric-lbl overview-label">Aprobados</span>
+        </div>
+        <div class="hero-metric-item ${enRiesgo ? "st-warn" : ""} overview-tile">
+          <span class="hero-metric-val overview-value">${enRiesgo}</span>
+          <span class="hero-metric-lbl overview-label">En riesgo</span>
+        </div>
+      </div>
+    </div>`;
 
   const toolbar = $("#rendimiento-toolbar");
   if (toolbar) {
@@ -3206,9 +3271,7 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
   const sesionesTxt = ses.count
     ? `${ses.count} ${ses.count === 1 ? "sesión" : "sesiones"}${horas ? " · " + horas : ""}`
     : "Sin horario";
-  const ppLabel = r.practicasTotal
-    ? (r.practicasTotal === 1 ? "Prom. de 1 Práctica" : `Prom. de ${r.practicasTotal} Prácticas`)
-    : "Prom. Prácticas";
+  const ppLabel = "Prácticas";
   const tienePromedio = r.promedio !== null;
   const valorCentral = tienePromedio ? r.promedio : (r.estado === "sin-notas" ? null : r.acumulado);
   const nombre = escapeHtml(c.nombre);
@@ -3217,22 +3280,23 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
   const faltasTxt = asist ? (faltasCount > 0 ? `${faltasCount} ${faltasCount === 1 ? "falta" : "faltas"}` : "0 faltas") : "Asistencia";
   const asistBadgeClass = asist && faltasCount > 0 ? (asist.enRiesgo ? "course-asist-badge danger-faltas" : "course-asist-badge has-faltas") : "course-asist-badge";
 
+  const metaParts = [];
+  if (c.creditos) metaParts.push(`${c.creditos} Créd.`);
+  if (c.ciclo_curso) metaParts.push(`Ciclo ${escapeHtml(c.ciclo_curso)}`);
+  if (c.tipo_condicion === "electivo") metaParts.push(`<span style="color:var(--status-warning);font-weight:600;">Electivo</span>`);
+  if (c.grupo_seccion) metaParts.push(`Gr. ${escapeHtml(c.grupo_seccion)}`);
+  if (c.profesor) metaParts.push(escapeHtml(c.profesor));
+  if (c.aula) metaParts.push(escapeHtml(c.aula));
+
   return `
     <article class="course-card" data-id="${escapeHtml(c.id)}">
       <span class="class-card-stripe" style="background:${color}"></span>
       <div class="course-card-main" data-action="notas" role="button" tabindex="0" aria-label="Ver y registrar notas de ${nombre}">
         <span class="course-card-head">
           <span class="class-card-title">${nombre}</span>
-          <span class="class-card-details">
-            ${c.creditos ? `<span class="class-detail-tag">${c.creditos} Créditos</span>` : ""}
-            ${c.ciclo_curso ? `<span class="class-detail-tag">Ciclo ${escapeHtml(c.ciclo_curso)}</span>` : ""}
-            ${c.tipo_condicion === "electivo" ? `<span class="class-detail-tag" style="color:var(--status-warning);font-weight:600;">Electivo</span>` : ""}
-            
-            ${c.grupo_seccion ? `<span class="class-detail-tag">Gr. ${escapeHtml(c.grupo_seccion)}</span>` : ""}
-            ${c.profesor ? `<span class="class-detail-tag">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
-            ${c.aula ? `<span class="class-detail-tag">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
-            <span class="class-detail-tag">${ICONS.layers} ${sesionesTxt}</span>
-          </span>
+          <div class="class-card-details">
+            ${metaParts.join(' <span style="opacity:0.35;">·</span> ')}
+          </div>
         </span>
         <span class="grade-strip">
           ${gradeCellHTML("Parcial", r.parcial)}
@@ -3243,13 +3307,15 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
             <span class="grade-cell-value">${formatNota(valorCentral)}</span>
           </span>
         </span>
-        <span class="course-card-footer">
-          <span class="grade-status-pill ${info.tone}">${info.label}</span>
-          <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
+        <div class="course-card-footer">
+          <div class="course-card-footer-left">
+            <span class="grade-status-pill ${info.tone}">${info.label}</span>
+            <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
+          </div>
           <button type="button" class="asist-pill-btn ${asistBadgeClass}" data-action="asistencia" data-id="${escapeHtml(c.id)}" title="Ver registro y control de faltas (${faltasTxt})">
             ${ICONS.chart} ${faltasTxt}
           </button>
-        </span>
+        </div>
       </div>
       <button type="button" class="icon-btn course-edit-btn" data-action="edit-curso" aria-label="Editar datos de ${nombre}" title="Editar curso">${ICONS.edit}</button>
     </article>`;
@@ -4111,11 +4177,11 @@ function renderAjustes() {
       const text = $("#db-indicator-text");
       if (persisted) {
         dot.className = "db-indicator ok";
-        text.textContent = "Almacenamiento persistente activo en el dispositivo";
+        text.textContent = "Tus datos están protegidos y guardados en tu teléfono";
       } else {
         dot.className = "db-indicator";
         dot.style.background = "var(--status-warning)";
-        text.textContent = "Almacenamiento estándar activo";
+        text.textContent = "Guardado local activo en tu teléfono";
       }
     });
   }
@@ -6846,6 +6912,16 @@ function wireAttendanceAndModalEvents() {
     });
   }
 
+  // Modal Clase Info & Asistencia de Hoy
+  const btnCloseClaseInfo = $("#btn-close-clase-info-modal");
+  if (btnCloseClaseInfo) btnCloseClaseInfo.addEventListener("click", closeClaseHoyModal);
+  const modalClaseInfoBackdrop = $("#modal-clase-info-backdrop");
+  if (modalClaseInfoBackdrop) {
+    modalClaseInfoBackdrop.addEventListener("click", (e) => {
+      if (e.target.id === "modal-clase-info-backdrop") closeClaseHoyModal();
+    });
+  }
+
   // Modal Asistencia
   const btnCloseAsist = $("#btn-close-asistencia-modal");
   if (btnCloseAsist) btnCloseAsist.addEventListener("click", closeAsistenciaModal);
@@ -7103,7 +7179,7 @@ async function init() {
     const indDot = $("#db-indicator-dot");
     const indTxt = $("#db-indicator-text");
     if (indDot) { indDot.className = "db-indicator error"; }
-    if (indTxt) { indTxt.textContent = "Almacenamiento local restringido o no disponible"; }
+    if (indTxt) { indTxt.textContent = "Memoria local no disponible temporalmente"; }
     showToast("Advertencia: Almacenamiento local restringido en esta sesión.", true);
   }
 
@@ -7135,4 +7211,202 @@ if (typeof window !== "undefined" && typeof document !== "undefined" && typeof d
   } else {
     init();
   }
+}
+
+
+/* =====================================================================
+   MODAL DE INFORMACIÓN DE CLASE Y ASISTENCIA DE HOY
+   ===================================================================== */
+let claseHoyModalClaseIdActual = null;
+
+async function openClaseHoyModal(claseId) {
+  if (typeof Haptic !== "undefined") Haptic.selection();
+  claseHoyModalClaseIdActual = claseId;
+
+  const clases = await obtenerClasesEnriquecidas();
+  const c = clases.find(x => x.id === claseId);
+  if (!c) return;
+
+  const fechaHoyStr = formatFechaISO(new Date());
+  const excepciones = await db.excepciones.toArray();
+  const asistencias = await db.asistencia.toArray();
+  const cursos = await db.cursos.toArray();
+  const curso = c.curso_id ? cursos.find(x => x.id === c.curso_id) : null;
+
+  const modal = $("#modal-clase-info-backdrop");
+  if (!modal) return;
+
+  // 1. Encabezado
+  const badgeEl = $("#clase-info-badge");
+  if (badgeEl) {
+    if (c.esActividad) {
+      badgeEl.textContent = "Actividad / Trabajo";
+      badgeEl.style.background = "var(--surface-subtle)";
+      badgeEl.style.color = "var(--text-secondary)";
+    } else {
+      badgeEl.textContent = "Asignatura Universitaria";
+      badgeEl.style.background = c.color || "var(--accent)";
+      badgeEl.style.color = "var(--deep-leaf)";
+    }
+  }
+
+  const titleEl = $("#clase-info-title");
+  if (titleEl) titleEl.textContent = c.materia || "Clase";
+
+  const subEl = $("#clase-info-subtitle");
+  if (subEl) {
+    const durMin = Math.max(0, timeToMinutes(c.hora_fin) - timeToMinutes(c.hora_inicio));
+    const durTxt = typeof formatearDuracion === "function" ? formatearDuracion(durMin) : `${durMin} min`;
+    subEl.textContent = `${DIAS_LABEL[c.dia_semana] || c.dia_semana} · ${formatTimeRange12(c.hora_inicio, c.hora_fin)} (${durTxt})`;
+  }
+
+  // 2. Detalles Inset Group
+  const detailsEl = $("#clase-info-details");
+  if (detailsEl) {
+    let asistRes = null;
+    if (c.curso_id) {
+      const clasesDelCurso = await db.clases.where("curso_id").equals(c.curso_id).toArray();
+      const asistCurso = await db.asistencia.where("curso_id").equals(c.curso_id).toArray();
+      const ajustes = await db.ajustes.toArray();
+      const mapAjustes = {};
+      for (const a of ajustes) mapAjustes[a.clave] = a.valor;
+      const cfg = typeof sanitizarAjustes === "function" ? sanitizarAjustes(mapAjustes) : mapAjustes;
+      const cicloActivo = await obtenerCicloActivo();
+      const fechaIni = cicloActivo?.fecha_inicio || cfg.ciclo_inicio || "2026-01-01";
+      const fechaFin = cicloActivo?.fecha_fin || cfg.ciclo_fin || "2026-12-31";
+
+      if (typeof resumenAsistencia === "function") {
+        asistRes = resumenAsistencia({
+          cursoId: c.curso_id,
+          clasesDelCurso,
+          asistencias: asistCurso,
+          cicloInicio: fechaIni,
+          cicloFin: fechaFin,
+          excepciones,
+          limiteFaltasPct: cfg.limite_faltas_pct || 30
+        });
+      }
+    }
+
+    detailsEl.innerHTML = `
+      <div class="clase-info-row">
+        <span class="clase-info-label">${ICONS.clock} Horario</span>
+        <span class="clase-info-value">${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
+      </div>
+      <div class="clase-info-row">
+        <span class="clase-info-label">${ICONS.location} Aula / Ubicación</span>
+        <span class="clase-info-value">${escapeHtml(c.aula || "No especificada")}</span>
+      </div>
+      ${c.profesor ? `
+      <div class="clase-info-row">
+        <span class="clase-info-label">${ICONS.person} Profesor / Docente</span>
+        <span class="clase-info-value">${escapeHtml(c.profesor)}</span>
+      </div>` : ""}
+      ${curso?.creditos ? `
+      <div class="clase-info-row">
+        <span class="clase-info-label">${ICONS.layers} Créditos Universitarios</span>
+        <span class="clase-info-value">${curso.creditos} Créditos</span>
+      </div>` : ""}
+      ${asistRes ? `
+      <div class="clase-info-row">
+        <span class="clase-info-label">${ICONS.chart} Inasistencias Semestre</span>
+        <span class="clase-info-value ${asistRes.enRiesgo ? 'text-danger' : ''}">${asistRes.faltas} de ${asistRes.maxFaltasPermitidas} permitidas (${asistRes.faltasRestantes} restantes)</span>
+      </div>` : ""}
+    `;
+  }
+
+  // 3. Asistencia de Hoy
+  const cancelada = (typeof verificarEsDiaFeriado === "function" && verificarEsDiaFeriado(fechaHoyStr, excepciones)) ||
+    (typeof esClaseCancelada === "function" ? esClaseCancelada(c.id, c.curso_id, fechaHoyStr, excepciones) : false);
+  const exItem = excepciones.find(e => e.fecha === fechaHoyStr && (e.tipo === "feriado" || (e.tipo === "cancelada" && (e.clase_id === c.id || (!e.clase_id && e.curso_id === c.curso_id)))));
+  const asistHoy = asistencias.find(a => a.curso_id === c.curso_id && a.fecha === fechaHoyStr);
+  const estadoAsist = asistHoy ? asistHoy.estado : null;
+
+  const fechaHoyEl = $("#clase-info-fecha-hoy");
+  if (fechaHoyEl) fechaHoyEl.textContent = formatReadableDate();
+
+  const statusBannerEl = $("#clase-info-asist-status");
+  if (statusBannerEl) {
+    if (cancelada) {
+      statusBannerEl.className = "clase-asist-status-banner st-cancelada";
+      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Clase Cancelada Hoy</strong><p>${escapeHtml(exItem?.motivo || "Sesión suspendida para el día de hoy.")}</p></div>`;
+    } else if (estadoAsist === "presente") {
+      statusBannerEl.className = "clase-asist-status-banner st-presente";
+      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.check}</span> <div><strong>Asistencia Registrada</strong><p>Marcaste presencia para esta sesión.</p></div>`;
+    } else if (estadoAsist === "falta") {
+      statusBannerEl.className = "clase-asist-status-banner st-falta";
+      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Inasistencia Registrada</strong><p>Se contabiliza 1 falta en tu récord del ciclo.</p></div>`;
+    } else if (estadoAsist === "justificada") {
+      statusBannerEl.className = "clase-asist-status-banner st-justificada";
+      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.flag}</span> <div><strong>Falta Justificada</strong><p>Esta falta no descuenta de tu límite de inasistencias.</p></div>`;
+    } else {
+      statusBannerEl.className = "clase-asist-status-banner st-pendiente";
+      statusBannerEl.innerHTML = `<span class="asist-banner-icon">⚪</span> <div><strong>Sin registrar aún</strong><p>Marca tu asistencia tocando uno de los botones de abajo.</p></div>`;
+    }
+  }
+
+  // 4. Botones de Asistencia
+  const btnsWrap = $("#clase-info-buttons-wrap");
+  if (btnsWrap) {
+    btnsWrap.innerHTML = `
+      <button type="button" class="btn-asist-pill ${estadoAsist === 'presente' ? 'is-active presente' : ''}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Asistí</span>
+      </button>
+      <button type="button" class="btn-asist-pill ${estadoAsist === 'falta' ? 'is-active falta' : ''}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span>Falté</span>
+      </button>
+      <button type="button" class="btn-asist-pill ${estadoAsist === 'justificada' ? 'is-active justificada' : ''}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        <span>Justif.</span>
+      </button>
+      <button type="button" class="btn-asist-pill ${cancelada ? 'is-active cancelada' : ''}" data-action="${cancelada ? 'restaurar-sesion' : 'cancelar-sesion'}" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        <span>${cancelada ? 'Restaurar' : 'Cancelar'}</span>
+      </button>
+    `;
+
+    wireTodayAttendanceEvents(btnsWrap, clases, fechaHoyStr, excepciones, asistencias);
+
+    // After clicking any attendance button, refresh openClaseHoyModal
+    $$("button", btnsWrap).forEach(btn => {
+      const origClick = btn.onclick;
+      btn.addEventListener("click", () => {
+        setTimeout(() => {
+          if (claseHoyModalClaseIdActual) openClaseHoyModal(claseHoyModalClaseIdActual);
+        }, 120);
+      });
+    });
+  }
+
+  // 5. Botones secundarios
+  const btnVerNotas = $("#btn-clase-info-ver-notas");
+  if (btnVerNotas) {
+    if (c.curso_id) {
+      btnVerNotas.classList.remove("hidden");
+      btnVerNotas.onclick = () => {
+        closeClaseHoyModal();
+        openNotasModal(c.curso_id);
+      };
+    } else {
+      btnVerNotas.classList.add("hidden");
+    }
+  }
+
+  const btnEditar = $("#btn-clase-info-editar");
+  if (btnEditar) {
+    btnEditar.onclick = () => {
+      closeClaseHoyModal();
+      openEditClassModal(c.id);
+    };
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeClaseHoyModal() {
+  const modal = $("#modal-clase-info-backdrop");
+  if (modal) modal.classList.add("hidden");
+  claseHoyModalClaseIdActual = null;
 }

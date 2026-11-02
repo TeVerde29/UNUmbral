@@ -191,18 +191,18 @@
 
     <!-- VISTA 2.5: MIS CURSOS & NOTAS -->
     <section id="view-cursos" class="view-panel">
-      <div class="section-header">
+      <div class="section-header view-cursos-header">
         <div>
-          <h2 class="section-title">Mis Cursos y Notas</h2>
+          <h2 class="section-title">Cursos y Notas</h2>
         </div>
-        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <button id="btn-reporte-ciclo" type="button" class="btn-secondary btn-sm" title="Récord Académico y Feedback de Fin de Ciclo">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-right:4px;vertical-align:-2px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            <span>Reporte</span>
+        <div class="cursos-header-actions">
+          <button id="btn-reporte-ciclo" type="button" class="btn-secondary btn-sm btn-action-compact" title="Récord Académico y Feedback de Fin de Ciclo" aria-label="Reporte Académico">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <span class="btn-label-desktop">Reporte</span>
           </button>
-          <button id="btn-gestionar-ciclo-cursos" type="button" class="btn-secondary btn-sm" title="Gestionar Ciclo Académico">
-            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="margin-right:4px;vertical-align:-2px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            <span>Ciclo</span>
+          <button id="btn-gestionar-ciclo-cursos" type="button" class="btn-secondary btn-sm btn-action-compact" title="Gestionar Ciclo Académico" aria-label="Ciclo Académico">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span class="btn-label-desktop">Ciclo</span>
           </button>
           <button id="btn-add-curso" class="btn-primary btn-sm">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -397,15 +397,15 @@
             <p>Transfiere tu horario y materias a tus compañeros mediante códigos QR de forma rápida y sin conexión a internet.</p>
           </div>
         </div>
-        <div class="settings-card-actions">
+        <div class="settings-card-actions settings-qr-grid">
           <button id="btn-compartir-qr" class="btn-primary" type="button" style="width:100%;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            <span>Compartir por Código QR</span>
+            <span>Compartir QR</span>
           </button>
 
-          <button id="btn-escanear-qr" class="btn-secondary" type="button" style="width:100%; margin-top:8px;">
+          <button id="btn-escanear-qr" class="btn-secondary" type="button" style="width:100%;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" style="vertical-align:-2px;margin-right:4px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            <span>Leer Horario desde Imagen QR</span>
+            <span>Leer QR</span>
           </button>
         </div>
       </div>
@@ -613,7 +613,7 @@
       </div>
 
       <div class="settings-card">
-        <div class="settings-card-actions">
+        <div class="settings-card-actions settings-demo-grid">
           <button id="btn-load-demo" class="btn-secondary">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             <span>Cargar Semestre Modelo</span>
@@ -624,16 +624,17 @@
         </div>
       </div>
 
-      <!-- Info PWA y Móvil -->
+      <!-- Info Privacidad y App Móvil -->
       <div class="info-box" id="privacidad">
-        <strong>Dispositivo Móvil &amp; Privacidad 100% Local:</strong>
-        <p>Abre <a href="https://teverde29.github.io/UNUmbral/" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline;">UNUmbral</a> en Chrome, Safari o Brave en tu teléfono y selecciona <em>"Añadir a pantalla de inicio"</em> para instalar la aplicación en modo nativo. Política de privacidad: todos tus datos académicos residen exclusivamente en tu dispositivo sin servidores externos.</p>
+        <strong style="display:block;margin-bottom:6px;font-size:13px;color:var(--text-primary);">Tus datos seguros en tu teléfono</strong>
+        <p style="margin-bottom:8px;line-height:1.45;font-size:12.5px;">UNUmbral funciona directamente en tu celular sin necesidad de internet. Tus horarios, notas y tareas se guardan de forma privada en tu propio dispositivo y no se comparten con nadie.</p>
+        <p style="margin-bottom:10px;line-height:1.45;font-size:12px;color:var(--text-secondary);">Para usarla como una aplicación, abre el menú de tu navegador y selecciona <em>"Añadir a pantalla de inicio"</em>.</p>
         <div class="db-status-line">
           <span class="db-indicator ok" id="db-indicator-dot"></span>
-          <span id="db-indicator-text">Almacenamiento persistente activo en el dispositivo</span>
+          <span id="db-indicator-text">Tus datos están protegidos y guardados en tu teléfono</span>
         </div>
-        <p style="margin-top:8px;font-size:12px;color:var(--text-tertiary);">
-          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado el <time datetime="2026-10-30">30 de octubre de 2026</time> · <a href="PRIVACY.md" id="btn-ver-privacidad" style="color:var(--text-secondary);text-decoration:underline;">Política de Privacidad</a>
+        <p style="margin-top:10px;font-size:11.5px;color:var(--text-tertiary);">
+          Desarrollado por <a href="https://github.com/TeVerde29" target="_blank" rel="noopener noreferrer" style="color:var(--text-secondary);">Té Verde</a> · Actualizado en octubre de 2026 · <a href="PRIVACY.md" id="btn-ver-privacidad" style="color:var(--text-secondary);text-decoration:underline;">Privacidad</a>
         </p>
       </div>
     </section>
@@ -698,6 +699,52 @@
     </button>
   </nav>
 
+</div>
+
+<!-- MODAL DE INFORMACIÓN DE CLASE Y ASISTENCIA DE HOY (APPLE BOTTOM SHEET) -->
+<div id="modal-clase-info-backdrop" class="modal-backdrop hidden">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="clase-info-title" style="max-height: 90vh; overflow-y: auto;">
+    <div class="modal-drag-handle" aria-hidden="true"></div>
+    <div class="modal-header">
+      <div style="min-width:0; flex:1;">
+        <span class="clase-info-type-tag" id="clase-info-badge">Asignatura</span>
+        <h2 id="clase-info-title" class="clase-info-name">Nombre de la Clase</h2>
+        <p class="modal-subtitle" id="clase-info-subtitle">Horario y aula</p>
+      </div>
+      <button class="btn-icon-close" id="btn-close-clase-info-modal" aria-label="Cerrar modal">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+
+    <div class="modal-body" style="padding-top: 10px;">
+      <!-- Tarjeta Inset de Información de la Sesión -->
+      <div class="clase-info-inset-card" id="clase-info-details"></div>
+
+      <!-- Sección de Asistencia de Hoy -->
+      <div class="clase-asist-section">
+        <div class="clase-asist-header">
+          <span class="clase-asist-title">Registro de Asistencia de Hoy</span>
+          <span class="clase-asist-date" id="clase-info-fecha-hoy">Hoy</span>
+        </div>
+
+        <div id="clase-info-asist-status" class="clase-asist-status-banner"></div>
+
+        <div class="clase-asist-buttons-grid" id="clase-info-buttons-wrap"></div>
+      </div>
+
+      <!-- Acciones de Navegación / Edición -->
+      <div class="clase-info-actions-footer">
+        <button type="button" class="btn-secondary btn-sm" id="btn-clase-info-ver-notas" style="flex:1;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>Ver Notas del Curso</span>
+        </button>
+        <button type="button" class="btn-secondary btn-sm" id="btn-clase-info-editar" style="flex:1;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+          <span>Editar Horario</span>
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- DIÁLOGO MODAL: NUEVA / EDITAR CLASE (SOLO CURSO + DÍA + HORA) -->
