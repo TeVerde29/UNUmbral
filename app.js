@@ -41,6 +41,7 @@ const ICONS = {
   book: `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
   edit: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
   close: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+  flag: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>`,
   layers: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
   check: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`,
   x: `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
@@ -488,7 +489,7 @@ function enriquecerClase(clase, cursosMap) {
       materia: clase.titulo || "Actividad",
       color: normalizarColorPastel(clase.color || "#BAE6FD"),
       profesor: "",
-      aula: clase.categoria ? (CATEGORIAS_ACTIVIDAD[clase.categoria] || clase.categoria) : (clase.aula || "Actividad")
+      aula: clase.aula || (clase.categoria ? (CATEGORIAS_ACTIVIDAD[clase.categoria] || clase.categoria) : "Actividad")
     };
   }
   const curso = cursosMap[clase.curso_id];
@@ -1264,7 +1265,7 @@ async function renderHoy() {
                 <span style="display:inline-flex; align-items:center; color:var(--deep-leaf); font-size:13px;">${ICONS.clock}</span>
                 <span style="font-weight:600; font-size:13px; color:var(--text-primary); letter-spacing:-0.01em;">${rangoTexto}</span>
               </div>
-              <span style="font-size:11px; background:rgba(35,120,70,0.1); color:var(--deep-leaf); padding:2px 8px; border-radius:var(--radius-pill); font-weight:600;">${durTexto} libres${h.enCurso ? ' restantes' : ''}</span>
+              <span style="font-size:11.5px; color:var(--deep-leaf); font-weight:600;">${durTexto} libres${h.enCurso ? ' restantes' : ''}</span>
             </div>
             ${sugerenciaHtml}
           </div>`;
@@ -1469,16 +1470,23 @@ function renderLiveStatusCard(classesToday, excepciones = [], fechaHoyStr = "", 
     const diffSec = Math.max(0, eSec - curSec);
     const pct = Math.min(100, Math.round((elapsedSec / totalSec) * 100));
 
+    const esActividadCur = Boolean(currentClass.esActividad || currentClass.tipo === "actividad");
+    const badgeLabel = esActividadCur
+      ? `ACTIVIDAD EN CURSO · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}`
+      : `EN CURSO · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}`;
+    const aulaCurHtml = currentClass.aula ? `<span class="live-meta-item">${ICONS.location} ${escapeHtml(currentClass.aula)}</span>` : "";
+    const profCurHtml = (!esActividadCur && currentClass.profesor) ? `<span class="live-meta-item">${ICONS.person} ${escapeHtml(currentClass.profesor)}</span>` : "";
+
     container.className = "live-card in-class";
     container.innerHTML = `
       <div class="live-card-eyebrow">
         <span class="live-dot pulse"></span>
-        <span class="live-badge-in-class">EN CURSO · ${formatTime12(currentClass.hora_inicio)} a ${formatTime12(currentClass.hora_fin)}</span>
+        <span class="live-badge-in-class">${badgeLabel}</span>
       </div>
       <div class="live-card-title">${escapeHtml(currentClass.materia)}</div>
       <div class="live-card-meta">
-        <span class="live-meta-item">${ICONS.location} ${escapeHtml(currentClass.aula || "Sin aula")}</span>
-        <span class="live-meta-item">${ICONS.person} ${escapeHtml(currentClass.profesor || "Profesor(a)")}</span>
+        ${aulaCurHtml}
+        ${profCurHtml}
         <span class="live-meta-item live-timer-in-class" id="live-remaining-timer">${ICONS.clock} Restan ${formatearTiempoRestanteHMS(diffSec)}</span>
       </div>
       <div class="live-progress-bar">
@@ -1525,17 +1533,22 @@ function renderLiveStatusCard(classesToday, excepciones = [], fechaHoyStr = "", 
     const untilSec = Math.max(0, sSec - curSec);
     const countdown = formatearCuentaAtrasHMS(untilSec);
 
+    const esActividadNext = Boolean(nextClass.esActividad || nextClass.tipo === "actividad");
+    const eyebrowLabel = esActividadNext ? "Próxima Actividad" : "Próxima Clase";
+    const aulaNextHtml = nextClass.aula ? `<span class="live-meta-item">${ICONS.location} ${escapeHtml(nextClass.aula)}</span>` : "";
+    const profNextHtml = (!esActividadNext && nextClass.profesor) ? `<span class="live-meta-item">${ICONS.person} ${escapeHtml(nextClass.profesor)}</span>` : "";
+
     container.className = "live-card";
     container.innerHTML = `
       <div class="live-card-eyebrow">
         <span class="live-dot"></span>
-        <span>Próxima Clase</span>
+        <span>${eyebrowLabel}</span>
       </div>
       <div class="live-card-title">${escapeHtml(nextClass.materia)}</div>
       <div class="live-card-meta">
         <span class="live-meta-item" id="live-next-class-timer">${ICONS.clock} ${formatTimeRange12(nextClass.hora_inicio, nextClass.hora_fin)} (en <span id="live-next-countdown">${countdown}</span>)</span>
-        <span class="live-meta-item">${ICONS.location} ${escapeHtml(nextClass.aula || "Sin aula")}</span>
-        <span class="live-meta-item">${ICONS.person} ${escapeHtml(nextClass.profesor || "Profesor(a)")}</span>
+        ${aulaNextHtml}
+        ${profNextHtml}
       </div>`;
 
     state.liveCountdownInterval = setInterval(() => {
@@ -1706,8 +1719,8 @@ function renderClassCardHTML(c, opts = {}) {
       <div class="class-card-main">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
           <div class="class-card-title">${escapeHtml(c.materia)}</div>
-          ${cancelada ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:var(--radius-pill);background:rgba(210,50,50,0.15);color:var(--status-danger);font-weight:600;">${escapeHtml(motivoCancelada || "Cancelada")}</span>` : ""}
-          ${esAct ? `<span style="font-size:10.5px;padding:2px 6px;border-radius:var(--radius-pill);background:var(--surface-subtle);color:var(--text-secondary);font-weight:600;">Actividad</span>` : ""}
+          ${cancelada ? `<span style="font-size:11px;color:var(--status-danger);font-weight:600;">${escapeHtml(motivoCancelada || "Cancelada")}</span>` : ""}
+          ${esAct ? `<span style="font-size:11px;color:var(--text-tertiary);font-weight:500;">Actividad</span>` : ""}
         </div>
         <div class="class-card-details">
           <span class="class-time-tag">${ICONS.clock} ${formatTimeRange12(c.hora_inicio, c.hora_fin)}</span>
@@ -1937,7 +1950,7 @@ async function renderCicloRoadmap() {
       <div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(ciclo.nombre)}</h3>
-          <span class="cycle-badge-active" style="padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; background: var(--accent-sage-soft); color: var(--deep-leaf);">Activo</span>
+          <span class="cycle-badge-active" style="font-size: 12px; font-weight: 600; color: var(--primary);">· Activo</span>
           ${haConcluido ? `<span style="background: rgba(210,50,50,0.15); color: var(--status-danger); padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700;">17 Semanas Concluidas</span>` : ""}
         </div>
         <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-secondary);">
@@ -3280,13 +3293,14 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
   const faltasTxt = asist ? (faltasCount > 0 ? `${faltasCount} ${faltasCount === 1 ? "falta" : "faltas"}` : "0 faltas") : "Asistencia";
   const asistBadgeClass = asist && faltasCount > 0 ? (asist.enRiesgo ? "course-asist-badge danger-faltas" : "course-asist-badge has-faltas") : "course-asist-badge";
 
-  const metaParts = [];
-  if (c.creditos) metaParts.push(`${c.creditos} Créd.`);
-  if (c.ciclo_curso) metaParts.push(`Ciclo ${escapeHtml(c.ciclo_curso)}`);
-  if (c.tipo_condicion === "electivo") metaParts.push(`<span style="color:var(--status-warning);font-weight:600;">Electivo</span>`);
-  if (c.grupo_seccion) metaParts.push(`Gr. ${escapeHtml(c.grupo_seccion)}`);
-  if (c.profesor) metaParts.push(escapeHtml(c.profesor));
-  if (c.aula) metaParts.push(escapeHtml(c.aula));
+  // Organización profesional estructurada: Académico vs Logístico
+  const academicItems = [];
+  if (c.ciclo_curso) academicItems.push(`Ciclo ${escapeHtml(c.ciclo_curso)}`);
+  if (c.creditos) academicItems.push(`${c.creditos} Créditos`);
+  if (c.grupo_seccion) academicItems.push(`Grupo ${escapeHtml(c.grupo_seccion)}`);
+  if (c.tipo_condicion === "electivo") academicItems.push(`<span style="color:var(--status-warning);font-weight:600;">Electivo</span>`);
+
+  const hasLogistics = Boolean(c.profesor || c.aula);
 
   return `
     <article class="course-card" data-id="${escapeHtml(c.id)}">
@@ -3294,9 +3308,15 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
       <div class="course-card-main" data-action="notas" role="button" tabindex="0" aria-label="Ver y registrar notas de ${nombre}">
         <span class="course-card-head">
           <span class="class-card-title">${nombre}</span>
-          <div class="class-card-details">
-            ${metaParts.join(' <span style="opacity:0.35;">·</span> ')}
+          <div class="course-meta-academic">
+            ${academicItems.join(' <span class="course-meta-sep">·</span> ')}
           </div>
+          ${hasLogistics ? `
+            <div class="course-meta-logistics">
+              ${c.profesor ? `<span class="course-meta-item">${ICONS.person} ${escapeHtml(c.profesor)}</span>` : ""}
+              ${c.aula ? `<span class="course-meta-item">${ICONS.location} ${escapeHtml(c.aula)}</span>` : ""}
+            </div>
+          ` : ""}
         </span>
         <span class="grade-strip">
           ${gradeCellHTML("Parcial", r.parcial)}
@@ -3310,6 +3330,7 @@ function renderCursoCardHTML(c, r, ses, asist = null) {
         <div class="course-card-footer">
           <div class="course-card-footer-left">
             <span class="grade-status-pill ${info.tone}">${info.label}</span>
+            <span style="color:var(--text-tertiary);font-size:10px;opacity:0.6;">·</span>
             <span class="course-hint">${escapeHtml(mensajeRendimiento(r))}</span>
           </div>
           <button type="button" class="asist-pill-btn ${asistBadgeClass}" data-action="asistencia" data-id="${escapeHtml(c.id)}" title="Ver registro y control de faltas (${faltasTxt})">
@@ -4557,7 +4578,7 @@ async function openAsistenciaModal(cursoId) {
             ${s.motivo ? `<div style="font-size:11px;color:var(--status-warning);margin-top:2px;">${escapeHtml(s.motivo)}</div>` : ""}
           </div>
           <div class="asist-session-actions" style="display:flex;gap:4px;flex-shrink:0;">
-            ${s.cancelada ? `<span style="font-size:11px;padding:3px 8px;border-radius:var(--radius-pill);background:var(--surface-subtle);color:var(--text-secondary);">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
+            ${s.cancelada ? `<span style="font-size:11.5px;color:var(--text-tertiary);font-weight:500;">${s.feriado ? "Feriado" : "Cancelada"}</span>` : `
               <button type="button" class="asist-pill-btn ${est === "presente" ? "active-presente" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="presente" title="Marcar como presente">${ICONS.check} <span>Presente</span></button>
               <button type="button" class="asist-pill-btn ${est === "falta" ? "active-falta" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="falta" title="Marcar como inasistencia">${ICONS.x} <span>Falta</span></button>
               <button type="button" class="asist-pill-btn ${est === "justificada" ? "active-justificada" : ""}" data-action="set-asist" data-curso-id="${cursoId}" data-clase-id="${s.claseId || ""}" data-fecha="${s.fecha}" data-estado="justificada" title="Marcar como falta justificada">${ICONS.message} <span>Justif.</span></button>
@@ -7239,15 +7260,9 @@ async function openClaseHoyModal(claseId) {
   // 1. Encabezado
   const badgeEl = $("#clase-info-badge");
   if (badgeEl) {
-    if (c.esActividad) {
-      badgeEl.textContent = "Actividad / Trabajo";
-      badgeEl.style.background = "var(--surface-subtle)";
-      badgeEl.style.color = "var(--text-secondary)";
-    } else {
-      badgeEl.textContent = "Asignatura Universitaria";
-      badgeEl.style.background = c.color || "var(--accent)";
-      badgeEl.style.color = "var(--deep-leaf)";
-    }
+    badgeEl.textContent = c.esActividad ? "Actividad No Académica" : "Asignatura Universitaria";
+    badgeEl.style.background = "transparent";
+    badgeEl.style.color = "var(--text-tertiary)";
   }
 
   const titleEl = $("#clase-info-title");
@@ -7315,69 +7330,76 @@ async function openClaseHoyModal(claseId) {
     `;
   }
 
-  // 3. Asistencia de Hoy
-  const cancelada = (typeof verificarEsDiaFeriado === "function" && verificarEsDiaFeriado(fechaHoyStr, excepciones)) ||
-    (typeof esClaseCancelada === "function" ? esClaseCancelada(c.id, c.curso_id, fechaHoyStr, excepciones) : false);
-  const exItem = excepciones.find(e => e.fecha === fechaHoyStr && (e.tipo === "feriado" || (e.tipo === "cancelada" && (e.clase_id === c.id || (!e.clase_id && e.curso_id === c.curso_id)))));
-  const asistHoy = asistencias.find(a => a.curso_id === c.curso_id && a.fecha === fechaHoyStr);
-  const estadoAsist = asistHoy ? asistHoy.estado : null;
+  // 3. Asistencia de Hoy (Solo para cursos académicos universitarios)
+  const secAsist = $(".clase-asist-section", modal);
+  const esCursoAcademico = Boolean(!c.esActividad && c.curso_id);
 
-  const fechaHoyEl = $("#clase-info-fecha-hoy");
-  if (fechaHoyEl) fechaHoyEl.textContent = formatReadableDate();
-
-  const statusBannerEl = $("#clase-info-asist-status");
-  if (statusBannerEl) {
-    if (cancelada) {
-      statusBannerEl.className = "clase-asist-status-banner st-cancelada";
-      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Clase Cancelada Hoy</strong><p>${escapeHtml(exItem?.motivo || "Sesión suspendida para el día de hoy.")}</p></div>`;
-    } else if (estadoAsist === "presente") {
-      statusBannerEl.className = "clase-asist-status-banner st-presente";
-      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.check}</span> <div><strong>Asistencia Registrada</strong><p>Marcaste presencia para esta sesión.</p></div>`;
-    } else if (estadoAsist === "falta") {
-      statusBannerEl.className = "clase-asist-status-banner st-falta";
-      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Inasistencia Registrada</strong><p>Se contabiliza 1 falta en tu récord del ciclo.</p></div>`;
-    } else if (estadoAsist === "justificada") {
-      statusBannerEl.className = "clase-asist-status-banner st-justificada";
-      statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.flag}</span> <div><strong>Falta Justificada</strong><p>Esta falta no descuenta de tu límite de inasistencias.</p></div>`;
-    } else {
-      statusBannerEl.className = "clase-asist-status-banner st-pendiente";
-      statusBannerEl.innerHTML = `<span class="asist-banner-icon">⚪</span> <div><strong>Sin registrar aún</strong><p>Marca tu asistencia tocando uno de los botones de abajo.</p></div>`;
-    }
+  if (secAsist) {
+    secAsist.classList.toggle("hidden", !esCursoAcademico);
   }
 
-  // 4. Botones de Asistencia
-  const btnsWrap = $("#clase-info-buttons-wrap");
-  if (btnsWrap) {
-    btnsWrap.innerHTML = `
-      <button type="button" class="btn-asist-pill ${estadoAsist === 'presente' ? 'is-active presente' : ''}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-        <span>Asistí</span>
-      </button>
-      <button type="button" class="btn-asist-pill ${estadoAsist === 'falta' ? 'is-active falta' : ''}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        <span>Falté</span>
-      </button>
-      <button type="button" class="btn-asist-pill ${estadoAsist === 'justificada' ? 'is-active justificada' : ''}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        <span>Justif.</span>
-      </button>
-      <button type="button" class="btn-asist-pill ${cancelada ? 'is-active cancelada' : ''}" data-action="${cancelada ? 'restaurar-sesion' : 'cancelar-sesion'}" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-        <span>${cancelada ? 'Restaurar' : 'Cancelar'}</span>
-      </button>
-    `;
+  if (esCursoAcademico) {
+    const cancelada = (typeof verificarEsDiaFeriado === "function" && verificarEsDiaFeriado(fechaHoyStr, excepciones)) ||
+      (typeof esClaseCancelada === "function" ? esClaseCancelada(c.id, c.curso_id, fechaHoyStr, excepciones) : false);
+    const exItem = excepciones.find(e => e.fecha === fechaHoyStr && (e.tipo === "feriado" || (e.tipo === "cancelada" && (e.clase_id === c.id || (!e.clase_id && e.curso_id === c.curso_id)))));
+    const asistHoy = asistencias.find(a => a.curso_id === c.curso_id && a.fecha === fechaHoyStr);
+    const estadoAsist = asistHoy ? asistHoy.estado : null;
 
-    wireTodayAttendanceEvents(btnsWrap, clases, fechaHoyStr, excepciones, asistencias);
+    const fechaHoyEl = $("#clase-info-fecha-hoy");
+    if (fechaHoyEl) fechaHoyEl.textContent = formatReadableDate();
 
-    // After clicking any attendance button, refresh openClaseHoyModal
-    $$("button", btnsWrap).forEach(btn => {
-      const origClick = btn.onclick;
-      btn.addEventListener("click", () => {
-        setTimeout(() => {
-          if (claseHoyModalClaseIdActual) openClaseHoyModal(claseHoyModalClaseIdActual);
-        }, 120);
+    const statusBannerEl = $("#clase-info-asist-status");
+    if (statusBannerEl) {
+      if (cancelada) {
+        statusBannerEl.className = "clase-asist-status-banner st-cancelada";
+        statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Clase Cancelada Hoy</strong><p>${escapeHtml(exItem?.motivo || "Sesión suspendida para el día de hoy.")}</p></div>`;
+      } else if (estadoAsist === "presente") {
+        statusBannerEl.className = "clase-asist-status-banner st-presente";
+        statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.check}</span> <div><strong>Asistencia Registrada</strong><p>Marcaste presencia para esta sesión.</p></div>`;
+      } else if (estadoAsist === "falta") {
+        statusBannerEl.className = "clase-asist-status-banner st-falta";
+        statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.close}</span> <div><strong>Inasistencia Registrada</strong><p>Se contabiliza 1 falta en tu récord del ciclo.</p></div>`;
+      } else if (estadoAsist === "justificada") {
+        statusBannerEl.className = "clase-asist-status-banner st-justificada";
+        statusBannerEl.innerHTML = `<span class="asist-banner-icon">${ICONS.flag}</span> <div><strong>Falta Justificada</strong><p>Esta falta no descuenta de tu límite de inasistencias.</p></div>`;
+      } else {
+        statusBannerEl.className = "clase-asist-status-banner st-pendiente";
+        statusBannerEl.innerHTML = `<span class="asist-banner-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span> <div><strong>Sin registrar aún</strong><p>Marca tu asistencia tocando uno de los botones de abajo.</p></div>`;
+      }
+    }
+
+    // 4. Botones de Asistencia
+    const btnsWrap = $("#clase-info-buttons-wrap");
+    if (btnsWrap) {
+      btnsWrap.innerHTML = `
+        <button type="button" class="btn-asist-pill ${estadoAsist === 'presente' ? 'is-active presente' : ''}" data-action="asist-presente" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Asistí</span>
+        </button>
+        <button type="button" class="btn-asist-pill ${estadoAsist === 'falta' ? 'is-active falta' : ''}" data-action="asist-falta" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <span>Falté</span>
+        </button>
+        <button type="button" class="btn-asist-pill ${estadoAsist === 'justificada' ? 'is-active justificada' : ''}" data-action="asist-justificada" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          <span>Justif.</span>
+        </button>
+        <button type="button" class="btn-asist-pill ${cancelada ? 'is-active cancelada' : ''}" data-action="${cancelada ? 'restaurar-sesion' : 'cancelar-sesion'}" data-clase-id="${c.id}" data-curso-id="${c.curso_id || ''}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          <span>${cancelada ? 'Restaurar' : 'Cancelar'}</span>
+        </button>
+      `;
+
+      wireTodayAttendanceEvents(btnsWrap, clases, fechaHoyStr, excepciones, asistencias);
+
+      $$("button", btnsWrap).forEach(btn => {
+        btn.addEventListener("click", () => {
+          setTimeout(() => {
+            if (claseHoyModalClaseIdActual) openClaseHoyModal(claseHoyModalClaseIdActual);
+          }, 120);
+        });
       });
-    });
+    }
   }
 
   // 5. Botones secundarios
